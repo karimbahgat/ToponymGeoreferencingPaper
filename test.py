@@ -197,9 +197,9 @@ def warp(image, tiepoints):
     import os
     print 'control points:', tiepoints
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
-    call = 'gdal_translate -of GTiff {gcptext} "{image}" "warped.tif" & pause'.format(gcptext=gcptext, image=image)
+    call = 'gdal_translate -of GTiff {gcptext} "{image}" "testmaps/warped.tif" & pause'.format(gcptext=gcptext, image=image)
     os.system(call)
-    os.system('gdalwarp -r bilinear -tps -co COMPRESS=NONE -dstalpha -overwrite "warped.tif" "warped2.tif" & pause')
+    os.system('gdalwarp -r bilinear -tps -co COMPRESS=NONE -dstalpha -overwrite "warped.tif" "testmaps/warped2.tif" & pause')
 
 if __name__ == '__main__':
 
@@ -241,7 +241,7 @@ if __name__ == '__main__':
     import pythongis as pg
     m = pg.renderer.Map()
     m.add_layer(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
-    rlyr = m.add_layer('warped2.tif')
+    rlyr = m.add_layer('testmaps/warped2.tif')
     m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
                 fillcolor='red', outlinewidth=0.1)
     anchors = pg.VectorData()
