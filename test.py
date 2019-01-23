@@ -1,6 +1,7 @@
 """
 """
 
+import os
 from automap import triangulate, normalize
 
 def drawpoints(imgpath):
@@ -15,11 +16,12 @@ def drawpoints(imgpath):
         def __init__(self, master, *args, **kwargs):
             tk2.basics.Label.__init__(self, master, *args, **kwargs)
 
+            icon = os.path.abspath("automap/resources/flag.png")
             self.clickbut = tk2.basics.Button(self, command=self.begin_click)
-            self.clickbut.set_icon(icons.iconpath("identify.png"), width=40, height=40)
+            self.clickbut.set_icon(icon, width=40, height=40)
             self.clickbut.pack()
 
-            self.mouseicon_tk = icons.get("identify.png", width=30, height=30)
+            self.mouseicon_tk = icons.get(icon, width=30, height=30)
 
         def begin_click(self):
             print "begin click..."
@@ -139,8 +141,11 @@ def viewmatch(positions, feat):
     m.add_layer(d, fillcolor='green', outlinecolor=None)
 
     d = pg.VectorData()
-    feat['geometry']['coordinates'][0].append(feat['geometry']['coordinates'][0][0]) # close poly
-    geoj = normalize(feat['geometry'])
+    geoj = {'type': 'Polygon',
+            'coordinates': [ list(feat['geometry']['coordinates'][0]) ]
+            }
+    geoj['coordinates'][0].append(geoj['coordinates'][0][0]) # close poly
+    geoj = normalize(geoj)
     print 'red',geoj
     d.add_feature([], geoj)
     m.add_layer(d, fillcolor=None, outlinecolor='red')
@@ -149,7 +154,7 @@ def viewmatch(positions, feat):
     m.zoom_out(1.2)
     m.view()
 
-def run(test):
+def triang(test):
     names,positions = zip(*test)
     # reverse ys due to flipped image coordsys
     maxy = max((y for x,y in positions))
@@ -157,12 +162,36 @@ def run(test):
     # triangulate
     matches = triangulate(names, positions)
     for f,diff,diffs in matches[:1]:
-        print '-------'
         print 'error:', round(diff,6)
         for c in f['properties']['combination']:
             print c
         viewmatch(positions, f)
     return matches
+
+def process(test, thresh=0.1):
+    size = 3
+    grouped = zip(*(iter(test),) * size) # grouped 3-wise
+    grouped = [list(g) for g in grouped]
+    remaind = len(test) % size
+    for i in range(remaind):
+        grouped[-i].append(test[-i])
+    
+    orignames = []
+    origcoords = []
+    matchnames = []
+    matchcoords = []
+    for group in grouped:
+        print '-----'
+        print group
+        best = triang(group)[0]
+        f,diff,diffs = best
+        print f
+        if diff < thresh:
+            orignames.extend(zip(*group)[0])
+            origcoords.extend(zip(*group)[1])
+            matchnames.extend(f['properties']['combination'])
+            matchcoords.extend(f['geometry']['coordinates'][0])
+    return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
 def warp(image, tiepoints):
     import os
@@ -176,8 +205,14 @@ if __name__ == '__main__':
 
     # manually set points
 
-    img = 'testmaps/indo_china_1886.jpg'
-    test = drawpoints(img)
+    #img = 'testmaps/indo_china_1886.jpg'
+    #test = drawpoints(img)
+    #test = [('Quedah', (781.3125996810211, 1495.2308612440197)), ('Malacca', (889.2041467304629, 1716.9142743221696)), ('Bankok', (785.5271132376399, 1038.3775917065395)), ('Saigon', (1140.3891547049443, 1201.057814992026)), ('Hanoi', (1071.2711323763958, 605.9685007974485)), ('Akyab', (353.1180223285493, 656.1212121212127)), ('Rangoon', (498.5187400318987, 863.264553429028)), ('Mandalay', (536.0279106858058, 548.6511164274324)), ('Yun-nan', (899.7404306220102, 365.9519537480064))]
+    #test = [('Malacca', (889.2041467304629, 1716.9142743221696)), ('Bankok', (785.5271132376399, 1038.3775917065395)), ('Saigon', (1140.3891547049443, 1201.057814992026)), ('Hanoi', (1071.2711323763958, 605.9685007974485)), ('Rangoon', (498.5187400318987, 863.264553429028)), ('Mandalay', (536.0279106858058, 548.6511164274324)), ('Yun-nan', (899.7404306220102, 365.9519537480064))]
+    #test.pop(5)
+    #test.pop(0)
+    #test.pop(-3)
+    #test.pop(-1)
     
     #img = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
     #test = drawpoints(img)
@@ -185,11 +220,21 @@ if __name__ == '__main__':
     #img = 'testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg'
     #test = drawpoints(img)
     #test = [('Oro', (6273.619140625, 5655.9775390625)), ('Shaki', (4181.630078125, 5045.660058593749)), ('Yelwa', (6074.030078124998, 2027.337499999999))]
+
+    #img = 'testmaps/2113087.jpg'
+    #test = drawpoints(img)
+    #test = [('Konakry', (546.2107421875002, 1232.299316406251)), ('Kidal', (1913.4460937499998, 414.70908203125106)), ('Sokoto', (2251.6786621093747, 912.4295166015633)), ('Ibadan', (2129.5353027343745, 1432.5704101562508)), ('Kandi', (2038.523828124999, 1104.3330566406257)), ('Timbuktu', (1528.21767578125, 563.3535156250005)), ('Farakan', (1168.6650390624998, 981.0893066406256)), ('Bingerville', (1409.8339843750002, 1626.5142578125015)), ('Port Harcourt', (2416.6914062499995, 1677.407324218752))]
+    #test += [('Freetown', (587.10859375, 1330.05068359375)), ('Monrovia', (797.0081054687502, 1536.5802490234378)), ('Lagos', (2082.814550781249, 1520.487036132813)), ('Accra', (1744.0317871093746, 1603.4289794921879)), ("Fada N'Gourma", (1808.4046386718742, 999.9334960937498)), ('Bamako', (1073.8938964843753, 946.7020996093746)), ('Dakar', (254.58430175781353, 733.3638671874992))]
+
+    img = 'testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg'
+    #test = drawpoints(img)
+    test = [('Accra', (4470.905029296875, 1914.4513549804688)), ('Sago', (469.5520833333328, 2105.3281249999995)), ('Agboville', (1657.0520833333333, 1637.5546875)), ('Grand Bassam', (2003.10107421875, 2160.2200927734375)), ('Grand Lahou', (1091.766845703125, 2198.0557861328125)), ('Beoumi', (698.2548828125, 413.63043212890625)), ('Zamaka', (2216.144287109375, 945.9882202148436)), ('Techiman', (3251.75830078125, 478.48791503906244)), ('Waso', (4551.898681640625, 534.1641845703125)), ('Obuasi', (3445.209228515625, 1443.5208740234375)), ('Nappa', (533.7742919921875, 1421.5924682617188)), ('Farakro', (1784.802734375, 326.31201171875))]
+    test.pop(-4)
     
-    matches = run(test)
-    names,imgcoords = zip(*test)
-    geocoords = matches[0][0]['geometry']['coordinates'][0]
-    tiepoints = zip(imgcoords, geocoords)
+    origs,matches = process(test)
+    orignames,origcoords = zip(*origs)
+    matchnames,matchcoords = zip(*matches)
+    tiepoints = zip(origcoords, matchcoords)
     warp(img, tiepoints)
 
     # view warped
@@ -198,7 +243,11 @@ if __name__ == '__main__':
     m.add_layer(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
     rlyr = m.add_layer('warped2.tif')
     m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
-                fillcolor='red')
+                fillcolor='red', outlinewidth=0.1)
+    anchors = pg.VectorData()
+    for coord in matchcoords:
+        anchors.add_feature([], dict(type='Point', coordinates=coord))
+    m.add_layer(anchors, fillcolor=(0,255,0), outlinewidth=0.1)
     m.zoom_bbox(*rlyr.bbox)
     m.zoom_out(2)
     m.view()
