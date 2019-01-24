@@ -34,12 +34,15 @@ def triangulate(names, positions):
                }
 
     # find matches for each name
-    print 'finding matches'
+    print 'finding matches', names
     matchcandidates = []
     for name in names:
         match = list(geocode(name))
         if match:
             matchcandidates.append(match)
+
+    if len(matchcandidates) < 3:
+        return []
             
     for match in matchcandidates:
         print len(match)
@@ -135,7 +138,7 @@ def triangulate_add(origs, matches, add):
                }
 
     # find matches for each name
-    print 'finding matches'
+    print 'finding matches', addname
     match = list(geocode(addname))
     if not match:
         return False
