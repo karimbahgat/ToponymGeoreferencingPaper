@@ -165,7 +165,7 @@ def triang(test):
         print 'error:', round(diff,6)
         for c in f['properties']['combination']:
             print c
-        viewmatch(positions, f)
+        #viewmatch(positions, f)
     return matches
 
 def process(test, thresh=0.1):
@@ -199,16 +199,21 @@ def warp(image, tiepoints):
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "{image}" "testmaps/warped.tif" & pause'.format(gcptext=gcptext, image=image)
     os.system(call)
-    os.system('gdalwarp -r bilinear -tps -co COMPRESS=NONE -dstalpha -overwrite "warped.tif" "testmaps/warped2.tif" & pause')
+    os.system('gdalwarp -r bilinear -tps -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif" & pause')
 
 if __name__ == '__main__':
 
+    # IDEA:
+    # once first correct triangle matches found
+    # add each subsequent point to that triangle and only keep if accuracy stays within threshold
+    # no need to recalculate all possible combinations
+
     # manually set points
 
-    #img = 'testmaps/indo_china_1886.jpg'
+    img = 'testmaps/indo_china_1886.jpg'
     #test = drawpoints(img)
     #test = [('Quedah', (781.3125996810211, 1495.2308612440197)), ('Malacca', (889.2041467304629, 1716.9142743221696)), ('Bankok', (785.5271132376399, 1038.3775917065395)), ('Saigon', (1140.3891547049443, 1201.057814992026)), ('Hanoi', (1071.2711323763958, 605.9685007974485)), ('Akyab', (353.1180223285493, 656.1212121212127)), ('Rangoon', (498.5187400318987, 863.264553429028)), ('Mandalay', (536.0279106858058, 548.6511164274324)), ('Yun-nan', (899.7404306220102, 365.9519537480064))]
-    #test = [('Malacca', (889.2041467304629, 1716.9142743221696)), ('Bankok', (785.5271132376399, 1038.3775917065395)), ('Saigon', (1140.3891547049443, 1201.057814992026)), ('Hanoi', (1071.2711323763958, 605.9685007974485)), ('Rangoon', (498.5187400318987, 863.264553429028)), ('Mandalay', (536.0279106858058, 548.6511164274324)), ('Yun-nan', (899.7404306220102, 365.9519537480064))]
+    test = [('Malacca', (889.2041467304629, 1716.9142743221696)), ('Bankok', (785.5271132376399, 1038.3775917065395)), ('Saigon', (1140.3891547049443, 1201.057814992026)), ('Hanoi', (1071.2711323763958, 605.9685007974485)), ('Rangoon', (498.5187400318987, 863.264553429028)), ('Mandalay', (536.0279106858058, 548.6511164274324)), ('Yun-nan', (899.7404306220102, 365.9519537480064))]
     #test.pop(5)
     #test.pop(0)
     #test.pop(-3)
@@ -226,11 +231,12 @@ if __name__ == '__main__':
     #test = [('Konakry', (546.2107421875002, 1232.299316406251)), ('Kidal', (1913.4460937499998, 414.70908203125106)), ('Sokoto', (2251.6786621093747, 912.4295166015633)), ('Ibadan', (2129.5353027343745, 1432.5704101562508)), ('Kandi', (2038.523828124999, 1104.3330566406257)), ('Timbuktu', (1528.21767578125, 563.3535156250005)), ('Farakan', (1168.6650390624998, 981.0893066406256)), ('Bingerville', (1409.8339843750002, 1626.5142578125015)), ('Port Harcourt', (2416.6914062499995, 1677.407324218752))]
     #test += [('Freetown', (587.10859375, 1330.05068359375)), ('Monrovia', (797.0081054687502, 1536.5802490234378)), ('Lagos', (2082.814550781249, 1520.487036132813)), ('Accra', (1744.0317871093746, 1603.4289794921879)), ("Fada N'Gourma", (1808.4046386718742, 999.9334960937498)), ('Bamako', (1073.8938964843753, 946.7020996093746)), ('Dakar', (254.58430175781353, 733.3638671874992))]
 
-    img = 'testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg'
+    #img = 'testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg'
     #test = drawpoints(img)
-    test = [('Accra', (4470.905029296875, 1914.4513549804688)), ('Sago', (469.5520833333328, 2105.3281249999995)), ('Agboville', (1657.0520833333333, 1637.5546875)), ('Grand Bassam', (2003.10107421875, 2160.2200927734375)), ('Grand Lahou', (1091.766845703125, 2198.0557861328125)), ('Beoumi', (698.2548828125, 413.63043212890625)), ('Zamaka', (2216.144287109375, 945.9882202148436)), ('Techiman', (3251.75830078125, 478.48791503906244)), ('Waso', (4551.898681640625, 534.1641845703125)), ('Obuasi', (3445.209228515625, 1443.5208740234375)), ('Nappa', (533.7742919921875, 1421.5924682617188)), ('Farakro', (1784.802734375, 326.31201171875))]
-    test.pop(-4)
-    
+    #test = [('Accra', (4470.905029296875, 1914.4513549804688)), ('Sago', (469.5520833333328, 2105.3281249999995)), ('Agboville', (1657.0520833333333, 1637.5546875)), ('Grand Bassam', (2003.10107421875, 2160.2200927734375)), ('Grand Lahou', (1091.766845703125, 2198.0557861328125)), ('Beoumi', (698.2548828125, 413.63043212890625)), ('Zamaka', (2216.144287109375, 945.9882202148436)), ('Techiman', (3251.75830078125, 478.48791503906244)), ('Waso', (4551.898681640625, 534.1641845703125)), ('Obuasi', (3445.209228515625, 1443.5208740234375)), ('Nappa', (533.7742919921875, 1421.5924682617188)), ('Farakro', (1784.802734375, 326.31201171875))]
+    #test.pop(-4)
+
+    # process and warp
     origs,matches = process(test)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
@@ -240,14 +246,19 @@ if __name__ == '__main__':
     # view warped
     import pythongis as pg
     m = pg.renderer.Map()
+
     m.add_layer(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
+
     rlyr = m.add_layer('testmaps/warped2.tif')
+
     m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
                 fillcolor='red', outlinewidth=0.1)
+    
     anchors = pg.VectorData()
     for coord in matchcoords:
         anchors.add_feature([], dict(type='Point', coordinates=coord))
     m.add_layer(anchors, fillcolor=(0,255,0), outlinewidth=0.1)
+    
     m.zoom_bbox(*rlyr.bbox)
     m.zoom_out(2)
     m.view()
