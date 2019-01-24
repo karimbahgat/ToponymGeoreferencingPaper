@@ -119,4 +119,56 @@ def triangulate(names, positions):
 ##    matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
 ##    return matches[0]
 
+def triangulate_add(origs, matches, add):
+    orignames, origpositions = zip(*origs)
+    matchnames, matchpositions = zip(*matches)
+
+    addname,addpos = add
+
+    # define input names/positions as a polygon feature
+    findpoly = {'type': 'Feature',
+               'properties': {'combination': list(orignames) + [addname],
+                              },
+               'geometry': {'type': 'Polygon',
+                            'coordinates': [list(origpositions) + [addpos]]
+                            },
+               }
+
+    # find matches for each name
+    print 'finding matches'
+    match = list(geocode(addname))
+    if not match:
+        return False
+            
+    print len(match)
+
+    # find unique combinations of all possible candidates
+    print 'combining'
+    combipolys = []
+    for m in match:
+        #print '--->', combi
+        # make into polygon feature
+        combinames = list(matchnames) + [m['properties']['name']]
+        combipositions = list(matchpositions) + [m['geometry']['coordinates']]
+        combipoly = {'type': 'Feature',
+                   'properties': {'combination': combinames,
+                                  },
+                   'geometry': {'type': 'Polygon',
+                                'coordinates': [combipositions]
+                                },
+                   }
+        combipolys.append(combipoly)
+
+    # prep/normalize combipolys
+    print 'prepping'
+    combipolys = shapematch.prep_pool(combipolys)
+
+    # find closest match
+    print 'finding'
+    matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
+    return matches
+
+
+
+
         

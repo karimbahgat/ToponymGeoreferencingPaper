@@ -2,7 +2,7 @@
 """
 
 import os
-from automap import triangulate, normalize
+from automap import triangulate, normalize, geocode, triangulate_add
 
 def drawpoints(imgpath):
     import pythongis as pg
@@ -193,6 +193,62 @@ def process(test, thresh=0.1):
             matchcoords.extend(f['geometry']['coordinates'][0])
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
+def process_optim(test, thresh=0.1):
+    # build initial triangulation from first 3
+    valid = []
+    while True:
+        nxtname,nxtpos = test.pop(0)
+        matches = geocode(nxtname)
+        if matches:
+            valid.append((nxtname,nxtpos))
+        if len(valid) == 3:
+            best = triang(valid)[0]
+            f,diff,diffs = best
+            print f
+            if diff < thresh:
+                break
+            else:
+                valid.pop(0)
+
+    print valid
+    print f
+
+    # any remaining places are added incrementally to existing triangle/shape
+    orignames,origcoords = list(zip(*valid))
+    orignames,origcoords = list(orignames),list(origcoords)
+    matchnames = list(f['properties']['combination'])
+    matchcoords = list(f['geometry']['coordinates'][0])
+
+    #maxy = max((y for x,y in origcoords))
+    #origcoordsflip = [(x,maxy-y) for x,y in origcoords]
+    #viewmatch(origcoordsflip, f)
+    
+    while test:
+        print '-----'
+        nxtname,nxtpos = test.pop(0)
+        maxy = max((y for x,y in origcoords))
+        maxy = max(maxy,nxtpos[1])
+        nxtposflip = (nxtpos[0],maxy-nxtpos[1])
+        origcoordsflip = [(x,maxy-y) for x,y in origcoords + [nxtpos]]
+        print nxtname,nxtpos
+        prevdiff = diff
+        best = triangulate_add(zip(orignames,origcoordsflip), zip(matchnames,matchcoords), (nxtname,nxtposflip))[0]
+        if not best:
+            continue
+        f,diff,diffs = best
+        print f
+        print 'error:', round(diff,6)
+        
+        #viewmatch(origcoordsflip, f)
+        
+        if diff < thresh and diff/prevdiff < 10: # stay within thresh and dont worsen more than 10x
+            orignames.append(nxtname)
+            origcoords.append(nxtpos)
+            matchnames = f['properties']['combination']
+            matchcoords = f['geometry']['coordinates'][0]
+            
+    return zip(orignames, origcoords), zip(matchnames, matchcoords)
+
 def warp(image, tiepoints):
     import os
     print 'control points:', tiepoints
@@ -210,17 +266,17 @@ if __name__ == '__main__':
 
     # manually set points
 
-    img = 'testmaps/indo_china_1886.jpg'
+    #img = 'testmaps/indo_china_1886.jpg'
     #test = drawpoints(img)
     #test = [('Quedah', (781.3125996810211, 1495.2308612440197)), ('Malacca', (889.2041467304629, 1716.9142743221696)), ('Bankok', (785.5271132376399, 1038.3775917065395)), ('Saigon', (1140.3891547049443, 1201.057814992026)), ('Hanoi', (1071.2711323763958, 605.9685007974485)), ('Akyab', (353.1180223285493, 656.1212121212127)), ('Rangoon', (498.5187400318987, 863.264553429028)), ('Mandalay', (536.0279106858058, 548.6511164274324)), ('Yun-nan', (899.7404306220102, 365.9519537480064))]
-    test = [('Malacca', (889.2041467304629, 1716.9142743221696)), ('Bankok', (785.5271132376399, 1038.3775917065395)), ('Saigon', (1140.3891547049443, 1201.057814992026)), ('Hanoi', (1071.2711323763958, 605.9685007974485)), ('Rangoon', (498.5187400318987, 863.264553429028)), ('Mandalay', (536.0279106858058, 548.6511164274324)), ('Yun-nan', (899.7404306220102, 365.9519537480064))]
+    #test = [('Malacca', (889.2041467304629, 1716.9142743221696)), ('Bankok', (785.5271132376399, 1038.3775917065395)), ('Saigon', (1140.3891547049443, 1201.057814992026)), ('Hanoi', (1071.2711323763958, 605.9685007974485)), ('Rangoon', (498.5187400318987, 863.264553429028)), ('Mandalay', (536.0279106858058, 548.6511164274324)), ('Yun-nan', (899.7404306220102, 365.9519537480064))]
     #test.pop(5)
     #test.pop(0)
     #test.pop(-3)
     #test.pop(-1)
     
-    #img = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
-    #test = drawpoints(img)
+    img = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
+    test = drawpoints(img)
     
     #img = 'testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg'
     #test = drawpoints(img)
@@ -237,7 +293,7 @@ if __name__ == '__main__':
     #test.pop(-4)
 
     # process and warp
-    origs,matches = process(test)
+    origs,matches = process_optim(test)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
