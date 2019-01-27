@@ -8,6 +8,165 @@ import pytesseract as t
 import PIL, PIL.Image
 
 
+def threshold(im, color, thresh):
+##    from colormath.color_objects import sRGBColor, LabColor
+##    from colormath.color_conversions import convert_color
+##    from colormath.color_diff import delta_e_cie2000
+##    color = (0,0,0)
+##    target = convert_color(sRGBColor(*color), LabColor)
+##    px = im.load()
+##    coldict = dict()
+##    for y in range(im.size[1]):
+##        for x in range(im.size[0]):
+##            rgb = px[x,y]
+##            if rgb in coldict:
+##                diff = coldict.get(rgb)
+##                #print 'getting',rgb
+##            else:
+##                pxcol = convert_color(sRGBColor(*[v/255.0 for v in rgb]), LabColor)
+##                diff = delta_e_cie2000(target, pxcol)
+##                #print 'adding',rgb
+##                coldict[rgb] = diff
+##            if diff < thresh:
+##                #print rgb,diff
+##                pass #px[x,y] = target
+##            else:
+##                px[x,y] = (255,255,255)
+
+##    from colormath.color_objects import sRGBColor, LabColor
+##    from colormath.color_conversions import convert_color
+##
+##    from PIL import ImageCms
+##    srgb_profile = ImageCms.createProfile("sRGB")
+##    lab_profile  = ImageCms.createProfile("LAB")
+##    rgb2lab_transform = ImageCms.buildTransformFromOpenProfiles(srgb_profile, lab_profile, "RGB", "LAB")
+##    lab_im = ImageCms.applyTransform(im, rgb2lab_transform)
+##
+##    color = (0,0,0)
+##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
+##    tl,ta,tb = target
+##    threshsq = thresh**2
+##    px = im.load()
+##    lab_px = lab_im.load()
+##    coldict = dict()
+##    for y in range(im.size[1]):
+##        for x in range(im.size[0]):
+##            lab = lab_px[x,y]
+##            #print lab,target
+##            if lab in coldict:
+##                diff = coldict.get(lab)
+##                #print 'getting',rgb
+##            else:
+##                l,a,b = lab
+##                diff = (tl-l)**2 + (ta-a)**2 + (tb-b)**2
+##                print diff,threshsq
+##                #print 'adding',rgb
+##                coldict[lab] = diff
+##            if diff < threshsq:
+##                #print rgb,diff
+##                print diff,threshsq
+##                pass #px[x,y] = target
+##            else:
+##                px[x,y] = (255,255,255)
+
+
+
+##    from colormath.color_objects import sRGBColor, LabColor
+##    from colormath.color_conversions import convert_color
+##    from colormath.color_diff_matrix import delta_e_cie2000
+##
+##    import numpy as np
+##
+##    # PIL approach is not perfect, conversion to LAB is not fully accurate
+##    # TODO: switch to this: https://code.i-harness.com/en/q/3142c9
+##    # see https://stackoverflow.com/questions/21210479/converting-from-rgb-to-lab-colorspace-any-insight-into-the-range-of-lab-val
+##    from PIL import ImageCms
+##    srgb_profile = ImageCms.createProfile("sRGB")
+##    lab_profile  = ImageCms.createProfile("LAB")
+##    rgb2lab_transform = ImageCms.buildTransformFromOpenProfiles(srgb_profile, lab_profile, "RGB", "LAB")
+##    lab_im = ImageCms.applyTransform(im, rgb2lab_transform)
+##
+##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
+##    lab_im_arr = np.array(lab_im).astype(np.float32) / 255.0 * 100 # PIL uses 0-255, but colormath expects 0-100
+##    w,h,_ = lab_im_arr.shape
+##    diff_im = delta_e_cie2000(target, lab_im_arr.flatten().reshape((w*h, 3))).reshape((w,h))
+##    dissim = diff_im >= thresh
+##
+##    im_arr = np.array(im) 
+##    im_arr[dissim] = (255,255,255)
+##
+##    im = PIL.Image.fromarray(im_arr)
+
+    
+
+##    from colormath.color_objects import sRGBColor, LabColor
+##    from colormath.color_conversions import convert_color
+##    from colormath.color_diff_matrix import delta_e_cie2000
+##
+##    import numpy as np
+##
+##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor)
+##
+####    func = lambda rgb: convert_color(sRGBColor(*rgb, is_upscaled=True), LabColor).get_value_tuple()
+####    vfunc = np.vectorize(func)
+####    im_arr = np.array(im)
+####    lab_im_arr = vfunc(im_arr)
+##
+##    im_arr = np.array(im)
+##    lab_im_arr = np.array(im)
+##
+##    coldict = dict()
+##    for y in range(im.size[1]):
+##        for x in range(im.size[0]):
+##            rgb = tuple(im_arr[y,x])
+##            if rgb in coldict:
+##                lab = coldict.get(rgb)
+##            else:
+##                lab = convert_color(sRGBColor(*rgb, is_upscaled=True), LabColor).get_value_tuple()
+##            lab_im_arr[y,x] = lab
+##
+##    print im_arr
+##    print lab_im_arr
+##
+##    fdsfs
+##
+##    w,h,_ = lab_im_arr.shape
+##    diff_im = delta_e_cie2000(target, lab_im_arr.flatten().reshape((w*h, 3))).reshape((w,h))
+##    dissim = diff_im >= thresh
+##    
+##    im_arr[dissim] = (255,255,255)
+##
+##    im = PIL.Image.fromarray(im_arr)
+
+    # skimage approach
+    from colormath.color_objects import sRGBColor, LabColor
+    from colormath.color_conversions import convert_color
+    from colormath.color_diff_matrix import delta_e_cie2000
+
+    import numpy as np
+    
+    from skimage.color import rgb2lab
+    
+    im_arr = np.array(im)
+    w,h,_ = im_arr.shape
+    lab_im_arr = rgb2lab(im_arr)
+
+    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
+    w,h,_ = lab_im_arr.shape
+    diff_im = delta_e_cie2000(target, lab_im_arr.flatten().reshape((w*h, 3))).reshape((w,h))
+    dissim = diff_im >= thresh
+
+    im_arr[dissim] = (255,255,255)
+
+    im = PIL.Image.fromarray(im_arr)
+
+
+    # TODO: Maybe also do gaussian or otsu binarization/smoothing?
+    # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
+    
+
+    return im
+
 def detect_data(im, bbox=None):
     if bbox:
         im = im.crop(bbox)
@@ -72,7 +231,7 @@ def process_optim(test, thresh=0.1, limit=10):
 
     # find all triangles from all possible combinations
     triangles = []
-    combis = list(itertools.combinations(testsort, 3))
+    combis = list(itertools.combinations(testsort, 4))
     print 'finding all possible triangles (%s)' % len(combis)
     for i,tri in enumerate(combis):
         print '-----'
@@ -93,6 +252,8 @@ def process_optim(test, thresh=0.1, limit=10):
         print '%s triangles so far:' % len(triangles)
         print '\n'.join([repr((round(tr[2],6),[n for n,p in tr[0]],'-->',[n[:15] for n in tr[1]['properties']['combination']]))
                          for tr in triangles])
+        if len(triangles) > limit:
+            break
 
     # ...
     triangles = sorted(triangles, key=lambda x: x[2])
@@ -100,7 +261,7 @@ def process_optim(test, thresh=0.1, limit=10):
     matchnames,matchcoords = [],[]
     for tri,f,diff in triangles:
         for (n,c),(mn,mc) in zip(tri, zip(f['properties']['combination'], f['geometry']['coordinates'][0])):
-            if c in origcoords: continue
+            if c in origcoords or mc in matchcoords: continue
             orignames.append(n)
             origcoords.append(c)
             matchnames.append(mn)
@@ -112,34 +273,29 @@ def warp(image, tiepoints):
     import os
     print 'control points:', tiepoints
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
-    call = 'gdal_translate -of GTiff {gcptext} "{image}" "testmaps/warped.tif" & pause'.format(gcptext=gcptext, image=image)
-    os.system(call)
-    os.system('gdalwarp -r bilinear -tps -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif" & pause')
+    call = 'gdal_translate -of GTiff {gcptext} "{image}" "testmaps/warped.tif"'.format(gcptext=gcptext, image=image)
+    os.system(call) #-order 3 -refine_gcps 20 4
+    os.system('gdalwarp -r bilinear -tps -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
 
 
 
 if __name__ == '__main__':
     #pth = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
     #pth = 'testmaps/indo_china_1886.jpg'
-    pth = 'testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg'
+    #pth = 'testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg'
     #pth = 'testmaps/2113087.jpg'
-    #pth = 'testmaps/burkina.jpg'
+    #pth = 'testmaps/egypt_admn97.jpg'
+    
+    pth = 'testmaps/burkina.jpg'
     #pth = 'testmaps/cameroon_pol98.jpg'
-    im = PIL.Image.open(pth).crop((0,0,3000,3000))
+    #pth = 'testmaps/egypt_pol_1979.jpg'
+    #pth = 'testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg'
+    im = PIL.Image.open(pth)#.crop((2000,2000,4000,4000))
+    im.save('testmaps/testorig.jpg')
 
     # threshold
-    thresh = 150
-    target = (0,0,0)
-    px = im.load()
-    for y in range(im.size[1]):
-        for x in range(im.size[0]):
-            rgb = px[x,y]
-            diff = abs( sum([target[i]-rgb[i] for i in range(3)])/3.0 )
-            if diff < thresh:
-                #print rgb,diff
-                pass #px[x,y] = target
-            else:
-                px[x,y] = (255,255,255)
+    im = threshold(im, (0,0,0), 40) # black for text
+    #im = threshold(im, (190,55,10), 20) # red 
 
     # ocr
     im.save('testmaps/testthresh.jpg')
@@ -212,7 +368,7 @@ if __name__ == '__main__':
 
     # draw data onto image
     import pyagg
-    c = pyagg.load(pth)
+    c = pyagg.load('testmaps/testorig.jpg')
     for r in data:
         top,left,w,h = [int(r[k]) for k in 'top left width height'.split()]
         box = [left, top, left+w, top+h]
@@ -230,7 +386,7 @@ if __name__ == '__main__':
     print tiepoints
     for on,mc,mn in zip(orignames,matchcoords,matchnames):
         print on,mc,mn
-    warp(pth, tiepoints)
+    warp('testmaps/testorig.jpg', tiepoints)
 
     # view warped
     import pythongis as pg
