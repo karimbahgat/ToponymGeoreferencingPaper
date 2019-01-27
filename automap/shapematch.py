@@ -113,7 +113,7 @@ def find_match(test, pool):
         else:
             g2 = g2.boundary
         g2s.append( (f,g2) )
-    print time()-t
+    #print time()-t
 
     # prep test
     t=time()
@@ -123,7 +123,7 @@ def find_match(test, pool):
         polys = norm1['coordinates']
     else:
         polys = [norm1['coordinates']]
-    print time()-t
+    #print time()-t
 
     # calculate diffs
     results = []
@@ -149,7 +149,7 @@ def find_match_prepped(test, pool):
         polys = norm1['coordinates']
     else:
         polys = [norm1['coordinates']]
-    print time()-t
+    #print time()-t
 
     # calculate diffs
     t=time()
@@ -161,7 +161,7 @@ def find_match_prepped(test, pool):
         #print diff
 
         results.append( (f,diff,diffs) )
-    print time()-t
+    #print time()-t
 
     # return best
     return sorted(results, key=lambda pair: pair[1])
@@ -177,7 +177,7 @@ def find_exact_match_prepped(test, pool):
         polys = norm1['coordinates']
     else:
         polys = [norm1['coordinates']]
-    print time()-t
+    #print time()-t
 
     # calculate diffs
     t=time()
@@ -189,7 +189,7 @@ def find_exact_match_prepped(test, pool):
         #print diff
 
         results.append( (f,diff,diffs) )
-    print time()-t
+    #print time()-t
 
     # return best
     return sorted(results, key=lambda pair: pair[1])
@@ -209,7 +209,7 @@ def prep_pool(pool):
         else:
             g2 = g2.boundary
         g2s.append( (f,g2) )
-    print time()-t
+    #print time()-t
     return g2s
     
 

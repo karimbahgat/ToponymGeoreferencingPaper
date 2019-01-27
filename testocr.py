@@ -142,10 +142,11 @@ if __name__ == '__main__':
     pth = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
     #pth = 'testmaps/indo_china_1886.jpg'
     #pth = 'testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg'
+    #pth = 'testmaps/2113087.jpg'
     im = PIL.Image.open(pth).crop((0,0,1500,1500))
 
     # threshold
-    thresh = 50
+    thresh = 60
     target = (0,0,0)
     px = im.load()
     for y in range(im.size[1]):
@@ -161,16 +162,17 @@ if __name__ == '__main__':
     # ocr
     im.show()
     data = detect_data(im)
+    data = filter(lambda r: r['text'] and len(r['text'].strip().replace(' ','')) >= 3 and int(r['conf']) > 60,
+                  data)
     points = []
     for r in data:
-        text = r.get('text', None)
-        if text and len(text.strip().replace(' ','')) >= 3 and int(r['conf']) > 60:
-            text = text.strip().replace('.', '') #.replace("\x91", "'")
-            x = int(r['left'])
-            y = int(r['top'])
-            pt = (text, (x,y))
-            print pt
-            points.append( pt )
+        text = r['text']
+        text = text.strip().replace('.', '') #.replace("\x91", "'")
+        x = int(r['left'])
+        y = int(r['top'])
+        pt = (text, (x,y))
+        print pt
+        points.append( pt )
 
 ##    points = '''(u'ur.', (408, 106))
 ##                (u'Lum', (273, 131))
@@ -373,9 +375,10 @@ if __name__ == '__main__':
     for r in data:
         top,left,w,h = [int(r[k]) for k in 'top left width height'.split()]
         box = [left, top, left+w, top+h]
-        print box
+        text = r.get('text','[?]')
+        print box,text
         c.draw_box(bbox=box, fillcolor=None, outlinecolor=(0,255,0))
-        #c.draw_text(r['text'], xy=(left,top)) #bbox=box)
+        c.draw_text(text, xy=(left,top), anchor='sw', textsize=6) #bbox=box)
     c.save('testmaps/testocr.png')
 
     # process and warp

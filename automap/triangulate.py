@@ -20,7 +20,7 @@ def geocode(name):
                             },
                }
 
-def triangulate(names, positions):
+def triangulate(names, positions, matchcandidates=None):
     assert len(names) == len(positions)
     assert len(names) >= 3
 
@@ -34,12 +34,15 @@ def triangulate(names, positions):
                }
 
     # find matches for each name
-    print 'finding matches', names
-    matchcandidates = []
-    for name in names:
-        match = list(geocode(name))
-        if match:
-            matchcandidates.append(match)
+    #print 'finding matches', names
+    if matchcandidates:
+        assert len(matchcandidates) == len(names)
+    else:
+        matchcandidates = []
+        for name in names:
+            match = list(geocode(name))
+            if match:
+                matchcandidates.append(match)
 
     if len(matchcandidates) < 3:
         return []
@@ -48,7 +51,7 @@ def triangulate(names, positions):
         print len(match)
 
     # find unique combinations of all possible candidates
-    print 'combining'
+    #print 'combining'
     combis = list(itertools.product(*matchcandidates))
     combipolys = []
     for combi in combis:
@@ -66,11 +69,11 @@ def triangulate(names, positions):
         combipolys.append(combipoly)
 
     # prep/normalize combipolys
-    print 'prepping'
+    #print 'prepping'
     combipolys = shapematch.prep_pool(combipolys)
 
     # find closest match
-    print 'finding'
+    #print 'finding'
     matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
     return matches
 
@@ -122,7 +125,7 @@ def triangulate(names, positions):
 ##    matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
 ##    return matches[0]
 
-def triangulate_add(origs, matches, add):
+def triangulate_add(origs, matches, add, addcandidates=None):
     orignames, origpositions = zip(*origs)
     matchnames, matchpositions = zip(*matches)
 
@@ -138,15 +141,18 @@ def triangulate_add(origs, matches, add):
                }
 
     # find matches for each name
-    print 'finding matches', addname
-    match = list(geocode(addname))
-    if not match:
-        return False
+    #print 'finding matches', addname
+    if addcandidates:
+        match = addcandidates
+    else:
+        match = list(geocode(addname))
+        if not match:
+            return False
             
     print len(match)
 
     # find unique combinations of all possible candidates
-    print 'combining'
+    #print 'combining'
     combipolys = []
     for m in match:
         #print '--->', combi
@@ -163,11 +169,11 @@ def triangulate_add(origs, matches, add):
         combipolys.append(combipoly)
 
     # prep/normalize combipolys
-    print 'prepping'
+    #print 'prepping'
     combipolys = shapematch.prep_pool(combipolys)
 
     # find closest match
-    print 'finding'
+    #print 'finding'
     matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
     return matches
 
