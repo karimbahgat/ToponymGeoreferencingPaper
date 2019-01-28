@@ -167,6 +167,115 @@ def threshold(im, color, thresh):
 
     return im
 
+def maincolors(im):
+    import pyagg
+##    c = pyagg.graph.BarChart()
+##    bins = im.getcolors(im.size[0]*im.size[1])
+##    for cn,col in sorted(bins, key=lambda b: -b[0])[:10]:
+##        #print cn,col
+##        c.add_category(col, [(col,cn)]) #, fillcolor=col)
+##    c.draw().view()
+    
+##    c = pyagg.Canvas(1200, 500)
+##    c.custom_space(0, 500, 1200, 0)
+##    bins = im.getcolors(im.size[0]*im.size[1])
+##    print len(bins)
+##    bins = [b for b in bins if b[0] > 1]
+##    print len(bins)
+##    maxval = max((b[0] for b in bins))
+##    x = 0
+##    bins = sorted(bins, key=lambda b: -b[0])[:1000]
+##    incr = c.width/float(len(bins))
+##    for cn,col in bins:
+##        c.draw_box(bbox=[x,0,x+incr,cn/float(maxval)*c.height], fillcolor=col)
+##        x += incr
+##    c.view()
+
+    # using lab dist...
+##    import numpy as np
+##    from skimage.color import rgb2lab
+##    
+##    lab_im_arr = rgb2lab(np.array(im))
+##    print lab_im_arr
+##    colors,counts = np.unique(lab_im_arr.reshape(im.size+(3,)), return_counts=True)
+##    for cn,col in zip(colors,counts):
+##        print cn,col
+
+    # Altern, use kmeans clustering...
+    # https://www.alanzucconi.com/2015/05/24/how-to-find-the-main-colours-in-an-image/
+    # see also https://www.alanzucconi.com/2015/09/30/colour-sorting/
+    from sklearn.cluster import KMeans
+    from sklearn.metrics import silhouette_score
+
+    # By Adrian Rosebrock
+    import numpy as np
+    import cv2
+
+    def centroid_histogram(clt):
+        # grab the number of different clusters and create a histogram
+        # based on the number of pixels assigned to each cluster
+        numLabels = np.arange(0, len(np.unique(clt.labels_)) + 1)
+        (hist, _) = np.histogram(clt.labels_, bins = numLabels)
+     
+        # normalize the histogram, such that it sums to one
+        hist = hist.astype("float")
+        hist /= hist.sum()
+     
+        # return the histogram
+        return hist
+
+    # Reshape the image to be a list of pixels
+    im = im.resize((im.size[0]/50, im.size[1]/50))
+    image_array = np.array(im).reshape((im.size[0] * im.size[1], 3))
+    print len(image_array)
+
+    def drawhist(bins):
+        c = pyagg.Canvas(1200, 500)
+        c.custom_space(0, 500, 1200, 0)
+        maxval = max((b[0] for b in bins))
+        x = 0
+        bins = sorted(bins, key=lambda b: -b[0])[:1000]
+        incr = c.width/float(len(bins))
+        for cn,col in bins:
+            c.draw_box(bbox=[x,0,x+incr,cn/float(maxval)*c.height], fillcolor=tuple(col))
+            x += incr
+        c.view()
+
+    # Clusters the pixels
+    clt = KMeans(n_clusters=5)
+    clt.fit(image_array)
+
+    # Finds how many pixels are in each cluster
+    hist = centroid_histogram(clt)
+
+    bins = list(zip(hist, clt.cluster_centers_))
+    for perc,col in bins:
+        print perc,col
+
+    drawhist(bins)
+
+##    bestSilhouette = -1
+##    bestClusters = 0
+##
+##    for clusters in range(3, 5): 
+##        print 'clusters',clusters
+##        
+##        # Cluster colours
+##        clt = KMeans(n_clusters = clusters)
+##        clt.fit(image_array)
+##
+##        # Validate clustering result
+##        silhouette = silhouette_score(image_array, clt.labels_, metric='euclidean')
+##
+##        # Find the best one
+##        if silhouette > bestSilhouette:
+##            bestSilhouette = silhouette
+##            bestClusters = clusters
+
+    fdsfds
+
+
+
 def detect_data(im, bbox=None):
     if bbox:
         im = im.crop(bbox)
@@ -286,12 +395,16 @@ if __name__ == '__main__':
     #pth = 'testmaps/2113087.jpg'
     #pth = 'testmaps/egypt_admn97.jpg'
     
-    pth = 'testmaps/burkina.jpg'
+    #pth = 'testmaps/burkina.jpg'
     #pth = 'testmaps/cameroon_pol98.jpg'
-    #pth = 'testmaps/egypt_pol_1979.jpg'
+    pth = 'testmaps/egypt_pol_1979.jpg'
     #pth = 'testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg'
     im = PIL.Image.open(pth)#.crop((2000,2000,4000,4000))
     im.save('testmaps/testorig.jpg')
+
+    # histogram testing
+    #maincolors(im)
+    #fsdf
 
     # threshold
     im = threshold(im, (0,0,0), 40) # black for text
