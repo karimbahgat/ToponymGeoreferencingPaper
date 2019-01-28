@@ -167,7 +167,7 @@ def threshold(im, color, thresh):
 
     return im
 
-def maincolors(im):
+def maincolors(im, classes=5):
     import pyagg
 ##    c = pyagg.graph.BarChart()
 ##    bins = im.getcolors(im.size[0]*im.size[1])
@@ -242,7 +242,7 @@ def maincolors(im):
         c.view()
 
     # Clusters the pixels
-    clt = KMeans(n_clusters=5)
+    clt = KMeans(n_clusters=classes)
     clt.fit(image_array)
 
     # Finds how many pixels are in each cluster
@@ -321,7 +321,7 @@ def process(test, thresh=0.1):
             matchcoords.extend(f['geometry']['coordinates'][0])
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
-def process_optim(test, thresh=0.1, limit=10, maxcandidates=10, n_combi=4):
+def process_optim(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3):
     # filter to those that can be geocoded
     print 'geocode and filter'
     import time
@@ -332,24 +332,27 @@ def process_optim(test, thresh=0.1, limit=10, maxcandidates=10, n_combi=4):
             res = list(geocode(nxtname))
             if res:
                 testres.append((nxtname,nxtpos,res))
-                time.sleep(0.1)
+                #time.sleep(0.1)
         except Exception as err:
             print 'EXCEPTION:', err
         
-    testres = [(nxtname,nxtpos,res)
-               for nxtname,nxtpos,res in testres if res and len(res)<10]
-    #testres = [(nxtname,nxtpos,res[:maxcandidates])
-    #           for nxtname,nxtpos,res in testres]
-
-    # sort by length of possible geocodings, ie try most unique first --> faster+accurate
-    testsort = sorted(testres, key=lambda(nxtname,nxtpos,res): len(res))
-    for nxtname,nxtpos,res in testsort:
-        print nxtname,len(res)
+    #testres = [(nxtname,nxtpos,res)
+    #           for nxtname,nxtpos,res in testres if res and len(res)<10]
+    testres = [(nxtname,nxtpos,res[:maxcandidates])
+               for nxtname,nxtpos,res in testres]
 
     # find all triangles from all possible combinations
+    for nxtname,nxtpos,res in testres:
+        print nxtname,len(res)
+    combis = itertools.combinations(testres, n_combi)
+    # sort randomly to avoid local minima
+    from random import uniform
+    combis = sorted(combis, key=lambda x: uniform(0,1))
+    # sort by length of possible geocodings, ie try most unique first --> faster+accurate
+    combis = sorted(combis, key=lambda gr: sum((len(res) for nxtname,nxtpos,res in gr)))
+
+    print 'finding all possible triangles'
     triangles = []
-    combis = list(itertools.combinations(testsort, n_combi))
-    print 'finding all possible triangles (%s)' % len(combis)
     for i,tri in enumerate(combis):
         print '-----'
         print 'try triangle %s of %s' % (i, len(combis))
@@ -363,21 +366,51 @@ def process_optim(test, thresh=0.1, limit=10, maxcandidates=10, n_combi=4):
             #print f
             print 'error:', round(diff,6)
             if diff < thresh:
-                print 'ADDED'
+                print 'TRIANGLE FOUND'
                 valid = [tr[:2] for tr in tri]
+
+                # ...
+                for nxtname,nxtpos,res in testres:
+                    print 'trying to add incrementally:',nxtname,nxtpos
+                    orignames,origcoords = zip(*valid)
+                    orignames,origcoords = list(orignames),list(origcoords)
+                    matchnames = list(f['properties']['combination'])
+                    matchcoords = list(f['geometry']['coordinates'][0])
+                    
+                    if nxtpos in origcoords: continue
+                    maxy = max((y for x,y in origcoords))
+                    maxy = max(maxy,nxtpos[1])
+                    nxtposflip = (nxtpos[0],maxy-nxtpos[1])
+                    origcoordsflip = [(x,maxy-y) for x,y in origcoords + [nxtpos]]
+                    best = triangulate_add(zip(orignames,origcoordsflip),
+                                           zip(matchnames,matchcoords),
+                                           (nxtname,nxtposflip),
+                                           res)
+                    if not best: continue
+                    mf,mdiff,mdiffs = best[0]
+                    if mdiff < thresh:
+                        print 'ADDING'
+                        valid.append((nxtname,nxtpos))
+                        f = mf
+
                 triangles.append((valid,f,diff))
+                
         print '%s triangles so far:' % len(triangles)
-        print '\n'.join([repr((round(tr[2],6),[n for n,p in tr[0]],'-->',[n[:15] for n in tr[1]['properties']['combination']]))
+        print '\n>>>'.join([repr((round(tr[2],6),[n for n,p in tr[0]],'-->',[n[:15] for n in tr[1]['properties']['combination']]))
                          for tr in triangles])
-        if len(triangles) > limit:
+        if len(triangles) >= mintrials and max((len(v) for v,f,d in triangles)) >= minpoints:
             break
 
-    # ...
-    triangles = sorted(triangles, key=lambda x: x[2])
+        if i >= maxiter:
+            break
+
+    # of all the trial triangles, choose only the one with longest chain of points and lowest diff
+    triangles = sorted(triangles, key=lambda(v,f,d): (-len(v),-d) )
     orignames,origcoords = [],[]
     matchnames,matchcoords = [],[]
-    for tri,f,diff in triangles:
+    for tri,f,diff in triangles[:1]: # only the first best triangle is used
         for (n,c),(mn,mc) in zip(tri, zip(f['properties']['combination'], f['geometry']['coordinates'][0])):
+            print 'final',n,c,mn,mc
             if c in origcoords or mc in matchcoords: continue
             orignames.append(n)
             origcoords.append(c)
@@ -392,23 +425,28 @@ def warp(image, tiepoints):
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "{image}" "testmaps/warped.tif"'.format(gcptext=gcptext, image=image)
     os.system(call) #-order 3 -refine_gcps 20 4
-    os.system('gdalwarp -r bilinear -tps -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
+    os.system('gdalwarp -r bilinear -order 1 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
 
 
 
 if __name__ == '__main__':
-    #pth = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
     #pth = 'testmaps/indo_china_1886.jpg'
     #pth = 'testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg'
     #pth = 'testmaps/2113087.jpg'
     #pth = 'testmaps/egypt_admn97.jpg'
+    #pth = 'testmaps/brazil_army_amazon_1999.jpg'
+    #pth = 'testmaps/brazil_pop_1977.jpg'
+    #pth = 'testmaps/brazil_pol_1981.gif'
+    #pth = 'testmaps/brazil_land_1977.jpg'
     
     pth = 'testmaps/burkina.jpg'
     #pth = 'testmaps/cameroon_pol98.jpg'
+    #pth = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
     #pth = 'testmaps/egypt_pol_1979.jpg'
     #pth = 'testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg'
     #pth = 'testmaps/gmaps.png'
     im = PIL.Image.open(pth)#.crop((2000,2000,4000,4000))
+    im = im.convert('RGB')
     im.save('testmaps/testorig.jpg')
 
     # histogram testing
@@ -416,7 +454,8 @@ if __name__ == '__main__':
     #fsdf
 
     # threshold
-    im = threshold(im, (0,0,0), 25) # black for text
+    im = threshold(im, (0,0,0), 25) # black for text, low
+    #im = threshold(im, (0,0,0), 40) # black for text, high
     #im = threshold(im, (190,55,10), 20) # red 
 
     # ocr
