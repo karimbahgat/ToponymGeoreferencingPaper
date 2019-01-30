@@ -439,12 +439,14 @@ if __name__ == '__main__':
     #pth = 'testmaps/brazil_pol_1981.gif'
     #pth = 'testmaps/brazil_land_1977.jpg'
     
-    pth = 'testmaps/burkina.jpg'
-    #pth = 'testmaps/cameroon_pol98.jpg'
+    #pth = 'testmaps/burkina.jpg'
+    pth = 'testmaps/cameroon_pol98.jpg'
+    #pth = 'testmaps/repcongo.png'
     #pth = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
     #pth = 'testmaps/egypt_pol_1979.jpg'
     #pth = 'testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg'
     #pth = 'testmaps/gmaps.png'
+    #pth = 'testmaps/ierland-toeristische-attracties-kaart.jpg'
     im = PIL.Image.open(pth)#.crop((2000,2000,4000,4000))
     im = im.convert('RGB')
     im.save('testmaps/testorig.jpg')
