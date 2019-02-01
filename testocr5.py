@@ -293,9 +293,17 @@ def detect_text_points(im, data):
         x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
         x2 = x1+w
         y2 = y1+h
+
+        # possibly, narrow down the actual bbox via avg pixel coords
+##        onxs,onys = np.nonzero(im_arr == 0)
+##        tot = len(onxs)
+##        onxcounts = zip(*onxs.unique(return_counts=True))
+##        onycounts = zip(*onys.unique(return_counts=True))
+##        # ...hmm...
+
         buff = int(h * 1.5)
         filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff] = False # look in buffer zone around text box
-        #filt_im_arr[y1:y2, x1:x2] = True # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
+        filt_im_arr[y1:y2, x1:x2] = True # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
     im_arr[filt_im_arr] = 255
     im_arr[im_arr < 255] = 0
     #PIL.Image.fromarray(im_arr).show()
@@ -314,7 +322,7 @@ def detect_text_points(im, data):
         # filled circles only
         (cx, cy), radius = cv2.minEnclosingCircle(cnt)
         circleArea = radius * radius * np.pi
-        if (len(approx) > 8) and area >= 5: #and 0.4 < circleArea/float(area) < 1.6:
+        if (len(approx) > 8) and area >= 5 and 0.6 < circleArea/float(area) < 1.4:
             circles.append(cnt)
             centers.append((cx,cy))
     cv2.drawContours(im_arr_draw, circles, -1, (0,255,0), 1)
@@ -333,23 +341,24 @@ def detect_text_points(im, data):
         rect = shapely.geometry.box(x1, y1, x2, y2)
         # first those within dist of bbox
         nearby = filter(lambda x: x[1] < h, [(c,rect.distance(c)) for c in centers])
-        
-        # then choose the one with most whitespace around
-        neighbourhoods = [(c, im_arr[int(c.centroid.y)-h:int(c.centroid.y)+h, int(c.centroid.x)-h:int(c.centroid.x)+h].sum())
-                          for c,_ in nearby]
-        loneliest = sorted(neighbourhoods, key=lambda x: -x[1])
-        if loneliest:
-            c = loneliest[0][0]
+
+        # choose the nearest circle
+        if nearby:
+            nearest = sorted(nearby, key=lambda x: x[1])[0]
+            c = nearest[0]
             print text,c
             p = (int(c.centroid.x), int(c.centroid.y))
             points.append((text, p))
-
-        # altern, narrow down the actual bbox via avg pixel coords
-##        onxs,onys = np.nonzero(im_arr == 0)
-##        tot = len(onxs)
-##        onxcounts = zip(*onxs.unique(return_counts=True))
-##        onycounts = zip(*onys.unique(return_counts=True))
-##        # ...hmm...
+        
+        # or choose the one with most whitespace around
+##        neighbourhoods = [(c, im_arr[int(c.centroid.y)-h:int(c.centroid.y)+h, int(c.centroid.x)-h:int(c.centroid.x)+h].sum())
+##                          for c,_ in nearby]
+##        loneliest = sorted(neighbourhoods, key=lambda x: -x[1])
+##        if loneliest:
+##            c = loneliest[0][0]
+##            print text,c
+##            p = (int(c.centroid.x), int(c.centroid.y))
+##            points.append((text, p))
     
     return points
 
@@ -498,7 +507,7 @@ def warp(image, tiepoints):
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "{image}" "testmaps/warped.tif"'.format(gcptext=gcptext, image=image)
     os.system(call) #-order 3 -refine_gcps 20 4
-    os.system('gdalwarp -r bilinear -order 1 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
+    os.system('gdalwarp -r bilinear -tps -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
 
 
 
