@@ -159,13 +159,17 @@ def threshold(im, color, thresh):
 
     im_arr[dissim] = (255,255,255)
 
-    im = PIL.Image.fromarray(im_arr)
-
 
     # TODO: Maybe also do gaussian or otsu binarization/smoothing?
+    # Seems to do worse than original, makes sense since loses/changes original information
     # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
-    
+    import cv2
+    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
+    #im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
+    #ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
+
+    im = PIL.Image.fromarray(im_arr)
     return im
 
 def maincolors(im, classes=5):
@@ -488,23 +492,24 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
             
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
-def warp(image, tiepoints):
+def warp(im, tiepoints):
     import os
     print 'control points:', tiepoints
+    im.save('testmaps/warpedinput.tif')
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
-    call = 'gdal_translate -of GTiff {gcptext} "{image}" "testmaps/warped.tif"'.format(gcptext=gcptext, image=image)
+    call = 'gdal_translate -of GTiff {gcptext} "testmaps/warpedinput.tif" "testmaps/warped.tif"'.format(gcptext=gcptext)
     os.system(call) #-order 3 -refine_gcps 20 4 # -tps
     os.system('gdalwarp -r bilinear -order 1 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
 
 def debug_orig(im):
     im.save('testmaps/testorig.jpg')
 
-def debug_thresh(im):
-    im.save('testmaps/testthresh.jpg')
+def debug_prep(im):
+    im.save('testmaps/testprep.jpg')
 
 def debug_ocr(im, data, points):
     import pyagg
-    c = pyagg.load('testmaps/testorig.jpg').resize(im.size[0]*2, im.size[1]*2)
+    c = pyagg.load('testmaps/testorig.jpg')
     print c.width,c.height,im.size
     for r in data:
         top,left,w,h = [int(r[k]) for k in 'top left width height'.split()]
@@ -543,23 +548,37 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
         im = im.crop(bbox)
     debug_orig(im)
 
+    # begin prep
+    im_prep = im
+
     # histogram testing
     #maincolors(im)
     #fsdf
 
+    # NOTE: upscale -> threshold creates phenomenal resolution and ocr detections, but is slower and demands much more memory
+    # consider doing threshold -> upscale if memoryerror...
+
+    # upscale for better ocr
+    im_prep = im_prep.resize((im_prep.size[0]*2, im_prep.size[1]*2), PIL.Image.LANCZOS)
+
     # threshold
-    im = threshold(im, textcolor, colorthresh)
-    debug_thresh(im)
+    im_prep = threshold(im_prep, textcolor, colorthresh)
+    debug_prep(im_prep)
 
     # ocr
-    data = detect_data(im) #.resize((im.size[0]*2, im.size[1]*2), PIL.Image.ANTIALIAS)) # IF UPSCALE
+    data = detect_data(im_prep) 
     data = filter(lambda r: r.get('text') and len(r['text'].strip().replace(' ','')) >= 3 and int(r['conf']) >= textconf,
                   data)
 
-    #for r in data: # IF UPSCALED
-    #    for k in 'top left width height'.split():
-    #        r[k] = int(r[k]) / 2
-            
+    # downscale the data coordinates of the upscaled image back to original coordinates
+    for r in data: 
+        for k in 'top left width height'.split():
+            r[k] = int(r[k]) / 2
+
+    # end prep, switch back to original image
+    im = im
+
+    # detect text coordinates
     points = detect_text_points(im, data)
 
     # draw data onto image
@@ -573,7 +592,7 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     print tiepoints
     for on,mc,mn in zip(orignames,matchcoords,matchnames):
         print on,mc,mn
-    warp('testmaps/testorig.jpg', tiepoints)
+    warp(im, tiepoints)
 
     # view warped
     debug_warped('testmaps/warped2.tif', orignames, matchnames, matchcoords)
