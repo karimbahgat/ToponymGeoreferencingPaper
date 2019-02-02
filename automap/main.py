@@ -1,5 +1,6 @@
 
-from automap import triangulate, normalize, geocode, triangulate_add
+from .triangulate import triangulate, triangulate_add, geocode
+from .shapematch import normalize
 
 import itertools
 
@@ -281,7 +282,99 @@ def detect_data(im, bbox=None):
     drows = [dict(zip(dfields,row)) for row in drows]
     return drows
 
+def detect_text_points(im, data):
+    points = []
+    for r in data:
+        text = r['text']
+        text = text.strip().replace('.', '') #.replace("\x91", "'")
+        x = int(r['left'])
+        y = int(r['top'])
+        pt = (text, (x,y))
+        print pt
+        points.append( pt )
+
+##    import numpy as np
+##    import cv2
+##    points = []
+##    im_arr = cv2.cvtColor(np.array(im), cv2.COLOR_RGB2GRAY)
+##    filt_im_arr = np.ones(im_arr.shape[:2], dtype=bool)
+##    for r in data:
+##        text = r['text']
+##        text = text.strip().replace('.', '') #.replace("\x91", "'")
+##        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+##        x2 = x1+w
+##        y2 = y1+h
+##
+##        # possibly, narrow down the actual bbox via avg pixel coords
+####        onxs,onys = np.nonzero(im_arr == 0)
+####        tot = len(onxs)
+####        onxcounts = zip(*onxs.unique(return_counts=True))
+####        onycounts = zip(*onys.unique(return_counts=True))
+####        # ...hmm...
+##
+##        buff = int(h * 1.5)
+##        filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff] = False # look in buffer zone around text box
+##        filt_im_arr[y1:y2, x1:x2] = True # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
+##    im_arr[filt_im_arr] = 255
+##    im_arr[im_arr < 255] = 0
+##    #PIL.Image.fromarray(im_arr).show()
+##
+##    # next detect shapes in the masked area
+##    # https://stackoverflow.com/questions/11424002/how-to-detect-simple-geometric-shapes-using-opencv
+##    # https://stackoverflow.com/questions/46641101/opencv-detecting-a-circle-using-findcontours
+##    # see esp: https://www.learnopencv.com/blob-detection-using-opencv-python-c/
+##    _,contours,_ = cv2.findContours(im_arr.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+##    im_arr_draw = cv2.cvtColor(im_arr, cv2.COLOR_GRAY2RGB)
+##    circles = []
+##    centers = []
+##    for cnt in contours:
+##        approx = cv2.approxPolyDP(cnt,0.01*cv2.arcLength(cnt,True),True)
+##        area = cv2.contourArea(cnt)
+##        # filled circles only
+##        (cx, cy), radius = cv2.minEnclosingCircle(cnt)
+##        circleArea = radius * radius * np.pi
+##        if (len(approx) > 8) and area >= 5 and 0.6 < circleArea/float(area) < 1.4:
+##            circles.append(cnt)
+##            centers.append((cx,cy))
+##    cv2.drawContours(im_arr_draw, circles, -1, (0,255,0), 1)
+##    PIL.Image.fromarray(im_arr_draw).show()
+##
+##    # link each text to closest point
+##    import shapely, shapely.geometry
+##    points = []
+##    centers = [shapely.geometry.Polygon([tuple(cp[0]) for cp in c]) for c in circles]
+##    for r in data:
+##        text = r['text']
+##        text = text.strip().replace('.', '') #.replace("\x91", "'")
+##        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+##        x2 = x1+w
+##        y2 = y1+h
+##        rect = shapely.geometry.box(x1, y1, x2, y2)
+##        # first those within dist of bbox
+##        nearby = filter(lambda x: x[1] < h, [(c,rect.distance(c)) for c in centers])
+##
+##        # choose the nearest circle
+##        if nearby:
+##            nearest = sorted(nearby, key=lambda x: x[1])[0]
+##            c = nearest[0]
+##            print text,c
+##            p = (int(c.centroid.x), int(c.centroid.y))
+##            points.append((text, p))
+##        
+##        # or choose the one with most whitespace around
+####        neighbourhoods = [(c, im_arr[int(c.centroid.y)-h:int(c.centroid.y)+h, int(c.centroid.x)-h:int(c.centroid.x)+h].sum())
+####                          for c,_ in nearby]
+####        loneliest = sorted(neighbourhoods, key=lambda x: -x[1])
+####        if loneliest:
+####            c = loneliest[0][0]
+####            print text,c
+####            p = (int(c.centroid.x), int(c.centroid.y))
+####            points.append((text, p))
+    
+    return points
+
 def triang(test, matchcandidates=None):
+    # TODO: maybe superfluous, maybe just integrate right into "triangulate"?? 
     names,positions = zip(*test)
     # reverse ys due to flipped image coordsys
     maxy = max((y for x,y in positions))
@@ -296,32 +389,7 @@ def triang(test, matchcandidates=None):
         #viewmatch(positions, f)
     return matches
 
-def process(test, thresh=0.1):
-    size = 3
-    grouped = zip(*(iter(test),) * size) # grouped 3-wise
-    grouped = [list(g) for g in grouped]
-    remaind = len(test) % size
-    for i in range(remaind):
-        grouped[-i].append(test[-i])
-    
-    orignames = []
-    origcoords = []
-    matchnames = []
-    matchcoords = []
-    for group in grouped:
-        print '-----'
-        print group
-        best = triang(group)[0]
-        f,diff,diffs = best
-        print f
-        if diff < thresh:
-            orignames.extend(zip(*group)[0])
-            origcoords.extend(zip(*group)[1])
-            matchnames.extend(f['properties']['combination'])
-            matchcoords.extend(f['geometry']['coordinates'][0])
-    return zip(orignames, origcoords), zip(matchnames, matchcoords)
-
-def process_optim(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3):
+def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3):
     # filter to those that can be geocoded
     print 'geocode and filter'
     import time
@@ -358,6 +426,7 @@ def process_optim(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxca
         print 'try triangle %s of %s' % (i, len(combis))
         print '\n'.join([repr((tr[0],len(tr[2]))) for tr in tri])
         # try triang
+        best = None
         try: best = triang([tr[:2] for tr in tri],
                            matchcandidates=[tr[2] for tr in tri])
         except Exception as err: print 'EXCEPTION RAISED:',err
@@ -424,114 +493,19 @@ def warp(image, tiepoints):
     print 'control points:', tiepoints
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "{image}" "testmaps/warped.tif"'.format(gcptext=gcptext, image=image)
-    os.system(call) #-order 3 -refine_gcps 20 4
+    os.system(call) #-order 3 -refine_gcps 20 4 # -tps
     os.system('gdalwarp -r bilinear -order 1 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
 
-
-
-if __name__ == '__main__':
-    #pth = 'testmaps/indo_china_1886.jpg'
-    #pth = 'testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg'
-    #pth = 'testmaps/2113087.jpg'
-    #pth = 'testmaps/egypt_admn97.jpg'
-    #pth = 'testmaps/brazil_army_amazon_1999.jpg'
-    #pth = 'testmaps/brazil_pop_1977.jpg'
-    #pth = 'testmaps/brazil_pol_1981.gif'
-    #pth = 'testmaps/brazil_land_1977.jpg'
-    
-    #pth = 'testmaps/burkina.jpg'
-    pth = 'testmaps/cameroon_pol98.jpg'
-    #pth = 'testmaps/repcongo.png'
-    #pth = 'testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
-    #pth = 'testmaps/egypt_pol_1979.jpg'
-    #pth = 'testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg'
-    #pth = 'testmaps/gmaps.png'
-    #pth = 'testmaps/ierland-toeristische-attracties-kaart.jpg'
-    im = PIL.Image.open(pth)#.crop((2000,2000,4000,4000))
-    im = im.convert('RGB')
+def debug_orig(im):
     im.save('testmaps/testorig.jpg')
 
-    # histogram testing
-    #maincolors(im)
-    #fsdf
-
-    # threshold
-    im = threshold(im, (0,0,0), 25) # black for text, low
-    #im = threshold(im, (0,0,0), 40) # black for text, high
-    #im = threshold(im, (190,55,10), 20) # red 
-
-    # ocr
+def debug_thresh(im):
     im.save('testmaps/testthresh.jpg')
-    data = detect_data(im)
-    data = filter(lambda r: r.get('text') and len(r['text'].strip().replace(' ','')) >= 3 and int(r['conf']) > 60,
-                  data)
-    points = []
-    for r in data:
-        text = r['text']
-        text = text.strip().replace('.', '') #.replace("\x91", "'")
-        x = int(r['left'])
-        y = int(r['top'])
-        pt = (text, (x,y))
-        print pt
-        points.append( pt )
 
-##    points = '''(u'Zekharya', (546, 11))
-##(u'Zur', (1308, 5))
-##(u'Hadassa', (1358, 6))
-##(u'Betar', (1382, 84))
-##(u'Zomet', (615, 82))
-##(u'Bet', (163, 382))
-##(u'Nir', (204, 383))
-##(u'Zomet', (343, 550))
-##(u'Bet', (222, 597))
-##(u'Guvrin', (262, 597))
-##(u'Zomet', (207, 645))
-##(u'Guyrin', (273, 646))
-##(u'Lakhish', (42, 908))
-##(u'LiOn', (555, 190))
-##(u'Ela', (674, 191))
-##(u'Zomer', (718, 196))
-##(u'Givat', (495, 216))
-##(u'Nahal', (1285, 202))
-##(u"Geva'ot", (1352, 202))
-##(u'Newe', (931, 241))
-##(u"Jab'ae", (1215, 244))
-##(u'Zattirim', (612, 311))
-##(u'Adderet,', (762, 305))
-##(u'Sanit', (1150, 402))
-##(u'Beit', (1290, 567))
-##(u'Ummae', (1337, 567))
-##(u'Karm\xe9', (1347, 630))
-##(u'Zur', (1420, 631))
-##(u'N\xfcba', (1080, 657))
-##(u'Beit', (1048, 709))
-##(u'Aula', (1093, 709))
-##(u'Tarqumiya', (810, 811))
-##(u'Beit', (1204, 846))
-##(u'K\xe4hil', (1250, 846))
-##(u'Telem', (1006, 889))
-##(u'eAdora', (921, 974))
-##(u'Sumaiya', (639, 1080))
-##(u'Deir', (724, 1109))
-##(u'Samit', (773, 1109))
-##(u'Sheqef', (577, 1148))
-##(u'Durs', (973, 1179))
-##(u'Hevron', (1379, 1166))
-##(u'ura', (989, 1185))
-##(u'Belt', (584, 1195))
-##(u'(Adorayim)', (941, 1206))
-##(u'(Hebron)', (1378, 1196))
-##(u'Sikka', (559, 1290))
-##(u'NahalNegohot', (801, 1291))
-##(u'Haggay', (1274, 1349))
-##(u'Majd', (562, 1389))
-##(u'Kharasa', (903, 1399))
-##(u'Faw\xe4r', (1230, 1388))'''.split('\n')
-##    points = [eval(l.strip()) for l in points]
-
-    # draw data onto image
+def debug_ocr(im, data, points):
     import pyagg
-    c = pyagg.load('testmaps/testorig.jpg')
+    c = pyagg.load('testmaps/testorig.jpg').resize(im.size[0]*2, im.size[1]*2)
+    print c.width,c.height,im.size
     for r in data:
         top,left,w,h = [int(r[k]) for k in 'top left width height'.split()]
         box = [left, top, left+w, top+h]
@@ -539,10 +513,60 @@ if __name__ == '__main__':
         print box,text
         c.draw_box(bbox=box, fillcolor=None, outlinecolor=(0,255,0))
         c.draw_text(text, xy=(left,top), anchor='sw', textsize=6, textcolor=(0,255,0)) #bbox=box)
+    for txt,p in points:
+        c.draw_circle(xy=p, fillsize=1, fillcolor=None, outlinecolor=(0,0,255))
     c.save('testmaps/testocr.png')
 
+def debug_warped(pth, orignames, matchnames, matchcoords):
+    import pythongis as pg
+    m = pg.renderer.Map()
+
+    m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp")
+
+    rlyr = m.add_layer(pth)
+
+    m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
+                fillcolor='red', outlinewidth=0.1)
+
+    anchors = pg.VectorData(fields=['origname', 'matchname'])
+    for coord in matchcoords:
+        anchors.add_feature([], dict(type='Point', coordinates=coord))
+    m.add_layer(anchors, fillcolor=(0,255,0), outlinewidth=0.2)
+
+    m.zoom_bbox(*rlyr.bbox)
+    m.zoom_out(2)
+    m.view()
+
+def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=None):
+    im = PIL.Image.open(pth).convert('RGB')
+    if bbox:
+        im = im.crop(bbox)
+    debug_orig(im)
+
+    # histogram testing
+    #maincolors(im)
+    #fsdf
+
+    # threshold
+    im = threshold(im, textcolor, colorthresh)
+    debug_thresh(im)
+
+    # ocr
+    data = detect_data(im) #.resize((im.size[0]*2, im.size[1]*2), PIL.Image.ANTIALIAS)) # IF UPSCALE
+    data = filter(lambda r: r.get('text') and len(r['text'].strip().replace(' ','')) >= 3 and int(r['conf']) >= textconf,
+                  data)
+
+    #for r in data: # IF UPSCALED
+    #    for k in 'top left width height'.split():
+    #        r[k] = int(r[k]) / 2
+            
+    points = detect_text_points(im, data)
+
+    # draw data onto image
+    debug_ocr(im, data, points)
+
     # process and warp
-    origs,matches = process_optim(points, 0.1)
+    origs,matches = find_matches(points, matchthresh)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
@@ -552,24 +576,7 @@ if __name__ == '__main__':
     warp('testmaps/testorig.jpg', tiepoints)
 
     # view warped
-    import pythongis as pg
-    m = pg.renderer.Map()
-
-    m.add_layer(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
-
-    rlyr = m.add_layer('testmaps/warped2.tif')
-
-    m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
-                fillcolor='red', outlinewidth=0.1)
-    
-    anchors = pg.VectorData()
-    for coord in matchcoords:
-        anchors.add_feature([], dict(type='Point', coordinates=coord))
-    m.add_layer(anchors, fillcolor=(0,255,0), outlinewidth=0.2)
-    
-    m.zoom_bbox(*rlyr.bbox)
-    m.zoom_out(2)
-    m.view()
+    debug_warped('testmaps/warped2.tif', orignames, matchnames, matchcoords)
 
 
     

@@ -1,5 +1,6 @@
 """
 """
 
-from .triangulate import *
-from .shapematch import normalize
+from . import triangulate
+from . import shapematch
+from .main import automap
