@@ -489,6 +489,8 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
             origcoords.append(c)
             matchnames.append(mn)
             matchcoords.append(mc)
+
+    print 'final diff', diff
             
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
@@ -567,7 +569,12 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
 
     # ocr
     data = detect_data(im_prep) 
-    data = filter(lambda r: r.get('text') and len(r['text'].strip().replace(' ','')) >= 3 and int(r['conf']) >= textconf,
+    data = filter(lambda r:
+                  r.get('text')
+                  and len(r['text'].strip(''' '".,''').replace(' ','')) >= 3
+                  and not r['text'].strip(''' '".,''').replace(' ','').isnumeric()
+                  and int(r['conf']) >= textconf
+                  ,
                   data)
 
     # downscale the data coordinates of the upscaled image back to original coordinates
