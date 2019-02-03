@@ -277,6 +277,26 @@ def maincolors(im, classes=5):
 ##            bestSilhouette = silhouette
 ##            bestClusters = clusters
 
+def detect_boxes(im):
+    # detect boxes from contours
+    # https://stackoverflow.com/questions/11424002/how-to-detect-simple-geometric-shapes-using-opencv
+    # https://stackoverflow.com/questions/46641101/opencv-detecting-a-circle-using-findcontours
+    # see esp: https://www.learnopencv.com/blob-detection-using-opencv-python-c/
+    import numpy as np
+    import cv2
+    im_arr = np.array(im)
+    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
+    _,contours,_ = cv2.findContours(im_arr.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    im_arr_draw = cv2.cvtColor(im_arr, cv2.COLOR_GRAY2RGB)
+    boxes = []
+    for cnt in contours:
+        approx = cv2.approxPolyDP(cnt,0.01*cv2.arcLength(cnt,True),True)
+        if len(approx) == 4:
+            boxes.append(cnt)
+    cv2.drawContours(im_arr_draw, boxes, -1, (0,255,0), 1)
+    PIL.Image.fromarray(im_arr_draw).show()
+    return boxes
+
 def detect_data(im, bbox=None):
     if bbox:
         im = im.crop(bbox)
@@ -290,7 +310,7 @@ def detect_text_points(im, data):
     points = []
     for r in data:
         text = r['text']
-        text = text.strip().replace('.', '') #.replace("\x91", "'")
+        text = text.strip().strip(''' *'".,:''')
         x = int(r['left'])
         y = int(r['top'])
         pt = (text, (x,y))
@@ -401,7 +421,7 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
     for nxtname,nxtpos in test:
         print 'geocoding',nxtname
         try:
-            res = list(geocode(nxtname))
+            res = list(geocode(nxtname, maxcandidates))
             if res:
                 testres.append((nxtname,nxtpos,res))
                 #time.sleep(0.1)
@@ -410,8 +430,8 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
         
     #testres = [(nxtname,nxtpos,res)
     #           for nxtname,nxtpos,res in testres if res and len(res)<10]
-    testres = [(nxtname,nxtpos,res[:maxcandidates])
-               for nxtname,nxtpos,res in testres]
+    #testres = [(nxtname,nxtpos,res[:maxcandidates])
+    #           for nxtname,nxtpos,res in testres]
 
     # find all triangles from all possible combinations
     for nxtname,nxtpos,res in testres:
@@ -509,7 +529,7 @@ def debug_orig(im):
 def debug_prep(im):
     im.save('testmaps/testprep.jpg')
 
-def debug_ocr(im, data, points):
+def debug_ocr(im, data, points, origs):
     import pyagg
     c = pyagg.load('testmaps/testorig.jpg')
     print c.width,c.height,im.size
@@ -522,6 +542,8 @@ def debug_ocr(im, data, points):
         c.draw_text(text, xy=(left,top), anchor='sw', textsize=6, textcolor=(0,255,0)) #bbox=box)
     for txt,p in points:
         c.draw_circle(xy=p, fillsize=1, fillcolor=None, outlinecolor=(0,0,255))
+    for oname,ocoord in origs:
+        c.draw_circle(xy=ocoord, fillsize=1, fillcolor=(255,0,0,155), outlinecolor=None)
     c.save('testmaps/testocr.png')
 
 def debug_warped(pth, orignames, matchnames, matchcoords):
@@ -553,6 +575,10 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     # begin prep
     im_prep = im
 
+    # detect map box
+    #boxes = detect_boxes(im_prep)
+    #sefsdf
+
     # histogram testing
     #maincolors(im)
     #fsdf
@@ -571,8 +597,10 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     data = detect_data(im_prep) 
     data = filter(lambda r:
                   r.get('text')
-                  and len(r['text'].strip(''' '".,''').replace(' ','')) >= 3
-                  and not r['text'].strip(''' '".,''').replace(' ','').isnumeric()
+                  and len(r['text'].strip(''' *'".,:''').replace(' ','')) >= 3
+                  and not r['text'].strip(''' *'".,:''').replace(' ','').isnumeric()
+                  and r['text'].strip(''' *'".,:''')[0].isupper()
+                  and not r['text'].strip(''' *'".,:''').isupper()
                   and int(r['conf']) >= textconf
                   ,
                   data)
@@ -588,9 +616,6 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     # detect text coordinates
     points = detect_text_points(im, data)
 
-    # draw data onto image
-    debug_ocr(im, data, points)
-
     # process and warp
     origs,matches = find_matches(points, matchthresh)
     orignames,origcoords = zip(*origs)
@@ -600,6 +625,9 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     for on,mc,mn in zip(orignames,matchcoords,matchnames):
         print on,mc,mn
     warp(im, tiepoints)
+
+    # draw data onto image
+    debug_ocr(im, data, points, origs)
 
     # view warped
     debug_warped('testmaps/warped2.tif', orignames, matchnames, matchcoords)

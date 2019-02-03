@@ -8,9 +8,9 @@ import geopy
 from . import shapematch
 
 
-def geocode(name):
+def geocode(name, limit=10):
     coder = geopy.geocoders.Nominatim()
-    ms = coder.geocode(name, exactly_one=False, limit=100) or []
+    ms = coder.geocode(name, exactly_one=False, limit=limit) or []
     for m in ms:
         yield {'type': 'Feature',
                'properties': {'name': m.address,

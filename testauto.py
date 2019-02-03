@@ -4,7 +4,7 @@ from automap import automap
 # works
 
 automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-#automap('testmaps/cameroon_pol98.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[0,0,1000,1000])
+#automap('testmaps/cameroon_pol98.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[0,0,1000,1100])
 #automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[0,0,1000,1000])
 
 #automap('testmaps/repcongo.png', textcolor=(120,120,120), colorthresh=25, textconf=60)
@@ -13,6 +13,7 @@ automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[3000,3500,4000,4500])
 #automap('testmaps/gmaps.png', textcolor=(80,80,80), colorthresh=25, textconf=60)
 #automap('testmaps/brazil_pol_1981.gif', textcolor=(0,0,0), colorthresh=25, textconf=80, bbox=[0,0,1000,1000])
+#automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 
 
