@@ -4,8 +4,8 @@ from automap import automap
 # works
 
 automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-#automap('testmaps/cameroon_pol98.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[0,0,1000,1100])
-#automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[0,0,1000,1000])
+#automap('testmaps/cameroon_pol98.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 #automap('testmaps/repcongo.png', textcolor=(120,120,120), colorthresh=25, textconf=60)
 #automap('testmaps/egypt_pol_1979.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
@@ -22,5 +22,6 @@ automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg', textcolor=(50,50,50), colorthresh=25, textconf=90, bbox=[3000,1500,4000,2500])
 #automap('testmaps/brazil_pop_1977.jpg', textcolor=(50,50,50), colorthresh=40, textconf=80)
 #automap('testmaps/brazil_land_1977.jpg', textcolor=(50,50,50), colorthresh=40, textconf=60)
+#automap('testmaps/devils tower small.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, maxiter=3000, mintrials=1000)
 
 

@@ -1,0 +1,9 @@
+PIL
+numpy
+opencv-python
+colormath
+scikit-image
+scikit-learn
+pytesseract
+
+pythongis

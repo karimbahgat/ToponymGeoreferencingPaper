@@ -2,6 +2,7 @@
 from .triangulate import triangulate, triangulate_add, geocode
 from .shapematch import normalize
 
+import os
 import itertools
 
 import pytesseract as t
@@ -139,26 +140,94 @@ def threshold(im, color, thresh):
 ##
 ##    im = PIL.Image.fromarray(im_arr)
 
-    # skimage approach
     from colormath.color_objects import sRGBColor, LabColor
     from colormath.color_conversions import convert_color
     from colormath.color_diff_matrix import delta_e_cie2000
 
     import numpy as np
-    
-    from skimage.color import rgb2lab
-    
+
     im_arr = np.array(im)
-    w,h,_ = im_arr.shape
-    lab_im_arr = rgb2lab(im_arr)
+
+    # fast way (but maybe slightly worse ocr due to quantization?)
+    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
+    qcolors = [col for cn,col in sorted(quant.getcolors(256), key=lambda e: e[0])]
+    colors = [col for cn,col in sorted(quant.convert('RGB').getcolors(256), key=lambda e: e[0])]
+    colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
+                  for col in colors]
 
     target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
-    w,h,_ = lab_im_arr.shape
-    diff_im = delta_e_cie2000(target, lab_im_arr.flatten().reshape((w*h, 3))).reshape((w,h))
-    dissim = diff_im >= thresh
+    diffs = delta_e_cie2000(target, np.array(colors_lab))
+
+
+
+    # EXPERIMENTAL COLOR DETECTION (MOVE ELSEWHERE)
+##    pairdiffs = dict()
+##    for col,lcol in zip(colors,colors_lab):
+##        diffs = delta_e_cie2000(lcol, np.array(colors_lab))
+##        for col2,diff in zip(colors,diffs):
+##            if col != col2 and diff <= 10:
+##                pairdiffs[(col,col2)] = diff
+##    print len(colors_lab)*len(colors_lab), len(pairdiffs)
+##    diffgroups = []
+##    popcolors = list(colors)
+##    while popcolors:
+##        pop = popcolors.pop(0)
+##        diffgroup = [pop]
+##        for pair in pairdiffs.keys():
+##            if pair[0]==pop:
+##                conn = pair[1]
+##                diffgroup.append(conn)
+##                try: popcolors.pop(popcolors.index(conn))
+##                except: pass
+##        if len(diffgroup) > 1:
+##            diffgroups.append(diffgroup)
+##    #diffgroups = set([tuple(sorted(g)) for g in diffgroups])
+##    for i,g in enumerate(diffgroups):
+##        print i, g[0], len(g)
+####    import networkx as nx
+####    graph = nx.Graph()
+####    graph.add_edges_from(pairdiffs)
+####    groups = nx.connected_components(graph)
+####    for i,g in enumerate(groups):
+####        print i, list(g)[0], len(g)
+##    import pyagg
+##    c=pyagg.Canvas(1000,200)
+##    c.percent_space()
+##    x = 0
+##    for i,g in enumerate(diffgroups):
+##        x += 1
+##        for col in g:
+##            x += 0.1
+##            c.draw_line([(x,0),(x,100)], fillcolor=col, fillsize=0.1)
+##    c.view()
+##    fdsfds
+
+    
+    difftable = dict(list(zip(qcolors,diffs)))
+    diff_im_flat = np.array(quant).flatten()
+    for qcol,diff in difftable.items():
+        diff_im_flat[diff_im_flat==qcol] = diff
+
+    diff_im = diff_im_flat.reshape((im.height, im.width))
+    
+    dissim = diff_im > thresh
+
+    # slower but stable?
+##    from skimage.color import rgb2lab
+##    w,h,_ = im_arr.shape
+##    lab_im_arr = rgb2lab(im_arr)
+##
+##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
+##    w,h,_ = lab_im_arr.shape
+##    diff_im = delta_e_cie2000(target, lab_im_arr.flatten().reshape((w*h, 3))).reshape((w,h))
+##    dissim = diff_im >= thresh
+
+    #PIL.Image.fromarray(diff_im).show()
+    #fdsfs
 
     im_arr[dissim] = (255,255,255)
-
+    #PIL.Image.fromarray(im_arr).show()
+    #fdsf
 
     # TODO: Maybe also do gaussian or otsu binarization/smoothing?
     # Seems to do worse than original, makes sense since loses/changes original information
@@ -171,6 +240,97 @@ def threshold(im, color, thresh):
 
     im = PIL.Image.fromarray(im_arr)
     return im
+
+##def threshold(im, color, thresh):
+##    import numpy as np
+##    import cv2
+##
+##    # convert image to hsl
+##    im_arr = np.array(im)
+##    width,height,_ = im_arr.shape
+##    hsl_im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2HLS_FULL)
+##    print 'converted'
+##
+##    # determine target color
+##    from colormath.color_conversions import convert_color
+##    from colormath.color_objects import sRGBColor, HSLColor
+##    th,ts,tl = convert_color(sRGBColor(*color, is_upscaled=True), HSLColor).get_value_tuple()
+##
+##    # calc diff (note that cv2 uses different order, HLS instead of HSL)
+##    # THEORY: if "color" (sat > 50 or 30 < lightness < 220), then take max of hue and sat
+##    # but if not "color" (ie opposite), then take max of lightness only
+##    hdiff = abs(th - hsl_im_arr[:,:,0])
+##    ldiff = abs(tl - hsl_im_arr[:,:,1])
+##    sdiff = abs(ts - hsl_im_arr[:,:,2])
+##
+##    maxdiff = np.maximum.reduce([hdiff, ldiff, sdiff])
+##
+##    im.show()
+##    PIL.Image.fromarray(hdiff).show()
+##    PIL.Image.fromarray(ldiff).show()
+##    PIL.Image.fromarray(sdiff).show()
+##    PIL.Image.fromarray(maxdiff).show()
+##    fdsfs
+##    
+##    dissim = diff_im >= thresh
+##
+##    im_arr[dissim] = (255,255,255)
+##
+##
+##    # TODO: Maybe also do gaussian or otsu binarization/smoothing?
+##    # Seems to do worse than original, makes sense since loses/changes original information
+##    # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
+##    import cv2
+##    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
+##    #im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
+##    #ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+##
+##
+##    im = PIL.Image.fromarray(im_arr)
+##    return im
+
+##def threshold(im, color, thresh):
+##    import numpy as np
+##    import cv2
+##
+##    # convert image to hsl
+##    im_arr = np.array(im)
+##    width,height,_ = im_arr.shape
+##    lab_im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2LAB)
+##    print lab_im_arr[:,:,0].max()
+##    print lab_im_arr[:,:,1].max()
+##    print lab_im_arr[:,:,2].max()
+##    print 'converted'
+##
+##    # determine target color
+##    from colormath.color_conversions import convert_color
+##    from colormath.color_objects import sRGBColor, LabColor
+##    from colormath.color_diff_matrix import delta_e_cie2000, delta_e_cie1976
+##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
+##
+##    # calc diff (note that cv2 uses different order, HLS instead of HSL)
+##    diff_im = delta_e_cie1976(target, lab_im_arr.flatten().reshape((width*height, 3))).reshape((width,height))
+##    dissim = diff_im >= thresh
+##
+##    PIL.Image.fromarray(dissim).show()
+##    fsdds
+##    
+##    dissim = diff_im >= thresh
+##
+##    im_arr[dissim] = (255,255,255)
+##
+##
+##    # TODO: Maybe also do gaussian or otsu binarization/smoothing?
+##    # Seems to do worse than original, makes sense since loses/changes original information
+##    # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
+##    import cv2
+##    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
+##    #im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
+##    #ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+##
+##
+##    im = PIL.Image.fromarray(im_arr)
+##    return im
 
 def maincolors(im, classes=5):
     import pyagg
@@ -521,7 +681,7 @@ def warp(im, tiepoints):
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "testmaps/warpedinput.tif" "testmaps/warped.tif"'.format(gcptext=gcptext)
     os.system(call) #-order 3 -refine_gcps 20 4 # -tps
-    os.system('gdalwarp -r bilinear -order 1 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
+    os.system('gdalwarp -r bilinear -order 3 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
 
 def debug_orig(im):
     im.save('testmaps/testorig.jpg')
@@ -566,7 +726,8 @@ def debug_warped(pth, orignames, matchnames, matchcoords):
     m.zoom_out(2)
     m.view()
 
-def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=None):
+def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=None, **kwargs):
+    print 'loading image'
     im = PIL.Image.open(pth).convert('RGB')
     if bbox:
         im = im.crop(bbox)
@@ -587,13 +748,16 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     # consider doing threshold -> upscale if memoryerror...
 
     # upscale for better ocr
+    print 'upscaling'
     im_prep = im_prep.resize((im_prep.size[0]*2, im_prep.size[1]*2), PIL.Image.LANCZOS)
 
     # threshold
+    print 'thresholding'
     im_prep = threshold(im_prep, textcolor, colorthresh)
     debug_prep(im_prep)
 
     # ocr
+    print 'detecting text'
     data = detect_data(im_prep) 
     data = filter(lambda r:
                   r.get('text')
@@ -614,16 +778,21 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     im = im
 
     # detect text coordinates
+    print 'determening text anchors'
     points = detect_text_points(im, data)
 
-    # process and warp
-    origs,matches = find_matches(points, matchthresh)
+    # find matches
+    print 'finding matches'
+    origs,matches = find_matches(points, matchthresh, **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
     print tiepoints
     for on,mc,mn in zip(orignames,matchcoords,matchnames):
         print on,mc,mn
+
+    # warp
+    print 'warping'
     warp(im, tiepoints)
 
     # draw data onto image
@@ -632,6 +801,157 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     # view warped
     debug_warped('testmaps/warped2.tif', orignames, matchnames, matchcoords)
 
+def drawpoints(img):
+    import pythongis as pg
+    from pythongis.app import dialogs, icons
+
+    import tk2
+
+    points = []
+    
+    class ClickControl(tk2.basics.Label):
+        def __init__(self, master, *args, **kwargs):
+            tk2.basics.Label.__init__(self, master, *args, **kwargs)
+
+            icon = os.path.abspath("automap/resources/flag.png")
+            self.clickbut = tk2.basics.Button(self, command=self.begin_click)
+            self.clickbut.set_icon(icon, width=40, height=40)
+            self.clickbut.pack()
+
+            self.mouseicon_tk = icons.get(icon, width=30, height=30)
+
+        def begin_click(self):
+            print "begin click..."
+            # replace mouse with identicon
+            self.mouseicon_on_canvas = self.mapview.create_image(-100, -100, anchor="center", image=self.mouseicon_tk )
+            #self.mapview.config(cursor="none")
+            def follow_mouse(event):
+                # gets called for entire app, so check to see if directly on canvas widget
+                root = self.winfo_toplevel()
+                rootxy = root.winfo_pointerxy()
+                mousewidget = root.winfo_containing(*rootxy)
+                if mousewidget == self.mapview:
+                    curx,cury = self.mapview.canvasx(event.x) + 28, self.mapview.canvasy(event.y) + 5
+                    self.mapview.coords(self.mouseicon_on_canvas, curx, cury)
+            self.followbind = self.winfo_toplevel().bind('<Motion>', follow_mouse, '+')
+            # identify once clicked
+            def callclick(event):
+                # reset
+                cancel()
+                # find
+                x,y = self.mapview.mouse2coords(event.x, event.y)
+                self.click(x, y)
+            self.clickbind = self.winfo_toplevel().bind("<ButtonRelease-1>", callclick, "+")
+            # cancel with esc button
+            def cancel(event=None):
+                self.winfo_toplevel().unbind('<Motion>', self.followbind)
+                self.winfo_toplevel().unbind('<ButtonRelease-1>', self.clickbind)
+                self.winfo_toplevel().unbind('<Escape>', self.cancelbind)
+                #self.mapview.config(cursor="arrow")
+                self.mapview.delete(self.mouseicon_on_canvas)
+            self.cancelbind = self.winfo_toplevel().bind("<Escape>", cancel, "+")
+
+        def click(self, x, y):
+            print "clicked: ",x, y
+            entrywin = tk2.Window()
+            entrywin.focus()
+
+            title = tk2.Label(entrywin, text="Coordinates: %s, %s" % (x, y))
+            title.pack(fill="x")#, expand=1)
+
+            entry = tk2.Entry(entrywin, label="Place Name: ", width=40)
+            entry.pack(fill="x", expand=1)
+            entry.focus()
+
+            def addpoint():
+                name = entry.get()
+                print x,y,name
+
+                import geopy
+                coder = geopy.geocoders.Nominatim()
+                ms = coder.geocode(name, exactly_one=False, limit=100)
+                if ms:
+                    points.append((name, (x,y)))
+                    
+                    markers.add_feature([name], {'type':'Point', 'coordinates':(x,y)})
+                    markerslyr.update()
+                    self.mapview.threaded_rendering()
+                    #self.mapview.renderer.render_all() #render_one(markers)
+                    #self.mapview.renderer.update_draworder()
+                    #self.mapview.update_image()
+                else:
+                    tk2.messagebox.showwarning('Try another named location!', 'Named location "%s" could not be found/geocoded.' % name)
+                
+                entrywin.destroy()
+            
+            okbut = tk2.OkButton(entrywin, command=addpoint)
+            okbut.pack()
+
+    # load image
+    import PIL, PIL.Image
+    r = pg.RasterData('testmaps/testorig.jpg',
+                      xy_cell=(0,0),
+                      xy_geo=(0,0),
+                      cellwidth=1,
+                      cellheight=1,
+                      width=img.size[0],
+                      height=img.size[1],
+                      )
+    m = pg.renderer.Map()
+    m._create_drawer()
+    m.drawer.custom_space(*r.bbox)
+    m.add_layer(r)
+
+    markers = pg.VectorData(fields=['name'])
+    markerslyr = m.add_layer(markers, fillcolor=(0,255,0), fillsize=1)
+    markerslyr.add_effect('shadow', xdist=5, ydist=5) # opacity=0.8
+    #markerslyr.add_effect('glow', color='black', size=20)
+
+    m.zoom_auto()
+
+    # build and run application
+    w = tk2.Tk()
+    w.state('zoomed')
+    mw = pg.app.builder.MultiLayerMap(w, m)
+    mw.pack(fill="both", expand=1)
+    clickcontrol = ClickControl(mw.mapview)
+    clickcontrol.place(relx=0.99, rely=0.98, anchor="se")
+    mw.mapview.add_control(clickcontrol)
+    w.mainloop()
+
+    print points
+    return points
+
+def manual(pth, matchthresh=0.1, bbox=None, **kwargs):
+    print 'loading image'
+    im = PIL.Image.open(pth).convert('RGB')
+    if bbox:
+        im = im.crop(bbox)
+    debug_orig(im)
+
+    # manually select text anchors/coordinates
+    print 'drawing anchor points'
+    points = drawpoints(im)
+
+    # find matches
+    print 'finding matches'
+    origs,matches = find_matches(points, matchthresh, **kwargs)
+    orignames,origcoords = zip(*origs)
+    matchnames,matchcoords = zip(*matches)
+    tiepoints = zip(origcoords, matchcoords)
+    print tiepoints
+    for on,mc,mn in zip(orignames,matchcoords,matchnames):
+        print on,mc,mn
+
+    # warp
+    print 'warping'
+    warp(im, tiepoints)
+
+    # draw data onto image
+    #debug_ocr(im, data, points, origs)
+
+    # view warped
+    debug_warped('testmaps/warped2.tif', orignames, matchnames, matchcoords)
 
     
 
