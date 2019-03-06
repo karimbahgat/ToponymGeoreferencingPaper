@@ -3,7 +3,9 @@ from automap import automap
 
 # works
 
-automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/satim.png', textcolor=(0,0,0), colorthresh=25, textconf=60)
+
+automap('testmaps/burkina.jpg', colorthresh=25, textconf=60)
 #automap('testmaps/cameroon_pol98.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 

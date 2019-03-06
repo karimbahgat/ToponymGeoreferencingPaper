@@ -157,51 +157,6 @@ def threshold(im, color, thresh):
 
     target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
     diffs = delta_e_cie2000(target, np.array(colors_lab))
-
-
-
-    # EXPERIMENTAL COLOR DETECTION (MOVE ELSEWHERE)
-##    pairdiffs = dict()
-##    for col,lcol in zip(colors,colors_lab):
-##        diffs = delta_e_cie2000(lcol, np.array(colors_lab))
-##        for col2,diff in zip(colors,diffs):
-##            if col != col2 and diff <= 10:
-##                pairdiffs[(col,col2)] = diff
-##    print len(colors_lab)*len(colors_lab), len(pairdiffs)
-##    diffgroups = []
-##    popcolors = list(colors)
-##    while popcolors:
-##        pop = popcolors.pop(0)
-##        diffgroup = [pop]
-##        for pair in pairdiffs.keys():
-##            if pair[0]==pop:
-##                conn = pair[1]
-##                diffgroup.append(conn)
-##                try: popcolors.pop(popcolors.index(conn))
-##                except: pass
-##        if len(diffgroup) > 1:
-##            diffgroups.append(diffgroup)
-##    #diffgroups = set([tuple(sorted(g)) for g in diffgroups])
-##    for i,g in enumerate(diffgroups):
-##        print i, g[0], len(g)
-####    import networkx as nx
-####    graph = nx.Graph()
-####    graph.add_edges_from(pairdiffs)
-####    groups = nx.connected_components(graph)
-####    for i,g in enumerate(groups):
-####        print i, list(g)[0], len(g)
-##    import pyagg
-##    c=pyagg.Canvas(1000,200)
-##    c.percent_space()
-##    x = 0
-##    for i,g in enumerate(diffgroups):
-##        x += 1
-##        for col in g:
-##            x += 0.1
-##            c.draw_line([(x,0),(x,100)], fillcolor=col, fillsize=0.1)
-##    c.view()
-##    fdsfds
-
     
     difftable = dict(list(zip(qcolors,diffs)))
     diff_im_flat = np.array(quant).flatten()
@@ -237,103 +192,13 @@ def threshold(im, color, thresh):
     #im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
     #ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
-
     im = PIL.Image.fromarray(im_arr)
     return im
 
-##def threshold(im, color, thresh):
-##    import numpy as np
-##    import cv2
-##
-##    # convert image to hsl
-##    im_arr = np.array(im)
-##    width,height,_ = im_arr.shape
-##    hsl_im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2HLS_FULL)
-##    print 'converted'
-##
-##    # determine target color
-##    from colormath.color_conversions import convert_color
-##    from colormath.color_objects import sRGBColor, HSLColor
-##    th,ts,tl = convert_color(sRGBColor(*color, is_upscaled=True), HSLColor).get_value_tuple()
-##
-##    # calc diff (note that cv2 uses different order, HLS instead of HSL)
-##    # THEORY: if "color" (sat > 50 or 30 < lightness < 220), then take max of hue and sat
-##    # but if not "color" (ie opposite), then take max of lightness only
-##    hdiff = abs(th - hsl_im_arr[:,:,0])
-##    ldiff = abs(tl - hsl_im_arr[:,:,1])
-##    sdiff = abs(ts - hsl_im_arr[:,:,2])
-##
-##    maxdiff = np.maximum.reduce([hdiff, ldiff, sdiff])
-##
-##    im.show()
-##    PIL.Image.fromarray(hdiff).show()
-##    PIL.Image.fromarray(ldiff).show()
-##    PIL.Image.fromarray(sdiff).show()
-##    PIL.Image.fromarray(maxdiff).show()
-##    fdsfs
-##    
-##    dissim = diff_im >= thresh
-##
-##    im_arr[dissim] = (255,255,255)
-##
-##
-##    # TODO: Maybe also do gaussian or otsu binarization/smoothing?
-##    # Seems to do worse than original, makes sense since loses/changes original information
-##    # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
-##    import cv2
-##    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
-##    #im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
-##    #ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-##
-##
-##    im = PIL.Image.fromarray(im_arr)
-##    return im
-
-##def threshold(im, color, thresh):
-##    import numpy as np
-##    import cv2
-##
-##    # convert image to hsl
-##    im_arr = np.array(im)
-##    width,height,_ = im_arr.shape
-##    lab_im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2LAB)
-##    print lab_im_arr[:,:,0].max()
-##    print lab_im_arr[:,:,1].max()
-##    print lab_im_arr[:,:,2].max()
-##    print 'converted'
-##
-##    # determine target color
-##    from colormath.color_conversions import convert_color
-##    from colormath.color_objects import sRGBColor, LabColor
-##    from colormath.color_diff_matrix import delta_e_cie2000, delta_e_cie1976
-##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
-##
-##    # calc diff (note that cv2 uses different order, HLS instead of HSL)
-##    diff_im = delta_e_cie1976(target, lab_im_arr.flatten().reshape((width*height, 3))).reshape((width,height))
-##    dissim = diff_im >= thresh
-##
-##    PIL.Image.fromarray(dissim).show()
-##    fsdds
-##    
-##    dissim = diff_im >= thresh
-##
-##    im_arr[dissim] = (255,255,255)
-##
-##
-##    # TODO: Maybe also do gaussian or otsu binarization/smoothing?
-##    # Seems to do worse than original, makes sense since loses/changes original information
-##    # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
-##    import cv2
-##    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
-##    #im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
-##    #ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-##
-##
-##    im = PIL.Image.fromarray(im_arr)
-##    return im
-
-def maincolors(im, classes=5):
+def maincolors(im):
     import pyagg
+
+    # View all colors
 ##    c = pyagg.graph.BarChart()
 ##    bins = im.getcolors(im.size[0]*im.size[1])
 ##    for cn,col in sorted(bins, key=lambda b: -b[0])[:10]:
@@ -356,7 +221,7 @@ def maincolors(im, classes=5):
 ##        x += incr
 ##    c.view()
 
-    # using lab dist...
+    # Using lab dist... (old)
 ##    import numpy as np
 ##    from skimage.color import rgb2lab
 ##    
@@ -369,73 +234,331 @@ def maincolors(im, classes=5):
     # Altern, use kmeans clustering...
     # https://www.alanzucconi.com/2015/05/24/how-to-find-the-main-colours-in-an-image/
     # see also https://www.alanzucconi.com/2015/09/30/colour-sorting/
-    from sklearn.cluster import KMeans
-    from sklearn.metrics import silhouette_score
+##    from sklearn.cluster import KMeans
+##    from sklearn.metrics import silhouette_score
+##
+##    # By Adrian Rosebrock
+##    import numpy as np
+##    import cv2
+##
+##    def centroid_histogram(clt):
+##        # grab the number of different clusters and create a histogram
+##        # based on the number of pixels assigned to each cluster
+##        numLabels = np.arange(0, len(np.unique(clt.labels_)) + 1)
+##        (hist, _) = np.histogram(clt.labels_, bins = numLabels)
+##     
+##        # normalize the histogram, such that it sums to one
+##        hist = hist.astype("float")
+##        hist /= hist.sum()
+##     
+##        # return the histogram
+##        return hist
+##
+##    # Reshape the image to be a list of pixels
+##    im = im.resize((im.size[0]/50, im.size[1]/50))
+##    image_array = np.array(im).reshape((im.size[0] * im.size[1], 3))
+##    print len(image_array)
+##
+##    def drawhist(bins):
+##        c = pyagg.Canvas(1200, 500)
+##        c.custom_space(0, 500, 1200, 0)
+##        maxval = max((b[0] for b in bins))
+##        x = 0
+##        bins = sorted(bins, key=lambda b: -b[0])[:1000]
+##        incr = c.width/float(len(bins))
+##        for cn,col in bins:
+##            c.draw_box(bbox=[x,0,x+incr,cn/float(maxval)*c.height], fillcolor=tuple(col))
+##            x += incr
+##        c.view()
+##
+##    # Clusters the pixels
+##    clt = KMeans(n_clusters=classes)
+##    clt.fit(image_array)
+##
+##    # Finds how many pixels are in each cluster
+##    hist = centroid_histogram(clt)
+##
+##    bins = list(zip(hist, clt.cluster_centers_))
+##    for perc,col in bins:
+##        print perc,col
+##
+##    drawhist(bins)
+##
+####    bestSilhouette = -1
+####    bestClusters = 0
+####
+####    for clusters in range(3, 5): 
+####        print 'clusters',clusters
+####        
+####        # Cluster colours
+####        clt = KMeans(n_clusters = clusters)
+####        clt.fit(image_array)
+####
+####        # Validate clustering result
+####        silhouette = silhouette_score(image_array, clt.labels_, metric='euclidean')
+####
+####        # Find the best one
+####        if silhouette > bestSilhouette:
+####            bestSilhouette = silhouette
+####            bestClusters = clusters
 
-    # By Adrian Rosebrock
+    # EXPERIMENTAL GLOBAL COLOR DETECTION
+##    from colormath.color_objects import sRGBColor, LabColor
+##    from colormath.color_conversions import convert_color
+##    from colormath.color_diff_matrix import delta_e_cie2000
+##
+##    import numpy as np
+##
+##    im_arr = np.array(im)
+##
+##    # quantize and convert colors
+##    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
+##    qcolors = [col for cn,col in sorted(quant.getcolors(256), key=lambda e: e[0])]
+##    colors = [col for cn,col in sorted(quant.convert('RGB').getcolors(256), key=lambda e: e[0])]
+##    colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
+##                  for col in colors]
+##
+##    # calc diffs
+##    pairdiffs = dict()
+##    for col,lcol in zip(colors,colors_lab):
+##        diffs = delta_e_cie2000(lcol, np.array(colors_lab))
+##        for col2,diff in zip(colors,diffs):
+##            if col != col2 and diff <= 10:
+##                pairdiffs[(col,col2)] = diff
+##    print len(colors_lab)*len(colors_lab), len(pairdiffs)
+####    import itertools
+####    pairdiffs = dict()
+####    for (col,lcol),(col2,lcol2) in itertools.combinations(zip(colors,colors_lab), 2):
+####        diff = delta_e_cie2000(lcol, np.array([lcol2]))
+####        if diff <= 10:
+####            pairdiffs[(col,col2)] = diff
+####    print len(colors_lab)*len(colors_lab), len(pairdiffs)
+##    
+##    # group custom
+##    diffgroups = []
+##    popcolors = list(colors)
+##    while popcolors:
+##        pop = popcolors.pop(0)
+##        diffgroup = [pop]
+##        for pair in pairdiffs.keys():
+##            if pair[0]==pop:
+##                conn = pair[1]
+##                diffgroup.append(conn)
+##                try: popcolors.pop(popcolors.index(conn))
+##                except: pass
+##        if len(diffgroup) > 1:
+##            diffgroups.append(diffgroup)
+##    diffgroups = set([tuple(sorted(g)) for g in diffgroups])
+##    for i,g in enumerate(diffgroups):
+##        print i, g[0], len(g)
+##
+##    # group network graph
+####    import networkx as nx
+####    graph = nx.Graph()
+####    graph.add_edges_from(pairdiffs)
+####    groups = nx.connected_components(graph)
+####    for i,g in enumerate(groups):
+####        print i, list(g)[0], len(g)
+##
+##    # view
+##    import pyagg
+##    c=pyagg.Canvas(1000,200)
+##    c.percent_space()
+##    x = 0
+##    for i,g in enumerate(diffgroups):
+##        x += 1
+##        for col in g:
+##            x += 0.1
+##            c.draw_line([(x,0),(x,100)], fillcolor=col, fillsize=0.1)
+##    c.view()
+##    fdsfds
+
+    # EXPERIMENTAL COLOR AREAS
+    colorthresh = 5
+    
+    from colormath.color_objects import sRGBColor, LabColor
+    from colormath.color_conversions import convert_color
+    from colormath.color_diff_matrix import delta_e_cie2000
+
     import numpy as np
+
+    im_arr = np.array(im)
+
+    # compare w normal binarization
+##    import cv2
+##    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
+##    im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
+##    ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+##    PIL.Image.fromarray(im_arr).show()
+
+    # smooth small color changes
     import cv2
+    #im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
+    #im = PIL.Image.fromarray(im_arr)
 
-    def centroid_histogram(clt):
-        # grab the number of different clusters and create a histogram
-        # based on the number of pixels assigned to each cluster
-        numLabels = np.arange(0, len(np.unique(clt.labels_)) + 1)
-        (hist, _) = np.histogram(clt.labels_, bins = numLabels)
-     
-        # normalize the histogram, such that it sums to one
-        hist = hist.astype("float")
-        hist /= hist.sum()
-     
-        # return the histogram
-        return hist
+    # quantize and convert colors
+    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
+    qcolors = [col for cn,col in sorted(quant.getcolors(256), key=lambda e: e[0])]
+    colors = [col for cn,col in sorted(quant.convert('RGB').getcolors(256), key=lambda e: e[0])]
+    colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
+                  for col in colors]
 
-    # Reshape the image to be a list of pixels
-    im = im.resize((im.size[0]/50, im.size[1]/50))
-    image_array = np.array(im).reshape((im.size[0] * im.size[1], 3))
-    print len(image_array)
+    # calc diffs
+    pairdiffs = np.zeros((len(qcolors),len(qcolors)))
+    for qcol,lcol in zip(qcolors,colors_lab):
+        diffs = delta_e_cie2000(lcol, np.array(colors_lab))
+        for qcol2,diff in zip(qcolors,diffs):
+            if 1: #diff > colorthresh:
+                pairdiffs[qcol,qcol2] = diff
+    print len(colors_lab)*len(colors_lab), pairdiffs.shape
+    #PIL.Image.fromarray(pairdiffs).show()
+    #fsdfs
 
-    def drawhist(bins):
-        c = pyagg.Canvas(1200, 500)
-        c.custom_space(0, 500, 1200, 0)
-        maxval = max((b[0] for b in bins))
+    # detect color edges   
+##    orig_flat = np.array(quant).flatten()
+##    diff_im_flat = np.zeros(quant.size).flatten()
+##    for xoff in range(-1, 1+1, 1):
+##        for yoff in range(-1, 1+1, 1):
+##            if xoff == yoff == 0: continue
+##            off_flat = np.roll(quant, (xoff,yoff), (0,1)).flatten()
+##            diff_im_flat = diff_im_flat + pairdiffs[orig_flat,off_flat] #np.maximum(diff_im_flat, pairdiffs[orig_flat,off_flat])
+##    diff_im_flat = diff_im_flat / 8.0
+##
+##    diff_im_flat[diff_im_flat > colorthresh] = 255
+##    diff_im = diff_im_flat.reshape((im.height, im.width))
+##
+##    #diff_im = diff_im_flat.reshape((im.height, im.width)).astype(np.uint8)
+##    #ret,diff_im = cv2.threshold(diff_im,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+##    
+##    print diff_im.min(), diff_im.mean(), diff_im.max()
+##    quant.show()
+##    PIL.Image.fromarray(diff_im).show()
+
+    # group custom
+##    pairdiffs = dict([((colors[qcolors.index(c1)],colors[qcolors.index(c2)]),pairdiffs[c1,c2])
+##                      for c1 in range(pairdiffs.shape[0])
+##                      for c2 in range(pairdiffs.shape[1])
+##                      if pairdiffs[c1,c2] < 2])
+##    print len(pairdiffs)
+####    diffgroups = []
+####    popcolors = list(colors)
+####    while popcolors:
+####        pop = popcolors.pop(0)
+####        diffgroup = [pop]
+####        for pair in pairdiffs.keys():
+####            if pair[0]==pop:
+####                conn = pair[1]
+####                diffgroup.append(conn)
+####                try: popcolors.pop(colors.index(conn))
+####                except: pass
+####        if len(diffgroup) > 1:
+####            diffgroups.append(diffgroup)
+####    diffgroups = set([tuple(sorted(g)) for g in diffgroups])
+####    for i,g in enumerate(diffgroups):
+####        print i, g[0], len(g)
+##
+##    # group network graph
+##    import networkx as nx
+##    graph = nx.Graph()
+##    graph.add_edges_from(pairdiffs)
+##    diffgroups = list(nx.connected_components(graph))
+##    for i,g in enumerate(diffgroups):
+##        print i, list(g)[0], len(g)
+
+    # TODO: include count weights when calculating and assigning to main groups
+    # ...
+
+    # group custom 2
+    print pairdiffs.shape
+    diffgroups = dict()
+    for c in range(pairdiffs.shape[0]):
+        # find closest existing group that is sufficiently similar
+        dists = [(gc,pairdiffs[c,gc]) for gc in diffgroups.keys()]
+        similar = [(gc,dist) for gc,dist in dists if c != gc and dist < 10]
+        if similar:
+            nearest = sorted(similar, key=lambda x: x[1])[0][0]
+            diffgroups[nearest].append(c)
+            # update that group key as the new central color (lowest avg dist to group members)
+            gdists = [(gc1,[pairdiffs[gc1,gc2] for gc2 in diffgroups[nearest]]) for gc1 in diffgroups[nearest]]
+            central = sorted(gdists, key=lambda(gc,gds): sum(gds)/float(len(gds)))[0][0]
+            diffgroups[central] = diffgroups.pop(nearest)
+        else:
+            diffgroups[c] = [c]
+    # maybe also group color groupings together...
+##    diffgroups2 = dict()
+##    for c in diffgroups.keys():
+##        # find closest existing group that is sufficiently similar
+##        dists = [(gc,pairdiffs[c,gc]) for gc in diffgroups2.keys()]
+##        similar = [(gc,dist) for gc,dist in dists if c != gc and dist < 10]
+##        if similar:
+##            nearest = sorted(similar, key=lambda x: x[1])[0][0]
+##            diffgroups2[nearest].append(c)
+##            # update that group key as the new central color (lowest avg dist to group members)
+##            gdists = [(gc1,[pairdiffs[gc1,gc2] for gc2 in diffgroups2[nearest]]) for gc1 in diffgroups2[nearest]]
+##            central = sorted(gdists, key=lambda(gc,gds): sum(gds)/float(len(gds)))[0][0]
+##            diffgroups2[central] = diffgroups2.pop(nearest)
+##        else:
+##            diffgroups2[c] = [c]
+##    diffgroups = dict([(k,sum([diffgroups[gc] for gc in g],[])) for k,g in diffgroups2.items()])
+    # convert back to rgb
+    diffgroups_dict = diffgroups
+    diffgroups_rgb = dict([(colors[qcolors.index(q)], [colors[qcolors.index(c)] for c in g]) for q,g in diffgroups.items()])
+
+    # for alternative groupings, see https://scikit-learn.org/stable/modules/clustering.html
+    # ...
+
+    # maybe cluster neighbouring color pixels based on most similar color/class in regional neighbourhood
+    # ...
+
+    # view
+    if 1:
+        import pyagg
+        c=pyagg.Canvas(1000,200)
+        c.percent_space()
+        x = 2
+        for i,g in enumerate(diffgroups_dict.keys()):
+            g = colors[qcolors.index(g)]
+            print i, g
+            x += 2
+            c.draw_line([(x,0),(x,100)], fillcolor=g, fillsize=2)
+        c.view()
+        
+        c=pyagg.Canvas(1000,200)
+        c.percent_space()
         x = 0
-        bins = sorted(bins, key=lambda b: -b[0])[:1000]
-        incr = c.width/float(len(bins))
-        for cn,col in bins:
-            c.draw_box(bbox=[x,0,x+incr,cn/float(maxval)*c.height], fillcolor=tuple(col))
-            x += incr
+        for i,g in enumerate(diffgroups_rgb.values()):
+            print i, list(g)[0], len(g)
+            x += 1
+            for col in g:
+                x += 0.3
+                c.draw_line([(x,0),(x,100)], fillcolor=col, fillsize=0.3)
         c.view()
 
-    # Clusters the pixels
-    clt = KMeans(n_clusters=classes)
-    clt.fit(image_array)
-
-    # Finds how many pixels are in each cluster
-    hist = centroid_histogram(clt)
-
-    bins = list(zip(hist, clt.cluster_centers_))
-    for perc,col in bins:
-        print perc,col
-
-    drawhist(bins)
-
-##    bestSilhouette = -1
-##    bestClusters = 0
+    if 1:
+        # view colors in image
+        quant.show()
+        qarr = np.array(quant)
+##        for k,g in diffgroups_dict.items():
+##            colim = im_arr.copy()
+##            
+##    ##        colim[np.isin(qarr, g, invert=True)] = [255,255,255] #[0,0,0]
+##            
+##            diffs = [pairdiffs[k,oth] for oth in qcolors]
+##            difftable = dict(list(zip(qcolors,diffs)))
+##            diff_im_flat = np.array(quant).flatten()
+##            for qcol,diff in difftable.items():
+##                diff_im_flat[diff_im_flat==qcol] = diff
+##            diff_im = diff_im_flat.reshape((im.height, im.width))
+##            dissim = diff_im > 10
+##            colim[dissim] = (255,255,255)
 ##
-##    for clusters in range(3, 5): 
-##        print 'clusters',clusters
-##        
-##        # Cluster colours
-##        clt = KMeans(n_clusters = clusters)
-##        clt.fit(image_array)
-##
-##        # Validate clustering result
-##        silhouette = silhouette_score(image_array, clt.labels_, metric='euclidean')
-##
-##        # Find the best one
-##        if silhouette > bestSilhouette:
-##            bestSilhouette = silhouette
-##            bestClusters = clusters
+##            PIL.Image.fromarray(colim).show()
+        colim = np.zeros((im_arr.shape[0]*im_arr.shape[1]*3,), np.uint8).reshape(im_arr.shape)
+        for k,g in diffgroups_dict.items():
+            colim[np.isin(qarr, g)] = colors[qcolors.index(k)]
+        PIL.Image.fromarray(colim).show()
+    
+    return diffgroups_rgb
 
 def detect_boxes(im):
     # detect boxes from contours
@@ -681,7 +804,7 @@ def warp(im, tiepoints):
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "testmaps/warpedinput.tif" "testmaps/warped.tif"'.format(gcptext=gcptext)
     os.system(call) #-order 3 -refine_gcps 20 4 # -tps
-    os.system('gdalwarp -r bilinear -order 3 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
+    os.system('gdalwarp -r bilinear -order 1 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
 
 def debug_orig(im):
     im.save('testmaps/testorig.jpg')
@@ -726,7 +849,7 @@ def debug_warped(pth, orignames, matchnames, matchcoords):
     m.zoom_out(2)
     m.view()
 
-def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=None, **kwargs):
+def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, **kwargs):
     print 'loading image'
     im = PIL.Image.open(pth).convert('RGB')
     if bbox:
@@ -741,8 +864,11 @@ def automap(pth, matchthresh=0.1, textcolor=(0,0,0), colorthresh=25, textconf=60
     #sefsdf
 
     # histogram testing
-    #maincolors(im)
-    #fsdf
+    if not textcolor:
+        print 'detecting colors'
+        colorgroups = maincolors(im)
+        black = sorted(colorgroups.keys(), key=lambda k: sum(k)/3.0)[0] # avg color, lowest=black
+        textcolor = black
 
     # NOTE: upscale -> threshold creates phenomenal resolution and ocr detections, but is slower and demands much more memory
     # consider doing threshold -> upscale if memoryerror...
