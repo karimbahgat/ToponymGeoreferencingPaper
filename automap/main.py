@@ -746,12 +746,16 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
 ##    print 'test black ocr...'
 ##    print len(detect_data(im_prep_thresh))
 
-    # MAYBE at this stage of detecting placenames, only do ocr on grayish color groups?
+    # ALTERNATIVELY, resize to 4 times size, detect text of any color
+    # based on color change boundaries/standard deviation
     # ...
-    
-    for color in colorgroups.keys():
+
+    # placenames should be mostly in grayscale colors, so limit ocr to different levels of grayish colors
+    # only loop detected colors that are similar to various grayshades
+    for gray in range(0, 150+1, 50):
 
         # threshold
+        color = (gray,gray,gray)
         print 'thresholding', color
         im_prep_thresh = threshold(im_prep, color, colorthresh)
         im_prep_thresh.show()
