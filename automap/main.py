@@ -9,177 +9,31 @@ import pytesseract as t
 
 import PIL, PIL.Image
 
+from colormath.color_objects import sRGBColor, LabColor
+from colormath.color_conversions import convert_color
+from colormath.color_diff_matrix import delta_e_cie2000
+
+import numpy as np
+
 
 def threshold(im, color, thresh):
-##    from colormath.color_objects import sRGBColor, LabColor
-##    from colormath.color_conversions import convert_color
-##    from colormath.color_diff import delta_e_cie2000
-##    color = (0,0,0)
-##    target = convert_color(sRGBColor(*color), LabColor)
-##    px = im.load()
-##    coldict = dict()
-##    for y in range(im.size[1]):
-##        for x in range(im.size[0]):
-##            rgb = px[x,y]
-##            if rgb in coldict:
-##                diff = coldict.get(rgb)
-##                #print 'getting',rgb
-##            else:
-##                pxcol = convert_color(sRGBColor(*[v/255.0 for v in rgb]), LabColor)
-##                diff = delta_e_cie2000(target, pxcol)
-##                #print 'adding',rgb
-##                coldict[rgb] = diff
-##            if diff < thresh:
-##                #print rgb,diff
-##                pass #px[x,y] = target
-##            else:
-##                px[x,y] = (255,255,255)
-
-##    from colormath.color_objects import sRGBColor, LabColor
-##    from colormath.color_conversions import convert_color
-##
-##    from PIL import ImageCms
-##    srgb_profile = ImageCms.createProfile("sRGB")
-##    lab_profile  = ImageCms.createProfile("LAB")
-##    rgb2lab_transform = ImageCms.buildTransformFromOpenProfiles(srgb_profile, lab_profile, "RGB", "LAB")
-##    lab_im = ImageCms.applyTransform(im, rgb2lab_transform)
-##
-##    color = (0,0,0)
-##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
-##    tl,ta,tb = target
-##    threshsq = thresh**2
-##    px = im.load()
-##    lab_px = lab_im.load()
-##    coldict = dict()
-##    for y in range(im.size[1]):
-##        for x in range(im.size[0]):
-##            lab = lab_px[x,y]
-##            #print lab,target
-##            if lab in coldict:
-##                diff = coldict.get(lab)
-##                #print 'getting',rgb
-##            else:
-##                l,a,b = lab
-##                diff = (tl-l)**2 + (ta-a)**2 + (tb-b)**2
-##                print diff,threshsq
-##                #print 'adding',rgb
-##                coldict[lab] = diff
-##            if diff < threshsq:
-##                #print rgb,diff
-##                print diff,threshsq
-##                pass #px[x,y] = target
-##            else:
-##                px[x,y] = (255,255,255)
-
-
-
-##    from colormath.color_objects import sRGBColor, LabColor
-##    from colormath.color_conversions import convert_color
-##    from colormath.color_diff_matrix import delta_e_cie2000
-##
-##    import numpy as np
-##
-##    # PIL approach is not perfect, conversion to LAB is not fully accurate
-##    # TODO: switch to this: https://code.i-harness.com/en/q/3142c9
-##    # see https://stackoverflow.com/questions/21210479/converting-from-rgb-to-lab-colorspace-any-insight-into-the-range-of-lab-val
-##    from PIL import ImageCms
-##    srgb_profile = ImageCms.createProfile("sRGB")
-##    lab_profile  = ImageCms.createProfile("LAB")
-##    rgb2lab_transform = ImageCms.buildTransformFromOpenProfiles(srgb_profile, lab_profile, "RGB", "LAB")
-##    lab_im = ImageCms.applyTransform(im, rgb2lab_transform)
-##
-##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
-##    lab_im_arr = np.array(lab_im).astype(np.float32) / 255.0 * 100 # PIL uses 0-255, but colormath expects 0-100
-##    w,h,_ = lab_im_arr.shape
-##    diff_im = delta_e_cie2000(target, lab_im_arr.flatten().reshape((w*h, 3))).reshape((w,h))
-##    dissim = diff_im >= thresh
-##
-##    im_arr = np.array(im) 
-##    im_arr[dissim] = (255,255,255)
-##
-##    im = PIL.Image.fromarray(im_arr)
-
-    
-
-##    from colormath.color_objects import sRGBColor, LabColor
-##    from colormath.color_conversions import convert_color
-##    from colormath.color_diff_matrix import delta_e_cie2000
-##
-##    import numpy as np
-##
-##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor)
-##
-####    func = lambda rgb: convert_color(sRGBColor(*rgb, is_upscaled=True), LabColor).get_value_tuple()
-####    vfunc = np.vectorize(func)
-####    im_arr = np.array(im)
-####    lab_im_arr = vfunc(im_arr)
-##
-##    im_arr = np.array(im)
-##    lab_im_arr = np.array(im)
-##
-##    coldict = dict()
-##    for y in range(im.size[1]):
-##        for x in range(im.size[0]):
-##            rgb = tuple(im_arr[y,x])
-##            if rgb in coldict:
-##                lab = coldict.get(rgb)
-##            else:
-##                lab = convert_color(sRGBColor(*rgb, is_upscaled=True), LabColor).get_value_tuple()
-##            lab_im_arr[y,x] = lab
-##
-##    print im_arr
-##    print lab_im_arr
-##
-##    fdsfs
-##
-##    w,h,_ = lab_im_arr.shape
-##    diff_im = delta_e_cie2000(target, lab_im_arr.flatten().reshape((w*h, 3))).reshape((w,h))
-##    dissim = diff_im >= thresh
-##    
-##    im_arr[dissim] = (255,255,255)
-##
-##    im = PIL.Image.fromarray(im_arr)
-
-    from colormath.color_objects import sRGBColor, LabColor
-    from colormath.color_conversions import convert_color
-    from colormath.color_diff_matrix import delta_e_cie2000
-
-    import numpy as np
-
     im_arr = np.array(im)
 
-    # fast way (but maybe slightly worse ocr due to quantization?)
-    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
-    qcolors = [col for cn,col in sorted(quant.getcolors(256), key=lambda e: e[0])]
-    colors = [col for cn,col in sorted(quant.convert('RGB').getcolors(256), key=lambda e: e[0])]
-    colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
-                  for col in colors]
+    #target = color
+    #diffs = [pairdiffs[tuple(sorted([target,oth]))] for oth in colors if oth != target]
 
     target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
+    counts,colors = zip(*im.getcolors(256))
+    colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
+                  for col in colors]
     diffs = delta_e_cie2000(target, np.array(colors_lab))
     
-    difftable = dict(list(zip(qcolors,diffs)))
-    diff_im_flat = np.array(quant).flatten()
-    for qcol,diff in difftable.items():
-        diff_im_flat[diff_im_flat==qcol] = diff
-
-    diff_im = diff_im_flat.reshape((im.height, im.width))
-    
+    difftable = dict(list(zip(colors,diffs)))
+    diff_im = np.zeros((im.height,im.width))
+    for col,diff in difftable.items():
+        #print col
+        diff_im[(im_arr[:,:,0]==col[0])&(im_arr[:,:,1]==col[1])&(im_arr[:,:,2]==col[2])] = diff # 3 lookup is slow
     dissim = diff_im > thresh
-
-    # slower but stable?
-##    from skimage.color import rgb2lab
-##    w,h,_ = im_arr.shape
-##    lab_im_arr = rgb2lab(im_arr)
-##
-##    target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
-##    w,h,_ = lab_im_arr.shape
-##    diff_im = delta_e_cie2000(target, lab_im_arr.flatten().reshape((w*h, 3))).reshape((w,h))
-##    dissim = diff_im >= thresh
-
-    #PIL.Image.fromarray(diff_im).show()
-    #fdsfs
-
     im_arr[dissim] = (255,255,255)
     #PIL.Image.fromarray(im_arr).show()
     #fdsf
@@ -194,6 +48,29 @@ def threshold(im, color, thresh):
 
     im = PIL.Image.fromarray(im_arr)
     return im
+
+def quantize(im):
+    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256).convert('RGB')
+    return quant
+
+def color_differences(colors):
+    colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
+                  for col in colors]
+    pairdiffs = dict()
+    for lcol1,group in itertools.groupby(itertools.combinations(colors_lab, 2), key=lambda pair: pair[0]):
+        group = list(group)
+        #print lcol1, len(group), group[0]
+        _,lcol2s = zip(*group)
+        diffs = delta_e_cie2000(lcol1, np.array(lcol2s))
+        col1 = colors[colors_lab.index(lcol1)]
+        for lcol2,diff in zip(lcol2s, diffs):
+            col2 = colors[colors_lab.index(lcol2)]
+            pair = tuple(sorted([col1,col2]))
+            pairdiffs[pair] = diff
+    #print len(colors_lab)*len(colors_lab), pairdiffs.shape
+    #PIL.Image.fromarray(pairdiffs).show()
+    #fsdfs
+    return pairdiffs
 
 def maincolors(im):
     import pyagg
@@ -376,12 +253,6 @@ def maincolors(im):
     # EXPERIMENTAL COLOR AREAS
     colorthresh = 5
     
-    from colormath.color_objects import sRGBColor, LabColor
-    from colormath.color_conversions import convert_color
-    from colormath.color_diff_matrix import delta_e_cie2000
-
-    import numpy as np
-
     im_arr = np.array(im)
 
     # compare w normal binarization
@@ -397,24 +268,13 @@ def maincolors(im):
     #im = PIL.Image.fromarray(im_arr)
 
     # quantize and convert colors
-    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
-    qcolors = [col for cn,col in sorted(quant.getcolors(256), key=lambda e: e[0])]
-    colors = [col for cn,col in sorted(quant.convert('RGB').getcolors(256), key=lambda e: e[0])]
-    colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
-                  for col in colors]
+    quant = quantize(im)
+    counts,colors = zip(*quant.getcolors(256))
 
     # calc diffs
-    pairdiffs = np.zeros((len(qcolors),len(qcolors)))
-    for qcol,lcol in zip(qcolors,colors_lab):
-        diffs = delta_e_cie2000(lcol, np.array(colors_lab))
-        for qcol2,diff in zip(qcolors,diffs):
-            if 1: #diff > colorthresh:
-                pairdiffs[qcol,qcol2] = diff
-    print len(colors_lab)*len(colors_lab), pairdiffs.shape
-    #PIL.Image.fromarray(pairdiffs).show()
-    #fsdfs
+    pairdiffs = color_differences(colors)
 
-    # detect color edges   
+    # detect color edges
 ##    orig_flat = np.array(quant).flatten()
 ##    diff_im_flat = np.zeros(quant.size).flatten()
 ##    for xoff in range(-1, 1+1, 1):
@@ -469,17 +329,18 @@ def maincolors(im):
     # ...
 
     # group custom 2
-    print pairdiffs.shape
+    colorthresh = 15
+    
     diffgroups = dict()
-    for c in range(pairdiffs.shape[0]):
+    for c in colors:
         # find closest existing group that is sufficiently similar
-        dists = [(gc,pairdiffs[c,gc]) for gc in diffgroups.keys()]
-        similar = [(gc,dist) for gc,dist in dists if c != gc and dist < 10]
+        dists = [(gc,pairdiffs[tuple(sorted([c,gc]))]) for gc in diffgroups.keys()]
+        similar = [(gc,dist) for gc,dist in dists if c != gc and dist < colorthresh]
         if similar:
             nearest = sorted(similar, key=lambda x: x[1])[0][0]
             diffgroups[nearest].append(c)
             # update that group key as the new central color (lowest avg dist to group members)
-            gdists = [(gc1,[pairdiffs[gc1,gc2] for gc2 in diffgroups[nearest]]) for gc1 in diffgroups[nearest]]
+            gdists = [(gc1,[pairdiffs[tuple(sorted([c,gc]))] for gc2 in diffgroups[nearest]]) for gc1 in diffgroups[nearest]]
             central = sorted(gdists, key=lambda(gc,gds): sum(gds)/float(len(gds)))[0][0]
             diffgroups[central] = diffgroups.pop(nearest)
         else:
@@ -489,7 +350,7 @@ def maincolors(im):
 ##    for c in diffgroups.keys():
 ##        # find closest existing group that is sufficiently similar
 ##        dists = [(gc,pairdiffs[c,gc]) for gc in diffgroups2.keys()]
-##        similar = [(gc,dist) for gc,dist in dists if c != gc and dist < 10]
+##        similar = [(gc,dist) for gc,dist in dists if c != gc and dist < colorthresh]
 ##        if similar:
 ##            nearest = sorted(similar, key=lambda x: x[1])[0][0]
 ##            diffgroups2[nearest].append(c)
@@ -500,9 +361,6 @@ def maincolors(im):
 ##        else:
 ##            diffgroups2[c] = [c]
 ##    diffgroups = dict([(k,sum([diffgroups[gc] for gc in g],[])) for k,g in diffgroups2.items()])
-    # convert back to rgb
-    diffgroups_dict = diffgroups
-    diffgroups_rgb = dict([(colors[qcolors.index(q)], [colors[qcolors.index(c)] for c in g]) for q,g in diffgroups.items()])
 
     # for alternative groupings, see https://scikit-learn.org/stable/modules/clustering.html
     # ...
@@ -516,25 +374,24 @@ def maincolors(im):
         c=pyagg.Canvas(1000,200)
         c.percent_space()
         x = 2
-        for i,g in enumerate(diffgroups_dict.keys()):
-            g = colors[qcolors.index(g)]
+        for i,g in enumerate(diffgroups.keys()):
             print i, g
             x += 2
             c.draw_line([(x,0),(x,100)], fillcolor=g, fillsize=2)
-        c.view()
+        c.get_image().show()
         
         c=pyagg.Canvas(1000,200)
         c.percent_space()
         x = 0
-        for i,g in enumerate(diffgroups_rgb.values()):
+        for i,g in enumerate(diffgroups.values()):
             print i, list(g)[0], len(g)
             x += 1
             for col in g:
                 x += 0.3
                 c.draw_line([(x,0),(x,100)], fillcolor=col, fillsize=0.3)
-        c.view()
+        c.get_image().show()
 
-    if 1:
+    if 0:
         # view colors in image
         quant.show()
         qarr = np.array(quant)
@@ -554,11 +411,11 @@ def maincolors(im):
 ##
 ##            PIL.Image.fromarray(colim).show()
         colim = np.zeros((im_arr.shape[0]*im_arr.shape[1]*3,), np.uint8).reshape(im_arr.shape)
-        for k,g in diffgroups_dict.items():
-            colim[np.isin(qarr, g)] = colors[qcolors.index(k)]
+        for k,g in diffgroups.items():
+            colim[np.isin(qarr, g)] = k
         PIL.Image.fromarray(colim).show()
     
-    return diffgroups_rgb
+    return diffgroups
 
 def detect_boxes(im):
     # detect boxes from contours
@@ -864,11 +721,8 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
     #sefsdf
 
     # histogram testing
-    if not textcolor:
-        print 'detecting colors'
-        colorgroups = maincolors(im)
-        black = sorted(colorgroups.keys(), key=lambda k: sum(k)/3.0)[0] # avg color, lowest=black
-        textcolor = black
+    print 'detecting colors'
+    colorgroups = maincolors(im_prep)
 
     # NOTE: upscale -> threshold creates phenomenal resolution and ocr detections, but is slower and demands much more memory
     # consider doing threshold -> upscale if memoryerror...
@@ -877,23 +731,57 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
     print 'upscaling'
     im_prep = im_prep.resize((im_prep.size[0]*2, im_prep.size[1]*2), PIL.Image.LANCZOS)
 
-    # threshold
-    print 'thresholding'
-    im_prep = threshold(im_prep, textcolor, colorthresh)
-    debug_prep(im_prep)
+    # precalc color differences (MAYBE move to inside threshold?)
+    print 'quantize'
+    im_prep = quantize(im_prep)
+    #counts,colors = zip(*im_prep.getcolors(256))
+    #pairdiffs = color_differences(colors)
 
-    # ocr
-    print 'detecting text'
-    data = detect_data(im_prep) 
-    data = filter(lambda r:
-                  r.get('text')
-                  and len(r['text'].strip(''' *'".,:''').replace(' ','')) >= 3
-                  and not r['text'].strip(''' *'".,:''').replace(' ','').isnumeric()
-                  and r['text'].strip(''' *'".,:''')[0].isupper()
-                  and not r['text'].strip(''' *'".,:''').isupper()
-                  and int(r['conf']) >= textconf
-                  ,
-                  data)
+    # for each color
+    data = []
+
+##    print 'test black...'
+##    im_prep_thresh = threshold(im_prep, (0,0,0), colorthresh)
+##    im_prep_thresh.show()
+##    print 'test black ocr...'
+##    print len(detect_data(im_prep_thresh))
+
+    # MAYBE at this stage of detecting placenames, only do ocr on grayish color groups?
+    # ...
+    
+    for color in colorgroups.keys():
+
+        # threshold
+        print 'thresholding', color
+        im_prep_thresh = threshold(im_prep, color, colorthresh)
+        im_prep_thresh.show()
+        #debug_prep(im_prep_thresh)
+
+        # ocr
+        print 'detecting text'
+        subdata = detect_data(im_prep_thresh)
+        subdata = filter(lambda r:
+                      r.get('text')
+                      and len(r['text'].strip(''' *'".,:''').replace(' ','')) >= 3
+                      and not r['text'].strip(''' *'".,:''').replace(' ','').isnumeric()
+                      and r['text'].strip(''' *'".,:''')[0].isupper()
+                      and not r['text'].strip(''' *'".,:''').isupper()
+                      and int(r['conf']) >= textconf
+                      ,
+                      subdata)
+
+        # assign text characteristics
+        for dct in subdata:
+            dct['color'] = color
+
+        # filter out duplicates from previous loop, in case includes some of the same pixels
+        subdata = [r for r in subdata
+                   if (r['top'],r['left'],r['width'],r['height'])
+                   not in [(dr['top'],dr['left'],dr['width'],dr['height']) for dr in data]
+                   ]
+
+        data.extend(subdata)
+        print 'text data size', len(subdata), len(data)
 
     # downscale the data coordinates of the upscaled image back to original coordinates
     for r in data: 
