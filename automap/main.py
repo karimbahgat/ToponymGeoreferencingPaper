@@ -14,6 +14,7 @@ from colormath.color_conversions import convert_color
 from colormath.color_diff_matrix import delta_e_cie2000
 
 import numpy as np
+import cv2
 
 
 def threshold(im, color, thresh):
@@ -389,7 +390,7 @@ def maincolors(im):
             for col in g:
                 x += 0.3
                 c.draw_line([(x,0),(x,100)], fillcolor=col, fillsize=0.3)
-        c.get_image().show()
+        #c.get_image().show()
 
     if 0:
         # view colors in image
@@ -413,7 +414,7 @@ def maincolors(im):
         colim = np.zeros((im_arr.shape[0]*im_arr.shape[1]*3,), np.uint8).reshape(im_arr.shape)
         for k,g in diffgroups.items():
             colim[np.isin(qarr, g)] = k
-        PIL.Image.fromarray(colim).show()
+        #PIL.Image.fromarray(colim).show()
     
     return diffgroups
 
@@ -447,16 +448,19 @@ def detect_data(im, bbox=None):
     return drows
 
 def detect_text_points(im, data):
-    points = []
-    for r in data:
-        text = r['text']
-        text = text.strip().strip(''' *'".,:''')
-        x = int(r['left'])
-        y = int(r['top'])
-        pt = (text, (x,y))
-        print pt
-        points.append( pt )
+    # simple
+##    points = []
+##    for r in data:
+##        text = r['text']
+##        text = text.strip().strip(''' *'".,:''')
+##        x = int(r['left'])
+##        y = int(r['top'])
+##        pt = (text, (x,y))
+##        print pt
+##        points.append( pt )
+    
 
+    # experiments...
 ##    import numpy as np
 ##    import cv2
 ##    points = []
@@ -534,6 +538,115 @@ def detect_text_points(im, data):
 ####            print text,c
 ####            p = (int(c.centroid.x), int(c.centroid.y))
 ####            points.append((text, p))
+
+
+    # final?
+    points = []
+    im_arr = np.array(im) #cv2.cvtColor(np.array(im), cv2.COLOR_RGB2GRAY)
+    #PIL.Image.fromarray(im_arr).show()
+    
+    filt_im_arr = np.ones(im_arr.shape[:2], dtype=bool)
+    for r in data:
+        text = r['text']
+        text = text.strip().strip(''' *'".,:''')
+        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+        x2 = x1+w
+        y2 = y1+h
+
+        # possibly, narrow down the actual bbox via avg pixel coords
+##        onxs,onys = np.nonzero(im_arr == 0)
+##        tot = len(onxs)
+##        onxcounts = zip(*onxs.unique(return_counts=True))
+##        onycounts = zip(*onys.unique(return_counts=True))
+##        # ...hmm...
+
+        buff = int(h * 1.5)
+        filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff] = False # look in buffer zone around text box
+        #filt_im_arr[y1:y2, x1:x2] = True # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
+    im_arr[filt_im_arr] = 255
+    #im_arr[im_arr < 255] = 0
+    PIL.Image.fromarray(im_arr).show()
+
+    # determine kernel size from avg text height
+    h = sum([int(r['height']) for r in data]) / len(data)
+    h /= 2
+    print 'kernel size', h
+
+    # get average value in neighbourhood
+##    kernel = np.ones((h,h)) / (h*h)
+##    im_arr = 255 - im_arr # invert
+##    im_arr = cv2.filter2D(im_arr, -1, kernel) #cv2.blur(im_arr, (buff,buff)) #cv2.boxFilter(im_arr, -1, buff)
+##    #im_arr = cv2.distanceTransform(im_arr, cv2.DIST_L1, 3)
+##    print im_arr.max(), im_arr.mean()
+##    PIL.Image.fromarray(im_arr).show()
+
+    # get distance to center
+    im_arr = 255 - im_arr # invert
+    ret,im_arr = cv2.threshold(im_arr,200,255,cv2.THRESH_BINARY)
+    PIL.Image.fromarray(im_arr).show()
+    im_arr = cv2.distanceTransform(im_arr, cv2.DIST_L2, 3)
+    dist_arr = im_arr.copy()
+    print im_arr.max(), im_arr.mean()
+    PIL.Image.fromarray(im_arr*50).show()
+
+    # get highest value in neighbourhood
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(h*2,h*2))
+    max_arr = cv2.dilate(im_arr,kernel,iterations=1)
+    PIL.Image.fromarray(max_arr*50).show()
+
+    im_arr[im_arr != max_arr] = 0
+    #im_arr[im_arr < 100] = 0
+    #im_arr[im_arr == 0] = 0
+    #im_arr[(im_arr > 0) & (im_arr == max_arr)] = 255
+    print im_arr.max(), im_arr.mean()
+    PIL.Image.fromarray(im_arr*50).show()
+
+    # get shape centers
+    centers = np.nonzero(im_arr)
+    centervals = list(im_arr[centers]) #[im_arr[cx, cy] for cx,cy in centers]
+    centers = [(pt[1],pt[0]) for pt in np.transpose(centers)]
+    print 'centers', len(centers)
+
+    # link each text to closest point
+    import pyagg
+    c = pyagg.canvas.from_image(PIL.Image.fromarray(dist_arr*50))
+    
+    points = []
+    for r in data:
+        text = r['text']
+        text = text.strip().strip(''' *'".,:''')
+        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+        x2 = x1+w
+        y2 = y1+h
+        # buffer
+        x1 -= h
+        x2 += h
+        y1 -= h
+        y2 += h
+        # first those within buffered bbox
+        nearby = filter(lambda(x,y): x1 < x < x2 and y1 < y < y2, centers)
+
+        c.draw_box(bbox=[x1,y1,x2,y2], fillcolor=None, outlinecolor=(0,255,0))
+
+        if nearby:
+            # choose the nearest circle
+##            nearest = sorted(nearby, key=lambda x: x[1])[0]
+##            c = nearest[0]
+##            print text,c
+##            p = (int(c.centroid.x), int(c.centroid.y))
+##            points.append((text, p))
+            
+            # or choose the highest value pixel (most concentrated)
+            maxpt = max(nearby, key=lambda pt: centervals[centers.index(pt)])
+            maxpt = map(int, maxpt)
+            points.append((text, maxpt))
+
+            for n in nearby:
+                c.draw_circle(xy=n, fillsize=centervals[centers.index(n)], fillcolor=None, outlinecolor=(255,0,0))
+
+            c.draw_circle(xy=maxpt, fillsize=1, fillcolor=None, outlinecolor=(0,0,255))
+
+    c.get_image().show()
     
     return points
 
@@ -660,7 +773,7 @@ def warp(im, tiepoints):
     im.save('testmaps/warpedinput.tif')
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "testmaps/warpedinput.tif" "testmaps/warped.tif"'.format(gcptext=gcptext)
-    os.system(call) #-order 3 -refine_gcps 20 4 # -tps
+    os.system(call) #-order 3 -refine_gcps 4 10 # -tps
     os.system('gdalwarp -r bilinear -order 1 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
 
 def debug_orig(im):
@@ -721,8 +834,8 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
     #sefsdf
 
     # histogram testing
-    print 'detecting colors'
-    colorgroups = maincolors(im_prep)
+    #print 'detecting colors'
+    #colorgroups = maincolors(im_prep)
 
     # NOTE: upscale -> threshold creates phenomenal resolution and ocr detections, but is slower and demands much more memory
     # consider doing threshold -> upscale if memoryerror...
@@ -752,7 +865,7 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
 
     # placenames should be mostly in grayscale colors, so limit ocr to different levels of grayish colors
     # only loop detected colors that are similar to various grayshades
-    for gray in range(0, 150+1, 50):
+    for gray in [0]: #range(0, 150+1, 50):
 
         # threshold
         color = (gray,gray,gray)
@@ -770,7 +883,7 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
                       and not r['text'].strip(''' *'".,:''').replace(' ','').isnumeric()
                       and r['text'].strip(''' *'".,:''')[0].isupper()
                       and not r['text'].strip(''' *'".,:''').isupper()
-                      and int(r['conf']) >= textconf
+                      #and int(r['conf']) >= textconf
                       ,
                       subdata)
 
@@ -787,17 +900,20 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
         data.extend(subdata)
         print 'text data size', len(subdata), len(data)
 
+    # detect text coordinates
+    print 'determening text anchors'
+    points = detect_text_points(im_prep_thresh, data)
+
     # downscale the data coordinates of the upscaled image back to original coordinates
     for r in data: 
         for k in 'top left width height'.split():
             r[k] = int(r[k]) / 2
 
+    # same for points
+    points = [(text,(x/2, y/2)) for text,(x,y) in points]       
+
     # end prep, switch back to original image
     im = im
-
-    # detect text coordinates
-    print 'determening text anchors'
-    points = detect_text_points(im, data)
 
     # find matches
     print 'finding matches'
