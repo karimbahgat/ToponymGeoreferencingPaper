@@ -1,6 +1,7 @@
 
 from .triangulate import triangulate, triangulate_add, geocode
 from .shapematch import normalize
+from .rmse import optimal_rmse
 
 import os
 import itertools
@@ -767,14 +768,14 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
             
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
-def warp(im, tiepoints):
+def warp(im, tiepoints, order):
     import os
     print 'control points:', tiepoints
     im.save('testmaps/warpedinput.tif')
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "testmaps/warpedinput.tif" "testmaps/warped.tif"'.format(gcptext=gcptext)
-    os.system(call) #-order 3 -refine_gcps 4 10 # -tps
-    os.system('gdalwarp -r bilinear -order 1 -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"')
+    os.system(call) #-order 3 -refine_gcps 10 10 # -tps
+    os.system('gdalwarp -r bilinear -order {order} -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"'.format(order=order))
 
 def debug_orig(im):
     im.save('testmaps/testorig.jpg')
@@ -819,7 +820,7 @@ def debug_warped(pth, orignames, matchnames, matchcoords):
     m.zoom_out(2)
     m.view()
 
-def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, **kwargs):
+def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=2, max_residual=0.05, **kwargs):
     print 'loading image'
     im = PIL.Image.open(pth).convert('RGB')
     if bbox:
@@ -925,9 +926,16 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
     for on,mc,mn in zip(orignames,matchcoords,matchnames):
         print on,mc,mn
 
+    # exclude outliers
+    print 'excluding outliers'
+    frompoints,topoints = zip(*tiepoints)
+    best, best_frompoints, best_topoints, best_residuals = optimal_rmse(warp_order, frompoints, topoints, max_residual=max_residual)
+    tiepoints = zip(best_frompoints, best_topoints)
+    print 'RMSE:', best
+
     # warp
     print 'warping'
-    warp(im, tiepoints)
+    warp(im, tiepoints, warp_order)
 
     # draw data onto image
     debug_ocr(im, data, points, origs)
@@ -1056,7 +1064,7 @@ def drawpoints(img):
     print points
     return points
 
-def manual(pth, matchthresh=0.1, bbox=None, **kwargs):
+def manual(pth, matchthresh=0.1, bbox=None, warp_order=2, **kwargs):
     print 'loading image'
     im = PIL.Image.open(pth).convert('RGB')
     if bbox:
@@ -1079,7 +1087,7 @@ def manual(pth, matchthresh=0.1, bbox=None, **kwargs):
 
     # warp
     print 'warping'
-    warp(im, tiepoints)
+    warp(im, tiepoints, warp_order)
 
     # draw data onto image
     #debug_ocr(im, data, points, origs)
