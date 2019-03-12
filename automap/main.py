@@ -803,10 +803,10 @@ def warp(im, outpath, tiepoints, order=None):
 def debug_prep(im, outpath):
     im.save(outpath)
 
-def debug_ocr(pth, outpath, data, points, origs):
+def debug_ocr(im, outpath, data, points, origs):
     import pyagg
-    c = pyagg.load(pth)
-    print c.width,c.height #,im.size
+    c = pyagg.canvas.from_image(im)
+    print c.width,c.height,im.size
     for r in data:
         top,left,w,h = [int(r[k]) for k in 'top left width height'.split()]
         box = [left, top, left+w, top+h]
@@ -975,7 +975,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
     # draw data onto image
     debugpath = os.path.join(outfold, infil+'_debug_ocr.png')
-    debug_ocr(inpath, debugpath, data, points, origs)
+    debug_ocr(im, debugpath, data, points, origs)
 
     # view warped
     debug_warped(outpath, orignames, matchnames, matchcoords)
