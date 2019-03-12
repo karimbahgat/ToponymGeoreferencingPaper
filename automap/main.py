@@ -7,6 +7,8 @@ import os
 import itertools
 import tempfile
 
+import pythongis as pg
+
 import pytesseract as t
 
 import PIL, PIL.Image
@@ -449,7 +451,7 @@ def detect_data(im, bbox=None):
     drows = [dict(zip(dfields,row)) for row in drows]
     return drows
 
-def detect_text_points(im, data):
+def detect_text_points(im, data, debug=False):
     # simple
 ##    points = []
 ##    for r in data:
@@ -567,7 +569,8 @@ def detect_text_points(im, data):
         #filt_im_arr[y1:y2, x1:x2] = True # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
     im_arr[filt_im_arr] = 255
     #im_arr[im_arr < 255] = 0
-    PIL.Image.fromarray(im_arr).show()
+    if debug:
+        PIL.Image.fromarray(im_arr).show()
 
     # determine kernel size from avg text height
     h = sum([int(r['height']) for r in data]) / len(data)
@@ -585,23 +588,27 @@ def detect_text_points(im, data):
     # get distance to center
     im_arr = 255 - im_arr # invert
     ret,im_arr = cv2.threshold(im_arr,200,255,cv2.THRESH_BINARY)
-    PIL.Image.fromarray(im_arr).show()
+    if debug:
+        PIL.Image.fromarray(im_arr).show()
     im_arr = cv2.distanceTransform(im_arr, cv2.DIST_L2, 3)
     dist_arr = im_arr.copy()
     print im_arr.max(), im_arr.mean()
-    PIL.Image.fromarray(im_arr*50).show()
+    if debug:
+        PIL.Image.fromarray(im_arr*50).show()
 
     # get highest value in neighbourhood
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(h*2,h*2))
     max_arr = cv2.dilate(im_arr,kernel,iterations=1)
-    PIL.Image.fromarray(max_arr*50).show()
+    if debug:
+        PIL.Image.fromarray(max_arr*50).show()
 
     im_arr[im_arr != max_arr] = 0
     #im_arr[im_arr < 100] = 0
     #im_arr[im_arr == 0] = 0
     #im_arr[(im_arr > 0) & (im_arr == max_arr)] = 255
     print im_arr.max(), im_arr.mean()
-    PIL.Image.fromarray(im_arr*50).show()
+    if debug:
+        PIL.Image.fromarray(im_arr*50).show()
 
     # get shape centers
     centers = np.nonzero(im_arr)
@@ -648,7 +655,8 @@ def detect_text_points(im, data):
 
             c.draw_circle(xy=maxpt, fillsize=1, fillcolor=None, outlinecolor=(0,0,255))
 
-    c.get_image().show()
+    if debug:
+        c.get_image().show()
     
     return points
 
@@ -800,10 +808,27 @@ def warp(im, outpath, tiepoints, order=None):
     os.remove(gdal_trans_in)
     os.remove(gdal_trans_out)
 
+def final_controlpoints(tiepoints, residuals, origs, matches, outpath=False):
+    controlpoints = []
+    orignames,origcoords = zip(*origs)
+    matchnames,matchcoords = zip(*matches)
+    for (oc,mc),res in zip(tiepoints, residuals):
+        i = origcoords.index(oc)
+        oc,on,mc,mn = [lst[i] for lst in (origcoords,orignames,matchcoords,matchnames)]
+        controlpoints.append([on,oc,mn,mc,res])
+
+    if outpath:
+        vec = pg.VectorData(fields='origname origx origy matchname matchx matchy residual'.split())
+        for on,(ox,oy),mn,(mx,my),res in controlpoints:
+            vec.add_feature([on,ox,oy,mn,mx,my,res], geometry={'type': 'Point', 'coordinates': mc})
+        vec.save(outpath)
+
+    return controlpoints
+
 def debug_prep(im, outpath):
     im.save(outpath)
 
-def debug_ocr(im, outpath, data, points, origs):
+def debug_ocr(im, outpath, data, controlpoints, origs):
     import pyagg
     c = pyagg.canvas.from_image(im)
     print c.width,c.height,im.size
@@ -814,13 +839,13 @@ def debug_ocr(im, outpath, data, points, origs):
         print box,text
         c.draw_box(bbox=box, fillcolor=None, outlinecolor=(0,255,0))
         c.draw_text(text, xy=(left,top), anchor='sw', textsize=6, textcolor=(0,255,0)) #bbox=box)
-    for txt,p in points:
-        c.draw_circle(xy=p, fillsize=1, fillcolor=None, outlinecolor=(0,0,255))
     for oname,ocoord in origs:
-        c.draw_circle(xy=ocoord, fillsize=1, fillcolor=(255,0,0,155), outlinecolor=None)
+        c.draw_circle(xy=ocoord, fillsize=1, fillcolor=None, outlinecolor=(0,0,255))
+    for on,oc,mn,mc,res in controlpoints:
+        c.draw_circle(xy=oc, fillsize=1, fillcolor=(255,0,0,155), outlinecolor=None)
     c.save(outpath)
 
-def debug_warped(pth, orignames, matchnames, matchcoords):
+def debug_warped(pth, controlpoints):
     import pythongis as pg
     m = pg.renderer.Map()
 
@@ -831,9 +856,9 @@ def debug_warped(pth, orignames, matchnames, matchcoords):
     m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
                 fillcolor='red', outlinewidth=0.1)
 
-    anchors = pg.VectorData(fields=['origname', 'matchname'])
-    for coord in matchcoords:
-        anchors.add_feature([], dict(type='Point', coordinates=coord))
+    anchors = pg.VectorData(fields=['origname', 'matchname', 'residual'])
+    for on,oc,mn,mc,res in controlpoints:
+        anchors.add_feature([on,mn,res], dict(type='Point', coordinates=mc))
     m.add_layer(anchors, fillcolor=(0,255,0), outlinewidth=0.2)
 
     m.zoom_bbox(*rlyr.bbox)
@@ -899,7 +924,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
         # threshold
         print 'thresholding', color
         im_prep_thresh = threshold(im_prep, color, colorthresh)
-        im_prep_thresh.show()
+        #im_prep_thresh.show()
         #debugpath = os.path.join(outfold, infil+'_debug_prep.png')
         #debug_prep(im_prep_thresh, debugpath)
 
@@ -956,29 +981,34 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
     # determine transform method
     if not warp_order:
-        warp_order = optimal_warp_order(tiepoints)
+        warp_order_auto = optimal_warp_order(tiepoints)
 
     # exclude outliers
     print 'excluding outliers'
     frompoints,topoints = zip(*tiepoints)
-    best, best_frompoints, best_topoints, best_residuals = optimal_rmse(warp_order, frompoints, topoints, max_residual=max_residual)
+    best, best_frompoints, best_topoints, best_residuals = optimal_rmse(warp_order or warp_order_auto, frompoints, topoints, max_residual=max_residual)
     tiepoints = zip(best_frompoints, best_topoints)
     print 'RMSE:', best
 
     # once again, determine transform method after excluding outliers
     if not warp_order:
-        warp_order = optimal_warp_order(tiepoints)
+        warp_order_auto = optimal_warp_order(tiepoints)
 
     # warp
     print 'warping'
-    warp(im, outpath, tiepoints, warp_order)
+    print '{} points, warp_order={}'.format(len(tiepoints), warp_order or warp_order_auto)
+    warp(im, outpath, tiepoints, warp_order or warp_order_auto)
+
+    # final control points
+    cppath = os.path.join(outfold, infil+'_controlpoints.geojson')
+    controlpoints = final_controlpoints(tiepoints, best_residuals, origs, matches, outpath=cppath)
 
     # draw data onto image
     debugpath = os.path.join(outfold, infil+'_debug_ocr.png')
-    debug_ocr(im, debugpath, data, points, origs)
+    debug_ocr(im, debugpath, data, controlpoints, origs)
 
     # view warped
-    debug_warped(outpath, orignames, matchnames, matchcoords)
+    debug_warped(outpath, controlpoints)
 
 def drawpoints(img):
     import pythongis as pg
@@ -1136,8 +1166,12 @@ def manual(pth, matchthresh=0.1, bbox=None, warp_order=None, **kwargs):
     print 'warping'
     warp(im, outpath, tiepoints, warp_order)
 
+    # final control points
+    cppath = os.path.join(outfold, infil+'_controlpoints.geojson')
+    controlpoints = final_controlpoints(tiepoints, best_residuals, origs, matches, outpath=cppath)
+
     # view warped
-    debug_warped(outpath, orignames, matchnames, matchcoords)
+    debug_warped(outpath, controlpoints)
 
     
 
