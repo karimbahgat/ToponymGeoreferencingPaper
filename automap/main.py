@@ -768,14 +768,19 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
             
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
-def warp(im, tiepoints, order):
+def warp(im, tiepoints, order=None):
     import os
     print 'control points:', tiepoints
     im.save('testmaps/warpedinput.tif')
+    
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
     call = 'gdal_translate -of GTiff {gcptext} "testmaps/warpedinput.tif" "testmaps/warped.tif"'.format(gcptext=gcptext)
-    os.system(call) #-order 3 -refine_gcps 10 10 # -tps
-    os.system('gdalwarp -r bilinear -order {order} -co COMPRESS=NONE -dstalpha -overwrite "testmaps/warped.tif" "testmaps/warped2.tif"'.format(order=order))
+    os.system(call) 
+    
+    opts = '-r bilinear -co COMPRESS=NONE -dstalpha -overwrite'
+    if order: opts += ' -order {}'.format(order)
+    call = 'gdalwarp {options} "testmaps/warped.tif" "testmaps/warped2.tif"'.format(options=opts)
+    os.system(call)
 
 def debug_orig(im):
     im.save('testmaps/testorig.jpg')
@@ -820,7 +825,7 @@ def debug_warped(pth, orignames, matchnames, matchcoords):
     m.zoom_out(2)
     m.view()
 
-def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=2, max_residual=0.05, **kwargs):
+def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, **kwargs):
     print 'loading image'
     im = PIL.Image.open(pth).convert('RGB')
     if bbox:
@@ -1064,7 +1069,7 @@ def drawpoints(img):
     print points
     return points
 
-def manual(pth, matchthresh=0.1, bbox=None, warp_order=2, **kwargs):
+def manual(pth, matchthresh=0.1, bbox=None, warp_order=None, **kwargs):
     print 'loading image'
     im = PIL.Image.open(pth).convert('RGB')
     if bbox:
