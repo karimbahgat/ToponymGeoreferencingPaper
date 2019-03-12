@@ -5,6 +5,7 @@ from .rmse import optimal_rmse
 
 import os
 import itertools
+import tempfile
 
 import pytesseract as t
 
@@ -768,30 +769,44 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
             
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
-def warp(im, tiepoints, order=None):
+def optimal_warp_order(tiepoints):
+    # due to automation and high likelihood of errors, we set higher point threshold for polynomial order
+    # compare to gdal: https://github.com/naturalatlas/node-gdal/blob/master/deps/libgdal/gdal/alg/gdal_crs.c#L186
+    if len(tiepoints) >= 20:
+        warp_order = 3
+    elif len(tiepoints) >= 10:
+        warp_order = 2
+    else:
+        warp_order = 1
+    return warp_order
+
+def warp(im, outpath, tiepoints, order=None):
     import os
     print 'control points:', tiepoints
-    im.save('testmaps/warpedinput.tif')
+
+    gdal_trans_in = os.path.join(tempfile.gettempdir(), next(tempfile._get_candidate_names()) + '.tif')
+    gdal_trans_out = os.path.join(tempfile.gettempdir(), next(tempfile._get_candidate_names()) + '.tif')
+    im.save(gdal_trans_in)
     
     gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
-    call = 'gdal_translate -of GTiff {gcptext} "testmaps/warpedinput.tif" "testmaps/warped.tif"'.format(gcptext=gcptext)
+    call = 'gdal_translate -of GTiff {gcptext} "{gdal_trans_in}" "{gdal_trans_out}"'.format(gcptext=gcptext, gdal_trans_in=gdal_trans_in, gdal_trans_out=gdal_trans_out)
     os.system(call) 
     
     opts = '-r bilinear -co COMPRESS=NONE -dstalpha -overwrite'
     if order: opts += ' -order {}'.format(order)
-    call = 'gdalwarp {options} "testmaps/warped.tif" "testmaps/warped2.tif"'.format(options=opts)
+    call = 'gdalwarp {options} "{gdal_trans_out}" "{outpath}"'.format(options=opts, gdal_trans_out=gdal_trans_out, outpath=outpath)
     os.system(call)
 
-def debug_orig(im):
-    im.save('testmaps/testorig.jpg')
+    os.remove(gdal_trans_in)
+    os.remove(gdal_trans_out)
 
-def debug_prep(im):
-    im.save('testmaps/testprep.jpg')
+def debug_prep(im, outpath):
+    im.save(outpath)
 
-def debug_ocr(im, data, points, origs):
+def debug_ocr(pth, outpath, data, points, origs):
     import pyagg
-    c = pyagg.load('testmaps/testorig.jpg')
-    print c.width,c.height,im.size
+    c = pyagg.load(pth)
+    print c.width,c.height #,im.size
     for r in data:
         top,left,w,h = [int(r[k]) for k in 'top left width height'.split()]
         box = [left, top, left+w, top+h]
@@ -803,7 +818,7 @@ def debug_ocr(im, data, points, origs):
         c.draw_circle(xy=p, fillsize=1, fillcolor=None, outlinecolor=(0,0,255))
     for oname,ocoord in origs:
         c.draw_circle(xy=ocoord, fillsize=1, fillcolor=(255,0,0,155), outlinecolor=None)
-    c.save('testmaps/testocr.png')
+    c.save(outpath)
 
 def debug_warped(pth, orignames, matchnames, matchcoords):
     import pythongis as pg
@@ -825,12 +840,18 @@ def debug_warped(pth, orignames, matchnames, matchcoords):
     m.zoom_out(2)
     m.view()
 
-def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, **kwargs):
+def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, **kwargs):
     print 'loading image'
-    im = PIL.Image.open(pth).convert('RGB')
+    im = PIL.Image.open(inpath).convert('RGB')
     if bbox:
         im = im.crop(bbox)
-    debug_orig(im)
+
+    # determine various paths
+    infold,infil = os.path.split(inpath)
+    infil,ext = os.path.splitext(infil)
+    if not outpath:
+        outpath = os.path.join(infold, infil + '_georeferenced.tif')
+    outfold,outfil = os.path.split(outpath)
 
     # begin prep
     im_prep = im
@@ -871,14 +892,16 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
 
     # placenames should be mostly in grayscale colors, so limit ocr to different levels of grayish colors
     # only loop detected colors that are similar to various grayshades
-    for gray in [0]: #range(0, 150+1, 50):
+    #textcolors = [(v,v,v) for v in range(0, 150+1, 50)] # grayshades
+    textcolors = [textcolor] # input color
+    for color in textcolors: 
 
         # threshold
-        color = (gray,gray,gray)
         print 'thresholding', color
         im_prep_thresh = threshold(im_prep, color, colorthresh)
         im_prep_thresh.show()
-        #debug_prep(im_prep_thresh)
+        #debugpath = os.path.join(outfold, infil+'_debug_prep.png')
+        #debug_prep(im_prep_thresh, debugpath)
 
         # ocr
         print 'detecting text'
@@ -931,6 +954,10 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
     for on,mc,mn in zip(orignames,matchcoords,matchnames):
         print on,mc,mn
 
+    # determine transform method
+    if not warp_order:
+        warp_order = optimal_warp_order(tiepoints)
+
     # exclude outliers
     print 'excluding outliers'
     frompoints,topoints = zip(*tiepoints)
@@ -938,15 +965,20 @@ def automap(pth, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, b
     tiepoints = zip(best_frompoints, best_topoints)
     print 'RMSE:', best
 
+    # once again, determine transform method after excluding outliers
+    if not warp_order:
+        warp_order = optimal_warp_order(tiepoints)
+
     # warp
     print 'warping'
-    warp(im, tiepoints, warp_order)
+    warp(im, outpath, tiepoints, warp_order)
 
     # draw data onto image
-    debug_ocr(im, data, points, origs)
+    debugpath = os.path.join(outfold, infil+'_debug_ocr.png')
+    debug_ocr(inpath, debugpath, data, points, origs)
 
     # view warped
-    debug_warped('testmaps/warped2.tif', orignames, matchnames, matchcoords)
+    debug_warped(outpath, orignames, matchnames, matchcoords)
 
 def drawpoints(img):
     import pythongis as pg
@@ -1074,7 +1106,13 @@ def manual(pth, matchthresh=0.1, bbox=None, warp_order=None, **kwargs):
     im = PIL.Image.open(pth).convert('RGB')
     if bbox:
         im = im.crop(bbox)
-    debug_orig(im)
+
+    # determine various paths
+    infold,infil = os.path.split(inpath)
+    infil,ext = os.path.splitext(infil)
+    if not outpath:
+        outpath = os.path.join(infold, infil + '_georeferenced.tif')
+    outfold,outfil = os.path.split(outpath)
 
     # manually select text anchors/coordinates
     print 'drawing anchor points'
@@ -1090,15 +1128,16 @@ def manual(pth, matchthresh=0.1, bbox=None, warp_order=None, **kwargs):
     for on,mc,mn in zip(orignames,matchcoords,matchnames):
         print on,mc,mn
 
+    # determine transform method
+    if not warp_order:
+        warp_order = optimal_warp_order(tiepoints)
+
     # warp
     print 'warping'
-    warp(im, tiepoints, warp_order)
-
-    # draw data onto image
-    #debug_ocr(im, data, points, origs)
+    warp(im, outpath, tiepoints, warp_order)
 
     # view warped
-    debug_warped('testmaps/warped2.tif', orignames, matchnames, matchcoords)
+    debug_warped(outpath, orignames, matchnames, matchcoords)
 
     
 

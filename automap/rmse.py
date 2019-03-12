@@ -75,7 +75,7 @@ def polynomial(order, frompoints, topoints):
 
     return V_X, V_Y, V_XY, mo, mox, moy, predXs, predYs
 
-def optimal_rmse(order, frompoints, topoints, max_residual=0.1, min_points=6):
+def optimal_rmse(order, frompoints, topoints, max_residual=0.1, min_points=3):
     # try all combinations, but not physically possible
     # ...
 
