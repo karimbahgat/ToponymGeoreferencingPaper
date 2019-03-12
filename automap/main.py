@@ -801,7 +801,9 @@ def warp(im, outpath, tiepoints, order=None):
     os.system(call) 
     
     opts = '-r bilinear -co COMPRESS=NONE -dstalpha -overwrite'
-    if order: opts += ' -order {}'.format(order)
+    if order:
+        if order == 'tps': opts += ' -tps'
+        else: opts += ' -order {}'.format(order)
     call = 'gdalwarp {options} "{gdal_trans_out}" "{outpath}"'.format(options=opts, gdal_trans_out=gdal_trans_out, outpath=outpath)
     os.system(call)
 
@@ -984,11 +986,14 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
         warp_order_auto = optimal_warp_order(tiepoints)
 
     # exclude outliers
-    print 'excluding outliers'
-    frompoints,topoints = zip(*tiepoints)
-    best, best_frompoints, best_topoints, best_residuals = optimal_rmse(warp_order or warp_order_auto, frompoints, topoints, max_residual=max_residual)
-    tiepoints = zip(best_frompoints, best_topoints)
-    print 'RMSE:', best
+    if warp_order == 'tps':
+        best_residuals = [None for _ in tiepoints]
+    else:
+        print 'excluding outliers'
+        frompoints,topoints = zip(*tiepoints)
+        best, best_frompoints, best_topoints, best_residuals = optimal_rmse(warp_order or warp_order_auto, frompoints, topoints, max_residual=max_residual)
+        tiepoints = zip(best_frompoints, best_topoints)
+        print 'RMSE:', best
 
     # once again, determine transform method after excluding outliers
     if not warp_order:
@@ -996,7 +1001,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
     # warp
     print 'warping'
-    print '{} points, warp_order={}'.format(len(tiepoints), warp_order or warp_order_auto)
+    print '{} points, warp_method={}'.format(len(tiepoints), warp_order or warp_order_auto)
     warp(im, outpath, tiepoints, warp_order or warp_order_auto)
 
     # final control points
