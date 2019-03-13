@@ -547,6 +547,145 @@ def detect_data(im, bbox=None):
     drows = [dict(zip(dfields,row)) for row in drows]
     return drows
 
+def process_text(data, textconf):
+    processed = []
+    for r in data:
+        r['conf'] = float(r['conf'])
+        if r['conf'] < textconf: continue
+        # text
+        r['text'] = r.get('text')
+        if not r['text']: continue
+        r['text_clean'] = r['text'].strip(''' *'".,:;''')
+        if not r['text_clean']: continue
+        r['numeric'] = r['text_clean'].replace(' ','').isnumeric()
+        r['uppercase'] = r['text_clean'].isupper()
+        r['placename'] = r['numeric'] is False and r['text_clean'][0].isupper() and not r['uppercase']
+        # coords
+        for k in 'top left width height'.split():
+            r[k] = int(r[k])
+        processed.append(r)
+
+    return processed
+
+def connect_text(data, ythresh=6, xthresh=6):
+    
+    def merge_textgroups(newdata):
+        for i in range(len(newdata)):
+            group = newdata[i]
+            dct = {'text': ' '.join([r['text'] for r in group]),
+                   'text_clean': ' '.join([r['text_clean'] for r in group]),
+                   'numeric': min([r['numeric'] for r in group]),
+                   'uppercase': min([r['uppercase'] for r in group]),
+                   'placename': max([r['placename'] for r in group]),
+                   'conf': sum([r['conf'] for r in group]) / float(len(group)),
+                   'left': min([r['left'] for r in group]),
+                   'top': min([r['top'] for r in group]),
+                   }
+            dct['width'] = max([r['left']+r['width'] for r in group]) - dct['left']
+            dct['height'] = max([r['top']+r['height'] for r in group]) - dct['top']
+            print len(group),dct
+            newdata[i] = dct
+        return newdata
+    
+    # connect texts horizontally
+    candidates = sorted(data, key=lambda r: r['left'])
+    newdata = []
+    while candidates:
+        r = candidates.pop(0)
+        # find all whose top and bottom are within threshold
+        totheright = []
+        for r2 in candidates:
+            if r2 == r: continue
+            if (max(r['height'],r2['height']) / float(min(r['height'],r2['height']))) > 2: # height difference can't be more than x2
+                continue
+            # top or bottom within threshold
+            if (abs(r['top'] - r2['top']) < ythresh) or (abs((r['top']+r['height']) - (r2['top']+r2['height'])) < ythresh): 
+                totheright.append(r2)
+        # group those within height x distance
+        group = [r]
+        right = r['left'] + r['width']
+        while totheright:
+            nxt = totheright.pop(0)
+            if (right + r['height']) > nxt['left']:
+                # within distance, add to group
+                right = nxt['left'] + nxt['width']
+                candidates.pop(candidates.index(nxt)) # remove as candidate for others
+                group.append(nxt)
+            else:
+                # not within distance, break loop
+                break
+        newdata.append(group)
+
+    # merge groups
+    newdata = merge_textgroups(newdata)
+
+    # do same vertically (center aligned only)
+    candidates = sorted(newdata, key=lambda r: r['top'])
+    newdata = []
+    while candidates:
+        r = candidates.pop(0)
+        # find all whose midpoints are within threshold
+        below = []
+        for r2 in candidates:
+            if r2 == r: continue
+            # midpoints within threshold
+            mid1 = r['left'] + (r['width'] / 2.0)
+            mid2 = r2['left'] + (r2['width'] / 2.0)
+            if abs(mid1 - mid2) < xthresh:
+                below.append(r2)
+        # group those within height y distance
+        group = [r]
+        bottom = r['top'] + r['height']
+        while below:
+            nxt = below.pop(0)
+            #print '---'
+            #print bottom + r['height'], nxt['top']
+            #print r
+            #print nxt
+            if (bottom + r['height']) > nxt['top']:
+                # within distance, add to group
+                bottom = nxt['top'] + nxt['height']
+                candidates.pop(candidates.index(nxt)) # remove as candidate for others
+                group.append(nxt)
+            else:
+                # not within distance, break loop
+                break
+        newdata.append(group)
+
+    # merge groups
+    newdata = merge_textgroups(newdata)
+
+##    # merge text groups vertically (center aligned only)
+##    candidates = sorted(newdata, key=lambda gr: min([r['top'] for r in gr]))
+##    newdata2 = []
+##    while candidates:
+##        gr = candidates.pop(0)
+##        below = []
+##        # find all exactly below, ie whose midpoint is within threshold
+##        for gr2 in candidates:
+##            if gr2 == gr: continue
+##            mid1 = (gr[0]['left'] + (gr[-1]['left'] + gr[-1]['width']) / 2.0)
+##            mid2 = (gr2[0]['left'] + (gr2[-1]['left'] + gr2[-1]['width']) / 2.0)
+##            if abs(mid1 - mid2) < xthresh:
+##                # same midpoint
+##                below.append(gr2)
+##        # group those witihin height y distance
+##        bottom = max([r['top']+r['height'] for r in gr])
+##        grheight = bottom - min([r['top'] for r in gr])
+##        while below:
+##            nxtgr = below.pop(0)
+##            if (bottom + grheight) > min([r['top'] for r in nxtgr]):
+##                # within height distance, add to group
+##                bottom = max([r['top']+r['height'] for r in nxtgr])
+##                candidates.pop(candidates.index(nxtgr))
+##                gr.extend(nxtgr)
+##            else:
+##                # not within distance, break loop
+##                break
+##        newdata2.append(gr)   
+
+    return newdata
+
 def detect_text_points(im, data, debug=False):
     # simple
 ##    points = []
@@ -641,15 +780,14 @@ def detect_text_points(im, data, debug=False):
 
 
     # final?
-    points = []
     im_arr = np.array(im) #cv2.cvtColor(np.array(im), cv2.COLOR_RGB2GRAY)
     #PIL.Image.fromarray(im_arr).show()
     
     filt_im_arr = np.ones(im_arr.shape[:2], dtype=bool)
     for r in data:
-        text = r['text']
-        text = text.strip().strip(''' *'".,:''')
-        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+        if not r['placename']:
+            continue
+        x1,y1,w,h = [r[k] for k in 'left top width height'.split()]
         x2 = x1+w
         y2 = y1+h
 
@@ -669,7 +807,7 @@ def detect_text_points(im, data, debug=False):
         PIL.Image.fromarray(im_arr).show()
 
     # determine kernel size from avg text height
-    h = sum([int(r['height']) for r in data]) / len(data)
+    h = sum([r['height'] for r in data]) / len(data)
     h /= 2
     print 'kernel size', h
 
@@ -718,9 +856,9 @@ def detect_text_points(im, data, debug=False):
     
     points = []
     for r in data:
-        text = r['text']
-        text = text.strip().strip(''' *'".,:''')
-        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+        if not r['placename']:
+            continue
+        x1,y1,w,h = [r[k] for k in 'left top width height'.split()]
         x2 = x1+w
         y2 = y1+h
         # buffer
@@ -744,7 +882,7 @@ def detect_text_points(im, data, debug=False):
             # or choose the highest value pixel (most concentrated)
             maxpt = max(nearby, key=lambda pt: centervals[centers.index(pt)])
             maxpt = map(int, maxpt)
-            points.append((text, maxpt))
+            r['anchor'] = maxpt
 
             for n in nearby:
                 c.draw_circle(xy=n, fillsize=centervals[centers.index(n)], fillcolor=None, outlinecolor=(255,0,0))
@@ -754,7 +892,7 @@ def detect_text_points(im, data, debug=False):
     if debug:
         c.get_image().show()
     
-    return points
+    return data
 
 def triang(test, matchcandidates=None):
     # TODO: maybe superfluous, maybe just integrate right into "triangulate"?? 
@@ -979,7 +1117,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     # partition image
     mapp,margins,boxes = partition_image(im)
     im = mapp
-    im.show()
+    #im.show()
 
     # begin prep
     im_prep = im
@@ -1034,15 +1172,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
         # ocr
         print 'detecting text'
         subdata = detect_data(im_prep_thresh)
-        subdata = filter(lambda r:
-                      r.get('text')
-                      and len(r['text'].strip(''' *'".,:''').replace(' ','')) >= 3
-                      and not r['text'].strip(''' *'".,:''').replace(' ','').isnumeric()
-                      and r['text'].strip(''' *'".,:''')[0].isupper()
-                      and not r['text'].strip(''' *'".,:''').isupper()
-                      #and int(r['conf']) >= textconf
-                      ,
-                      subdata)
+        subdata = process_text(subdata, textconf)
 
         # assign text characteristics
         for dct in subdata:
@@ -1054,26 +1184,31 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
                    not in [(dr['top'],dr['left'],dr['width'],dr['height']) for dr in data]
                    ]
 
+        # connect text data
+        subdata = connect_text(subdata)
+
+        # detect text coordinates
+        print 'determening text anchors'
+        subdata = detect_text_points(im_prep_thresh, subdata)
+
         data.extend(subdata)
         print 'text data size', len(subdata), len(data)
-
-    # detect text coordinates
-    print 'determening text anchors'
-    points = detect_text_points(im_prep_thresh, data)
 
     # downscale the data coordinates of the upscaled image back to original coordinates
     for r in data: 
         for k in 'top left width height'.split():
             r[k] = int(r[k]) / 2
-
-    # same for points
-    points = [(text,(x/2, y/2)) for text,(x,y) in points]       
+        # same for points
+        if 'anchor' in r:
+            x,y = r['anchor']
+            r['anchor'] = (x/2, y/2)
 
     # end prep, switch back to original image
     im = im
 
     # find matches
     print 'finding matches'
+    points = [(r['text_clean'], r['anchor']) for r in data if r['placename'] and 'anchor' in r]
     origs,matches = find_matches(points, matchthresh, **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
