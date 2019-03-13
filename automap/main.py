@@ -422,52 +422,56 @@ def maincolors(im):
     
     return diffgroups
 
-def partition_image(im):
+def color_edges(im, colorthresh=10):
+    im_arr = np.array(im)
+    
+    # quantize and convert colors
+    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
+    quant_arr = np.array(quant)
+    qcounts,qcolors = zip(*sorted(quant.getcolors(256), key=lambda x: x[0]))
+    counts,colors = zip(*sorted(quant.convert('RGB').getcolors(256), key=lambda x: x[0]))
+
+    # calc diffs
+    pairdiffs = color_differences(colors)
+    pairdiffs_arr = np.zeros((256,256))
+    for k,v in list(pairdiffs.items()):
+        qx,qy = (qcolors[colors.index(k[0])], qcolors[colors.index(k[1])])
+        pairdiffs_arr[qx,qy] = v
+    #PIL.Image.fromarray(pairdiffs_arr*50).show()
+
+    # detect color edges
+    orig_flat = np.array(quant).flatten()
+    diff_im_flat = np.zeros(quant.size).flatten()
+    for xoff in range(-1, 1+1, 1):
+        for yoff in range(-1, 1+1, 1):
+            if xoff == yoff == 0: continue
+            off_flat = np.roll(quant, (xoff,yoff), (0,1)).flatten()
+            diff_im_flat = diff_im_flat + pairdiffs_arr[orig_flat,off_flat] #np.maximum(diff_im_flat, pairdiffs[orig_flat,off_flat])
+    diff_im_flat = diff_im_flat / 8.0
+
+    diff_im_flat[diff_im_flat > colorthresh] = 255
+    diff_im = diff_im_flat.reshape((im.height, im.width))
+
+    #diff_im = diff_im_flat.reshape((im.height, im.width)).astype(np.uint8)
+    #ret,diff_im = cv2.threshold(diff_im,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    
+    print diff_im.min(), diff_im.mean(), diff_im.max()
+    #quant.show()
+    #PIL.Image.fromarray(diff_im).show()
+
+    diff_im = diff_im / diff_im.max()
+    #PIL.Image.fromarray(diff_im).show()
+    diff_im *= 255
+    #PIL.Image.fromarray(diff_im).show()
+    diff_im = diff_im.astype(np.uint8)
+    #PIL.Image.fromarray(diff_im).show()
+    return diff_im
+
+def image_segments(im):
     colorthresh = 5
 
     # BOX APPROACH
-##    im_arr = np.array(im)
-##    
-##    # quantize and convert colors
-##    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
-##    quant_arr = np.array(quant)
-##    qcounts,qcolors = zip(*sorted(quant.getcolors(256), key=lambda x: x[0]))
-##    counts,colors = zip(*sorted(quant.convert('RGB').getcolors(256), key=lambda x: x[0]))
-##
-##    # calc diffs
-##    pairdiffs = color_differences(colors)
-##    pairdiffs_arr = np.zeros((256,256))
-##    for k,v in list(pairdiffs.items()):
-##        qx,qy = (qcolors[colors.index(k[0])], qcolors[colors.index(k[1])])
-##        pairdiffs_arr[qx,qy] = v
-##    PIL.Image.fromarray(pairdiffs_arr*50).show()
-##
-##    # detect color edges
-##    orig_flat = np.array(quant).flatten()
-##    diff_im_flat = np.zeros(quant.size).flatten()
-##    for xoff in range(-1, 1+1, 1):
-##        for yoff in range(-1, 1+1, 1):
-##            if xoff == yoff == 0: continue
-##            off_flat = np.roll(quant, (xoff,yoff), (0,1)).flatten()
-##            diff_im_flat = diff_im_flat + pairdiffs_arr[orig_flat,off_flat] #np.maximum(diff_im_flat, pairdiffs[orig_flat,off_flat])
-##    diff_im_flat = diff_im_flat / 8.0
-##
-##    diff_im_flat[diff_im_flat > colorthresh] = 255
-##    diff_im = diff_im_flat.reshape((im.height, im.width))
-##
-##    #diff_im = diff_im_flat.reshape((im.height, im.width)).astype(np.uint8)
-##    #ret,diff_im = cv2.threshold(diff_im,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-##    
-##    print diff_im.min(), diff_im.mean(), diff_im.max()
-##    quant.show()
-##    PIL.Image.fromarray(diff_im).show()
-##
-##    diff_im = diff_im / diff_im.max()
-##    #PIL.Image.fromarray(diff_im).show()
-##    diff_im *= 255
-##    #PIL.Image.fromarray(diff_im).show()
-##    diff_im = diff_im.astype(np.uint8)
-##    PIL.Image.fromarray(diff_im).show()
+
 ##    boxes = detect_boxes(diff_im)
 
     # WHITE THRESH APPROACH
@@ -493,30 +497,66 @@ def partition_image(im):
 
     # map is largest nonwhite contour
     largest_nonwhite = sorted(contours, key=lambda cnt: cv2.contourArea(cnt))[-1]
-    map_mask = np.zeros(mask.shape)
-    cv2.drawContours(map_mask, [largest_nonwhite], -1, 255, -1)
+    map_outline = largest_nonwhite
+    #map_mask = np.zeros(mask.shape)
+    #cv2.drawContours(map_mask, [largest_nonwhite], -1, 255, -1)
 
     # TODO: Problem when map is irregular shape and text overflows into margins ala brazil
     # solution: expand borders in those cases??
     #kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
     #map_mask = cv2.dilate(map_mask,kernel,iterations=30)
     
-    map_im = np.array(im.convert('RGBA'))
-    map_im[map_mask==0] = 0
-    map_im = PIL.Image.fromarray(map_im)
+    #map_im = np.array(im.convert('RGBA'))
+    #map_im[map_mask==0] = 0
+    #map_im = PIL.Image.fromarray(map_im)
     #map_im.show()
 
     # margins is the opposite
-    margins_mask = (np.ones(mask.shape) * 255) - map_mask
-    margins_im = np.array(im.convert('RGBA'))
-    margins_im[margins_mask==0] = 0
-    margins_im = PIL.Image.fromarray(margins_im)
+    #margins_mask = (np.ones(mask.shape) * 255) - map_mask
+    #margins_im = np.array(im.convert('RGBA'))
+    #margins_im[margins_mask==0] = 0
+    #margins_im = PIL.Image.fromarray(margins_im)
     #margins_im.show()
 
     # detect boxes
-    boxes = []
+    diff_im = color_edges(im)
+    boxes = detect_boxes(diff_im)
 
-    return map_im, margins_im, boxes
+    return map_outline, boxes
+
+def mask_image(im, poly, invert=False):
+    mask = np.zeros((im.size[1], im.size[0]))
+    cv2.drawContours(mask, [poly], -1, 255, -1)
+    new_im = np.array(im.convert('RGBA'))
+    trueval = 255 if invert else 0
+    new_im[mask==trueval] = 0
+    new_im = PIL.Image.fromarray(new_im)
+    return new_im
+
+def mask_text(data, poly, invert=False):
+    from shapely.geometry import Polygon, box
+    poly = Polygon([tuple(p[0]) for p in poly])
+    poly = poly.simplify(0)
+    xmin,ymin,xmax,ymax = poly.bounds
+
+    def maskfunc(p,b):
+        return p.disjoint(b) if invert else p.intersects(b)
+
+    def is_outside(r):
+        return r['left'] > xmax or (r['left']+r['width']) < xmin or r['top'] > ymax or (r['top']+r['height']) < ymin
+
+    def skipfunc(r):
+        outside = is_outside(r)
+        if invert: return not outside
+        else: return outside
+
+    for r in data:
+        if skipfunc(r):
+            continue
+        else:
+            textbox = box(r['left'], r['top'], r['left']+r['width'], r['top']+r['height'] )
+            if maskfunc(poly, textbox):
+                yield r
 
 def detect_boxes(im):
     # detect boxes from contours
@@ -528,14 +568,17 @@ def detect_boxes(im):
     im_arr = np.array(im)
     #im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
     contours,_ = cv2.findContours(im_arr.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    im_arr_draw = cv2.cvtColor(im_arr, cv2.COLOR_GRAY2RGB)
+    #im_arr_draw = cv2.cvtColor(im_arr, cv2.COLOR_GRAY2RGB)
     boxes = []
+    im_area = im_arr.shape[0] * im_arr.shape[1]
     for cnt in contours:
         approx = cv2.approxPolyDP(cnt,0.01*cv2.arcLength(cnt,True),True)
         if len(approx) == 4:
-            boxes.append(cnt)
-    cv2.drawContours(im_arr_draw, boxes, -1, (0,255,0), 1)
-    PIL.Image.fromarray(im_arr_draw).show()
+            if (im_area/(2.0**2)) > cv2.contourArea(cnt) > (im_area/(16.0**2)):
+                boxes.append(approx)
+            
+    #cv2.drawContours(im_arr_draw, boxes, -1, (0,255,0), 1)
+    #PIL.Image.fromarray(im_arr_draw).show()
     return boxes
 
 def detect_data(im, bbox=None):
@@ -550,6 +593,7 @@ def detect_data(im, bbox=None):
 def process_text(data, textconf):
     processed = []
     for r in data:
+        r['function'] = None
         r['conf'] = float(r['conf'])
         if r['conf'] < textconf: continue
         # text
@@ -559,13 +603,22 @@ def process_text(data, textconf):
         if not r['text_clean']: continue
         r['numeric'] = r['text_clean'].replace(' ','').isnumeric()
         r['uppercase'] = r['text_clean'].isupper()
-        r['placename'] = r['numeric'] is False and r['text_clean'][0].isupper() and not r['uppercase']
         # coords
         for k in 'top left width height'.split():
             r[k] = int(r[k])
+        # font
+        r['fontheight'] = r['height']
         processed.append(r)
 
     return processed
+
+def extract_metadata(data):
+    metadata = {}
+    
+    # find map title
+    metadata['title'] = sorted(data, key=lambda r: -r['fontheight'])[0]
+
+    return metadata 
 
 def connect_text(data, ythresh=6, xthresh=6):
     
@@ -576,10 +629,11 @@ def connect_text(data, ythresh=6, xthresh=6):
                    'text_clean': ' '.join([r['text_clean'] for r in group]),
                    'numeric': min([r['numeric'] for r in group]),
                    'uppercase': min([r['uppercase'] for r in group]),
-                   'placename': max([r['placename'] for r in group]),
                    'conf': sum([r['conf'] for r in group]) / float(len(group)),
                    'left': min([r['left'] for r in group]),
                    'top': min([r['top'] for r in group]),
+                   'fontheight': max([r['fontheight'] for r in group]),
+                   'function': group[0]['function'],
                    }
             dct['width'] = max([r['left']+r['width'] for r in group]) - dct['left']
             dct['height'] = max([r['top']+r['height'] for r in group]) - dct['top']
@@ -596,7 +650,8 @@ def connect_text(data, ythresh=6, xthresh=6):
         totheright = []
         for r2 in candidates:
             if r2 == r: continue
-            if (max(r['height'],r2['height']) / float(min(r['height'],r2['height']))) > 2: # height difference can't be more than x2
+            # height difference can't be more than x2
+            if (max(r['height'],r2['height']) / float(min(r['height'],r2['height']))) > 2: 
                 continue
             # top or bottom within threshold
             if (abs(r['top'] - r2['top']) < ythresh) or (abs((r['top']+r['height']) - (r2['top']+r2['height'])) < ythresh): 
@@ -628,6 +683,9 @@ def connect_text(data, ythresh=6, xthresh=6):
         below = []
         for r2 in candidates:
             if r2 == r: continue
+            # height difference can't be more than x2
+            if (max(r['height'],r2['height']) / float(min(r['height'],r2['height']))) > 2: 
+                continue
             # midpoints within threshold
             mid1 = r['left'] + (r['width'] / 2.0)
             mid2 = r2['left'] + (r2['width'] / 2.0)
@@ -785,8 +843,8 @@ def detect_text_points(im, data, debug=False):
     
     filt_im_arr = np.ones(im_arr.shape[:2], dtype=bool)
     for r in data:
-        if not r['placename']:
-            continue
+        #if not r['placename']:
+        #    continue
         x1,y1,w,h = [r[k] for k in 'left top width height'.split()]
         x2 = x1+w
         y2 = y1+h
@@ -807,7 +865,7 @@ def detect_text_points(im, data, debug=False):
         PIL.Image.fromarray(im_arr).show()
 
     # determine kernel size from avg text height
-    h = sum([r['height'] for r in data]) / len(data)
+    h = sum([r['fontheight'] for r in data]) / len(data)
     h /= 2
     print 'kernel size', h
 
@@ -856,8 +914,8 @@ def detect_text_points(im, data, debug=False):
     
     points = []
     for r in data:
-        if not r['placename']:
-            continue
+        #if not r['placename']:
+        #    continue
         x1,y1,w,h = [r[k] for k in 'left top width height'.split()]
         x2 = x1+w
         y2 = y1+h
@@ -1069,10 +1127,10 @@ def debug_ocr(im, outpath, data, controlpoints, origs):
     c = pyagg.canvas.from_image(im)
     print c.width,c.height,im.size
     for r in data:
-        top,left,w,h = [int(r[k]) for k in 'top left width height'.split()]
+        top,left,w,h = [r[k] for k in 'top left width height'.split()]
         box = [left, top, left+w, top+h]
         text = r.get('text','[?]')
-        print box,text
+        #print box,text
         c.draw_box(bbox=box, fillcolor=None, outlinecolor=(0,255,0))
         c.draw_text(text, xy=(left,top), anchor='sw', textsize=6, textcolor=(0,255,0)) #bbox=box)
     for oname,ocoord in origs:
@@ -1115,8 +1173,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     outfold,outfil = os.path.split(outpath)
 
     # partition image
-    mapp,margins,boxes = partition_image(im)
-    im = mapp
+    mapp_poly,box_polys = image_segments(im)
     #im.show()
 
     # begin prep
@@ -1203,12 +1260,33 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
             x,y = r['anchor']
             r['anchor'] = (x/2, y/2)
 
+    # print map metadata
+    print 'map metadata:'
+    metadata = extract_metadata(data)
+    for k,v in metadata.items():
+        print k
+        print v
+
     # end prep, switch back to original image
     im = im
 
+    # decide which labels to consider placenames
+    # only labels inside map region
+    filt = mask_text(data, mapp_poly)
+    # excluding labels inside any boxes
+    for box in box_polys:
+        filt = mask_text(filt, box, invert=True)
+    # only nonnumeric, first uppercased, rest lowercased
+    filt = [r for r in filt
+            if r['numeric'] is False and r['text_clean'][0].isupper() and not r['uppercase']]
+    # mark as placename
+    for r in filt:
+        r['function'] = 'placename'
+    # final placenames with anchor points
+    points = [(r['text_clean'], r['anchor']) for r in data if r['function']=='placename' and 'anchor' in r]
+
     # find matches
     print 'finding matches'
-    points = [(r['text_clean'], r['anchor']) for r in data if r['placename'] and 'anchor' in r]
     origs,matches = find_matches(points, matchthresh, **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
@@ -1238,7 +1316,8 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     # warp
     print 'warping'
     print '{} points, warp_method={}'.format(len(tiepoints), warp_order or warp_order_auto)
-    warp(im, outpath, tiepoints, warp_order or warp_order_auto)
+    mapp_im = mask_image(im, mapp_poly)
+    warp(mapp_im, outpath, tiepoints, warp_order or warp_order_auto)
 
     # final control points
     cppath = os.path.join(outfold, infil+'_controlpoints.geojson')
