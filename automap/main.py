@@ -52,7 +52,7 @@ def threshold(im, color, thresh):
     #ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
     im = PIL.Image.fromarray(im_arr)
-    return im
+    return im, dissim
 
 def quantize(im):
     quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256).convert('RGB')
@@ -422,6 +422,102 @@ def maincolors(im):
     
     return diffgroups
 
+def partition_image(im):
+    colorthresh = 5
+
+    # BOX APPROACH
+##    im_arr = np.array(im)
+##    
+##    # quantize and convert colors
+##    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
+##    quant_arr = np.array(quant)
+##    qcounts,qcolors = zip(*sorted(quant.getcolors(256), key=lambda x: x[0]))
+##    counts,colors = zip(*sorted(quant.convert('RGB').getcolors(256), key=lambda x: x[0]))
+##
+##    # calc diffs
+##    pairdiffs = color_differences(colors)
+##    pairdiffs_arr = np.zeros((256,256))
+##    for k,v in list(pairdiffs.items()):
+##        qx,qy = (qcolors[colors.index(k[0])], qcolors[colors.index(k[1])])
+##        pairdiffs_arr[qx,qy] = v
+##    PIL.Image.fromarray(pairdiffs_arr*50).show()
+##
+##    # detect color edges
+##    orig_flat = np.array(quant).flatten()
+##    diff_im_flat = np.zeros(quant.size).flatten()
+##    for xoff in range(-1, 1+1, 1):
+##        for yoff in range(-1, 1+1, 1):
+##            if xoff == yoff == 0: continue
+##            off_flat = np.roll(quant, (xoff,yoff), (0,1)).flatten()
+##            diff_im_flat = diff_im_flat + pairdiffs_arr[orig_flat,off_flat] #np.maximum(diff_im_flat, pairdiffs[orig_flat,off_flat])
+##    diff_im_flat = diff_im_flat / 8.0
+##
+##    diff_im_flat[diff_im_flat > colorthresh] = 255
+##    diff_im = diff_im_flat.reshape((im.height, im.width))
+##
+##    #diff_im = diff_im_flat.reshape((im.height, im.width)).astype(np.uint8)
+##    #ret,diff_im = cv2.threshold(diff_im,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+##    
+##    print diff_im.min(), diff_im.mean(), diff_im.max()
+##    quant.show()
+##    PIL.Image.fromarray(diff_im).show()
+##
+##    diff_im = diff_im / diff_im.max()
+##    #PIL.Image.fromarray(diff_im).show()
+##    diff_im *= 255
+##    #PIL.Image.fromarray(diff_im).show()
+##    diff_im = diff_im.astype(np.uint8)
+##    PIL.Image.fromarray(diff_im).show()
+##    boxes = detect_boxes(diff_im)
+
+    # WHITE THRESH APPROACH
+    # TODO: Problem when entire maps is largely gray/white, maybe instead do largest area of high stdev??
+    white = (255,255,255)
+    im_prep = im
+    im_prep = quantize(im_prep)
+    thresh,mask = threshold(im_prep, white, colorthresh)
+    mask_arr = np.zeros(mask.shape) #(im.size[0],im.size[1]))
+    mask_arr = mask_arr.astype(np.uint8)
+    mask_arr[mask] = 255
+    #print thresh.size,mask_arr.shape
+    #PIL.Image.fromarray(mask_arr).show()
+
+    # detect contours
+    print mask_arr.dtype
+    contours,_ = cv2.findContours(mask_arr.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    # draw them
+    #im_arr_draw = np.array(im)
+    #cv2.drawContours(im_arr_draw, contours, -1, (0,255,0), 1)
+    #PIL.Image.fromarray(im_arr_draw).show()
+
+    # map is largest nonwhite contour
+    largest_nonwhite = sorted(contours, key=lambda cnt: cv2.contourArea(cnt))[-1]
+    map_mask = np.zeros(mask.shape)
+    cv2.drawContours(map_mask, [largest_nonwhite], -1, 255, -1)
+
+    # TODO: Problem when map is irregular shape and text overflows into margins ala brazil
+    # solution: expand borders in those cases??
+    #kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
+    #map_mask = cv2.dilate(map_mask,kernel,iterations=30)
+    
+    map_im = np.array(im.convert('RGBA'))
+    map_im[map_mask==0] = 0
+    map_im = PIL.Image.fromarray(map_im)
+    #map_im.show()
+
+    # margins is the opposite
+    margins_mask = (np.ones(mask.shape) * 255) - map_mask
+    margins_im = np.array(im.convert('RGBA'))
+    margins_im[margins_mask==0] = 0
+    margins_im = PIL.Image.fromarray(margins_im)
+    #margins_im.show()
+
+    # detect boxes
+    boxes = []
+
+    return map_im, margins_im, boxes
+
 def detect_boxes(im):
     # detect boxes from contours
     # https://stackoverflow.com/questions/11424002/how-to-detect-simple-geometric-shapes-using-opencv
@@ -430,8 +526,8 @@ def detect_boxes(im):
     import numpy as np
     import cv2
     im_arr = np.array(im)
-    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
-    _,contours,_ = cv2.findContours(im_arr.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    #im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
+    contours,_ = cv2.findContours(im_arr.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     im_arr_draw = cv2.cvtColor(im_arr, cv2.COLOR_GRAY2RGB)
     boxes = []
     for cnt in contours:
@@ -880,6 +976,11 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
         outpath = os.path.join(infold, infil + '_georeferenced.tif')
     outfold,outfil = os.path.split(outpath)
 
+    # partition image
+    mapp,margins,boxes = partition_image(im)
+    im = mapp
+    im.show()
+
     # begin prep
     im_prep = im
 
@@ -925,7 +1026,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
         # threshold
         print 'thresholding', color
-        im_prep_thresh = threshold(im_prep, color, colorthresh)
+        im_prep_thresh,mask = threshold(im_prep, color, colorthresh)
         #im_prep_thresh.show()
         #debugpath = os.path.join(outfold, infil+'_debug_prep.png')
         #debug_prep(im_prep_thresh, debugpath)

@@ -13,9 +13,9 @@ from automap import automap
 #automap('testmaps/egypt_pol_1979.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
 #automap('testmaps/ierland-toeristische-attracties-kaart.jpg', textcolor=(0,0,0), colorthresh=30, textconf=60)
 #automap('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[2000,2500,4000,4500])
-#automap('testmaps/gmaps.png', textcolor=(80,80,80), colorthresh=25, textconf=60)
+automap('testmaps/gmaps.png', textcolor=(80,80,80), colorthresh=25, textconf=60)
 #automap('testmaps/brazil_pol_1981.gif', textcolor=(0,0,0), colorthresh=25, textconf=80, bbox=[0,0,1000,1000])
-automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 
 
