@@ -423,6 +423,7 @@ def maincolors(im):
     return diffgroups
 
 def color_edges(im, colorthresh=10):
+    # see alternatively faster approx: https://stackoverflow.com/questions/11456565/opencv-mean-sd-filter
     im_arr = np.array(im)
     
     # quantize and convert colors
@@ -637,7 +638,7 @@ def connect_text(data, ythresh=6, xthresh=6):
                    }
             dct['width'] = max([r['left']+r['width'] for r in group]) - dct['left']
             dct['height'] = max([r['top']+r['height'] for r in group]) - dct['top']
-            print len(group),dct
+            #print len(group),dct
             newdata[i] = dct
         return newdata
     
@@ -968,7 +969,7 @@ def triang(test, matchcandidates=None):
         #viewmatch(positions, f)
     return matches
 
-def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3):
+def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, debug=False):
     # filter to those that can be geocoded
     print 'geocode and filter'
     import time
@@ -988,9 +989,11 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
     #testres = [(nxtname,nxtpos,res[:maxcandidates])
     #           for nxtname,nxtpos,res in testres]
 
-    # find all triangles from all possible combinations
+    # print names to be tested
     for nxtname,nxtpos,res in testres:
         print nxtname,len(res)
+
+    # find all triangles from all possible combinations        
     combis = itertools.combinations(testres, n_combi)
     # sort randomly to avoid local minima
     from random import uniform
@@ -998,12 +1001,13 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
     # sort by length of possible geocodings, ie try most unique first --> faster+accurate
     combis = sorted(combis, key=lambda gr: sum((len(res) for nxtname,nxtpos,res in gr)))
 
-    print 'finding all possible triangles'
+    print '\n'+'finding all possible triangles'
     triangles = []
     for i,tri in enumerate(combis):
-        print '-----'
-        print 'try triangle %s of %s' % (i, len(combis))
-        print '\n'.join([repr((tr[0],len(tr[2]))) for tr in tri])
+        if debug:
+            print '-----'
+            print 'try triangle %s of %s' % (i, len(combis))
+            print '\n'.join([repr((tr[0],len(tr[2]))) for tr in tri])
         # try triang
         best = None
         try: best = triang([tr[:2] for tr in tri],
@@ -1012,14 +1016,17 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
         if best:
             f,diff,diffs = best[0]
             #print f
-            print 'error:', round(diff,6)
+            if debug:
+                print 'error:', round(diff,6)
             if diff < thresh:
-                print 'TRIANGLE FOUND'
+                if debug:
+                    print 'TRIANGLE FOUND'
                 valid = [tr[:2] for tr in tri]
 
                 # ...
                 for nxtname,nxtpos,res in testres:
-                    print 'trying to add incrementally:',nxtname,nxtpos
+                    if debug:
+                        print 'trying to add incrementally:',nxtname,nxtpos
                     orignames,origcoords = zip(*valid)
                     orignames,origcoords = list(orignames),list(origcoords)
                     matchnames = list(f['properties']['combination'])
@@ -1037,15 +1044,22 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
                     if not best: continue
                     mf,mdiff,mdiffs = best[0]
                     if mdiff < thresh:
-                        print 'ADDING'
+                        if debug:
+                            print 'ADDING'
                         valid.append((nxtname,nxtpos))
                         f = mf
+                
+                print '\n'+'MATCHES FOUND (error=%r)' % round(diff,6)
+                print '>>>', repr([n for n,p in valid]),'-->',[n[:15] for n in f['properties']['combination']]
 
                 triangles.append((valid,f,diff))
                 
-        print '%s triangles so far:' % len(triangles)
-        print '\n>>>'.join([repr((round(tr[2],6),[n for n,p in tr[0]],'-->',[n[:15] for n in tr[1]['properties']['combination']]))
-                         for tr in triangles])
+        if debug:
+            print '%s triangles so far:' % len(triangles)
+        
+        #print '\n>>>'.join([repr((round(tr[2],6),[n for n,p in tr[0]],'-->',[n[:15] for n in tr[1]['properties']['combination']]))
+        #                 for tr in triangles])
+        
         if len(triangles) >= mintrials and max((len(v) for v,f,d in triangles)) >= minpoints:
             break
 
@@ -1056,6 +1070,7 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
     triangles = sorted(triangles, key=lambda(v,f,d): (-len(v),-d) )
     orignames,origcoords = [],[]
     matchnames,matchcoords = [],[]
+    print '\n'+'Final matchset:'
     for tri,f,diff in triangles[:1]: # only the first best triangle is used
         for (n,c),(mn,mc) in zip(tri, zip(f['properties']['combination'], f['geometry']['coordinates'][0])):
             print 'final',n,c,mn,mc
@@ -1125,7 +1140,7 @@ def debug_prep(im, outpath):
 def debug_ocr(im, outpath, data, controlpoints, origs):
     import pyagg
     c = pyagg.canvas.from_image(im)
-    print c.width,c.height,im.size
+    #print c.width,c.height,im.size
     for r in data:
         top,left,w,h = [r[k] for k in 'top left width height'.split()]
         box = [left, top, left+w, top+h]
@@ -1159,8 +1174,8 @@ def debug_warped(pth, controlpoints):
     m.zoom_out(2)
     m.view()
 
-def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, **kwargs):
-    print 'loading image'
+def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, view_result=False, **kwargs):
+    print 'loading image', inpath
     im = PIL.Image.open(inpath).convert('RGB')
     if bbox:
         im = im.crop(bbox)
@@ -1222,9 +1237,8 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
         # threshold
         print 'thresholding', color
         im_prep_thresh,mask = threshold(im_prep, color, colorthresh)
-        #im_prep_thresh.show()
-        #debugpath = os.path.join(outfold, infil+'_debug_prep.png')
-        #debug_prep(im_prep_thresh, debugpath)
+        debugpath = os.path.join(outfold, infil+'_debug_prep.png')
+        debug_prep(im_prep_thresh, debugpath)
 
         # ocr
         print 'detecting text'
@@ -1291,9 +1305,10 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
-    print tiepoints
-    for on,mc,mn in zip(orignames,matchcoords,matchnames):
-        print on,mc,mn
+
+    #print tiepoints
+    #for on,mc,mn in zip(orignames,matchcoords,matchnames):
+    #    print on,mc,mn
 
     # determine transform method
     if not warp_order:
@@ -1303,7 +1318,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     if warp_order == 'tps':
         best_residuals = [None for _ in tiepoints]
     else:
-        print 'excluding outliers'
+        print '\n'+'excluding outliers'
         frompoints,topoints = zip(*tiepoints)
         best, best_frompoints, best_topoints, best_residuals = optimal_rmse(warp_order or warp_order_auto, frompoints, topoints, max_residual=max_residual)
         tiepoints = zip(best_frompoints, best_topoints)
@@ -1314,7 +1329,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
         warp_order_auto = optimal_warp_order(tiepoints)
 
     # warp
-    print 'warping'
+    print '\n'+'warping'
     print '{} points, warp_method={}'.format(len(tiepoints), warp_order or warp_order_auto)
     mapp_im = mask_image(im, mapp_poly)
     warp(mapp_im, outpath, tiepoints, warp_order or warp_order_auto)
@@ -1328,7 +1343,9 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     debug_ocr(im, debugpath, data, controlpoints, origs)
 
     # view warped
-    debug_warped(outpath, controlpoints)
+    print '\n'+'finished!'+'\n'
+    if view_result:
+        view_warped(outpath, controlpoints)
 
 def drawpoints(img):
     import pythongis as pg

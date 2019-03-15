@@ -47,8 +47,8 @@ def triangulate(names, positions, matchcandidates=None):
     if len(matchcandidates) < 3:
         return []
             
-    for match in matchcandidates:
-        print len(match)
+    #for match in matchcandidates:
+    #    print len(match)
 
     # find unique combinations of all possible candidates
     #print 'combining'
@@ -149,7 +149,7 @@ def triangulate_add(origs, matches, add, addcandidates=None):
         if not match:
             return False
             
-    print len(match)
+    #print len(match)
 
     # find unique combinations of all possible candidates
     #print 'combining'
