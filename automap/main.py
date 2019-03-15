@@ -567,13 +567,18 @@ def detect_boxes(im):
     import numpy as np
     import cv2
     im_arr = np.array(im)
+    thresh = 127 # from grayscale to binary (arbitrary, experiment more)
+    im_arr[im_arr < thresh] = 0 
+    im_arr[im_arr >= thresh] = 255
     #im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
+    #PIL.Image.fromarray(im).show()
     contours,_ = cv2.findContours(im_arr.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     #im_arr_draw = cv2.cvtColor(im_arr, cv2.COLOR_GRAY2RGB)
     boxes = []
     im_area = im_arr.shape[0] * im_arr.shape[1]
     for cnt in contours:
-        approx = cv2.approxPolyDP(cnt,0.01*cv2.arcLength(cnt,True),True)
+        epsilon = 5 # pixels # 0.01*cv2.arcLength(cnt,True)
+        approx = cv2.approxPolyDP(cnt,epsilon,True)
         if len(approx) == 4:
             if (im_area/(2.0**2)) > cv2.contourArea(cnt) > (im_area/(16.0**2)):
                 boxes.append(approx)
@@ -1129,7 +1134,7 @@ def final_controlpoints(tiepoints, residuals, origs, matches, outpath=False):
     if outpath:
         vec = pg.VectorData(fields='origname origx origy matchname matchx matchy residual'.split())
         for on,(ox,oy),mn,(mx,my),res in controlpoints:
-            vec.add_feature([on,ox,oy,mn,mx,my,res], geometry={'type': 'Point', 'coordinates': mc})
+            vec.add_feature([on,ox,oy,mn,mx,my,res], geometry={'type': 'Point', 'coordinates': (mx,my)})
         vec.save(outpath)
 
     return controlpoints
@@ -1154,7 +1159,7 @@ def debug_ocr(im, outpath, data, controlpoints, origs):
         c.draw_circle(xy=oc, fillsize=1, fillcolor=(255,0,0,155), outlinecolor=None)
     c.save(outpath)
 
-def debug_warped(pth, controlpoints):
+def view_warped(pth, controlpoints):
     import pythongis as pg
     m = pg.renderer.Map()
 
