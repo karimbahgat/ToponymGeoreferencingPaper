@@ -38,16 +38,19 @@ def threshold(im, color, thresh):
     for col,diff in difftable.items():
         #print col
         diff_im[(im_arr[:,:,0]==col[0])&(im_arr[:,:,1]==col[1])&(im_arr[:,:,2]==col[2])] = diff # 3 lookup is slow
+
     dissim = diff_im > thresh
-    im_arr[dissim] = (255,255,255)
+    #im_arr[dissim] = (255,255,255)
+    diff_im[dissim] = 255
+    im_arr = diff_im.astype(np.uint8)
     #PIL.Image.fromarray(im_arr).show()
     #fdsf
 
     # TODO: Maybe also do gaussian or otsu binarization/smoothing?
     # Seems to do worse than original, makes sense since loses/changes original information
     # https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
-    import cv2
-    im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
+    #import cv2
+    #im_arr = cv2.cvtColor(im_arr, cv2.COLOR_RGB2GRAY)
     #im_arr = cv2.GaussianBlur(im_arr,(3,3),0)
     #ret,im_arr = cv2.threshold(im_arr,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
@@ -334,7 +337,7 @@ def maincolors(im):
     # ...
 
     # group custom 2
-    colorthresh = 15
+    colorthresh = 10
     
     diffgroups = dict()
     for c in colors:
@@ -396,9 +399,13 @@ def maincolors(im):
                 c.draw_line([(x,0),(x,100)], fillcolor=col, fillsize=0.3)
         #c.get_image().show()
 
-    if 0:
+    if 1:
         # view colors in image
+        #im.show()
+        quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
         quant.show()
+        qcounts,qcolors = zip(*sorted(quant.getcolors(256), key=lambda x: x[0]))
+        counts,colors = zip(*sorted(quant.convert('RGB').getcolors(256), key=lambda x: x[0]))
         qarr = np.array(quant)
 ##        for k,g in diffgroups_dict.items():
 ##            colim = im_arr.copy()
@@ -417,10 +424,117 @@ def maincolors(im):
 ##            PIL.Image.fromarray(colim).show()
         colim = np.zeros((im_arr.shape[0]*im_arr.shape[1]*3,), np.uint8).reshape(im_arr.shape)
         for k,g in diffgroups.items():
-            colim[np.isin(qarr, g)] = k
-        #PIL.Image.fromarray(colim).show()
+            qg = [qcolors[colors.index(gs)] for gs in g]
+            colim[np.isin(qarr, qg)] = k
+        PIL.Image.fromarray(colim).show()
     
     return diffgroups
+
+def maincolors(im):
+    im_arr = np.array(quantize(im))
+
+    # try downsizing to get avg colors?
+    quantize(im).resize((500,500), PIL.Image.ANTIALIAS).show()
+
+    # try upsampling 4 times and get stdev
+    upsc = im.resize((im.size[0]*4,im.size[1]*4), PIL.Image.NEAREST)
+    upsc.show()
+    PIL.Image.fromarray(color_edges(upsc)).show()
+
+    # detect color edges
+    thresh = 10
+    uniq = set()
+    for xoff in range(-1, 0+1, 1):
+        for yoff in range(-1, 0+1, 1):
+            print xoff,yoff
+            if xoff == yoff == 0: continue
+            off = np.roll(im_arr, (xoff,yoff), (0,1))
+            stack = np.stack([im_arr, off], axis=1)
+            print im_arr.shape, off.shape, stack.shape
+            #print stack
+            #pairs,counts = np.unique(stack.reshape(im_arr.shape[0]*im_arr.shape[1], 6), return_counts=True, axis=1)
+            #print pairs.shape, pairs
+            #print counts.shape, counts
+            uniq.update(set((tuple(v) for v in stack.reshape(im_arr.shape[0]*im_arr.shape[1], 6))))
+            print len(uniq)
+
+##    pairdiffs = dict()
+##    for c,colors in itertools.groupby(sorted(uniq, key=lambda x: x[:3]), key=lambda x: x[:3]):
+##        colors = [col[3:6] for col in colors]
+##        c_lab = convert_color(sRGBColor(*c, is_upscaled=True), LabColor).get_value_tuple()
+##        colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
+##                      for col in colors]
+##        diffs = delta_e_cie2000(c_lab, np.array(colors_lab))
+##        simil = [(col,diff) for col,diff in zip(colors,diffs) if diff < thresh]
+##        #print c, len(colors), len(simil)
+##        pairdiffs.update([(tuple(sorted((c,col))),diff) for col,diff in simil])
+##        #for col,diff in simil:
+##        #    pairdiffs[tuple(sorted((c,col)))] = diff
+    colors = list(set([col[3:6] for col in uniq]))
+    pairdiffs = color_differences(colors)
+    print len(pairdiffs),pairdiffs.items()[0]
+
+    diffgroups = dict()
+    for c in colors:
+        # find closest existing group that is sufficiently similar
+        #print c, diffgroups.keys()
+        #c_lab = convert_color(sRGBColor(*c, is_upscaled=True), LabColor).get_value_tuple()
+        #dists = [(gc,pairdiffs.get(tuple(sorted([c,gc]))) or delta_e_cie2000(c_lab, np.array([convert_color(sRGBColor(*gc, is_upscaled=True), LabColor).get_value_tuple()])))
+        #         for gc in diffgroups.keys()]
+        dists = [(gc,pairdiffs[tuple(sorted([c,gc]))])
+                 for gc in diffgroups.keys()]
+        similar = [(gc,dist) for gc,dist in dists if c != gc and dist < thresh]
+        if similar:
+            nearest = sorted(similar, key=lambda x: x[1])[0][0]
+            diffgroups[nearest].append(c)
+            # update that group key as the new central color (lowest avg dist to group members)
+            gdists = [(gc1,[pairdiffs[tuple(sorted([c,gc]))] for gc2 in diffgroups[nearest]]) for gc1 in diffgroups[nearest]]
+            central = sorted(gdists, key=lambda(gc,gds): sum(gds)/float(len(gds)))[0][0]
+            diffgroups[central] = diffgroups.pop(nearest)
+        else:
+            diffgroups[c] = [c]
+
+    # view
+    if 1:        
+        import pyagg
+        c=pyagg.Canvas(1000,200)
+        c.percent_space()
+        x = 2
+        for i,g in enumerate(diffgroups.keys()):
+            print i, g
+            x += 2
+            c.draw_line([(x,0),(x,100)], fillcolor=g, fillsize=2)
+        c.get_image().show()
+
+    if 1:
+        # view colors in image
+        #im.show()
+        quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
+        quant.show()
+        qcounts,qcolors = zip(*sorted(quant.getcolors(256), key=lambda x: x[0]))
+        counts,colors = zip(*sorted(quant.convert('RGB').getcolors(256), key=lambda x: x[0]))
+        qarr = np.array(quant)
+##        for k,g in diffgroups_dict.items():
+##            colim = im_arr.copy()
+##            
+##    ##        colim[np.isin(qarr, g, invert=True)] = [255,255,255] #[0,0,0]
+##            
+##            diffs = [pairdiffs[k,oth] for oth in qcolors]
+##            difftable = dict(list(zip(qcolors,diffs)))
+##            diff_im_flat = np.array(quant).flatten()
+##            for qcol,diff in difftable.items():
+##                diff_im_flat[diff_im_flat==qcol] = diff
+##            diff_im = diff_im_flat.reshape((im.height, im.width))
+##            dissim = diff_im > 10
+##            colim[dissim] = (255,255,255)
+##
+##            PIL.Image.fromarray(colim).show()
+        colim = np.zeros((im_arr.shape[0]*im_arr.shape[1]*3,), np.uint8).reshape(im_arr.shape)
+        for k,g in diffgroups.items():
+            qg = [qcolors[colors.index(gs)] for gs in g]
+            mask = np.isin(qarr, qg)
+            colim[mask] = k
+        PIL.Image.fromarray(colim).show()
 
 def color_edges(im, colorthresh=10):
     # see alternatively faster approx: https://stackoverflow.com/questions/11456565/opencv-mean-sd-filter
@@ -1159,16 +1273,20 @@ def debug_ocr(im, outpath, data, controlpoints, origs):
         c.draw_circle(xy=oc, fillsize=1, fillcolor=(255,0,0,155), outlinecolor=None)
     c.save(outpath)
 
-def view_warped(pth, controlpoints):
+def debug_warped(pth, outpath, controlpoints):
     import pythongis as pg
     m = pg.renderer.Map()
 
-    m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp")
+    m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp",
+                fillcolor=(217,156,38))
 
-    rlyr = m.add_layer(pth)
+    warped = pg.RasterData(pth)
+    for b in warped.bands:
+        b.nodataval = 0 # need better approach, use 4th band as mask
+    rlyr = m.add_layer(warped, transparency=0.1)
 
     m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
-                fillcolor='red', outlinewidth=0.1)
+                fillcolor='red', fillsize=0.1) #outlinewidth=0.1)
 
     anchors = pg.VectorData(fields=['origname', 'matchname', 'residual'])
     for on,oc,mn,mc,res in controlpoints:
@@ -1176,10 +1294,12 @@ def view_warped(pth, controlpoints):
     m.add_layer(anchors, fillcolor=(0,255,0), outlinewidth=0.2)
 
     m.zoom_bbox(*rlyr.bbox)
-    m.zoom_out(2)
-    m.view()
+    m.zoom_out(1.5)
+    #m.view()
+    m.save(outpath)
+    
 
-def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, view_result=False, **kwargs):
+def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, **kwargs):
     print 'loading image', inpath
     im = PIL.Image.open(inpath).convert('RGB')
     if bbox:
@@ -1349,8 +1469,8 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
     # view warped
     print '\n'+'finished!'+'\n'
-    if view_result:
-        view_warped(outpath, controlpoints)
+    debugpath = os.path.join(outfold, infil+'_debug_warp.png')
+    debug_warped(outpath, debugpath, controlpoints)
 
 def drawpoints(img):
     import pythongis as pg
