@@ -6,6 +6,7 @@ from .rmse import optimal_rmse
 import os
 import itertools
 import tempfile
+import time
 
 import pythongis as pg
 
@@ -1275,7 +1276,7 @@ def debug_ocr(im, outpath, data, controlpoints, origs):
 
 def debug_warped(pth, outpath, controlpoints):
     import pythongis as pg
-    m = pg.renderer.Map()
+    m = pg.renderer.Map(width=2000, height=2000, background='white')
 
     m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp",
                 fillcolor=(217,156,38))
@@ -1283,7 +1284,7 @@ def debug_warped(pth, outpath, controlpoints):
     warped = pg.RasterData(pth)
     for b in warped.bands:
         b.nodataval = 0 # need better approach, use 4th band as mask
-    rlyr = m.add_layer(warped, transparency=0.1)
+    rlyr = m.add_layer(warped, transparency=0.3)
 
     m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
                 fillcolor='red', fillsize=0.1) #outlinewidth=0.1)
@@ -1291,7 +1292,7 @@ def debug_warped(pth, outpath, controlpoints):
     anchors = pg.VectorData(fields=['origname', 'matchname', 'residual'])
     for on,oc,mn,mc,res in controlpoints:
         anchors.add_feature([on,mn,res], dict(type='Point', coordinates=mc))
-    m.add_layer(anchors, fillcolor=(0,255,0), outlinewidth=0.2)
+    m.add_layer(anchors, fillcolor=(0,255,0), fillsize=0.3)
 
     m.zoom_bbox(*rlyr.bbox)
     m.zoom_out(1.5)
@@ -1300,6 +1301,8 @@ def debug_warped(pth, outpath, controlpoints):
     
 
 def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, **kwargs):
+    start = time.time()
+    
     print 'loading image', inpath
     im = PIL.Image.open(inpath).convert('RGB')
     if bbox:
@@ -1467,8 +1470,9 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     debugpath = os.path.join(outfold, infil+'_debug_ocr.png')
     debug_ocr(im, debugpath, data, controlpoints, origs)
 
-    # view warped
-    print '\n'+'finished!'+'\n'
+    # view warpedp
+    print '\n'+'finished!'
+    print 'total runtime: {:.1f} seconds \n'.format(time.time() - start)
     debugpath = os.path.join(outfold, infil+'_debug_warp.png')
     debug_warped(outpath, debugpath, controlpoints)
 
