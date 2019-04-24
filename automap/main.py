@@ -1428,11 +1428,15 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     points = [(r['text_clean'], r['anchor']) for r in data if r['function']=='placename' and 'anchor' in r]
 
     # find matches
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    
     print 'finding matches'
     origs,matches = find_matches(points, matchthresh, **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
+
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
 
     #print tiepoints
     #for on,mc,mn in zip(orignames,matchcoords,matchnames):

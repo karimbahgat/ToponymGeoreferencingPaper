@@ -17,16 +17,16 @@ def detect_data(im, bbox=None):
     print '-------------\n%s\n%s\n' % (len(drows), '\n'.join([r['text'] for r in drows if r.get('text')]))
     return drows
 
-#im = PIL.Image.open('testmaps/burkina.jpg')
-#n = 2
-im = PIL.Image.open('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg')
-n = 5
+im = PIL.Image.open('testmaps/burkina.jpg')
+n = 2
+#im = PIL.Image.open('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg')
+#n = 5
 
 im = im.convert('L')
 #im.show()
 
 # all in one
-if 0:
+if 1:
     t = time()
     detect_data(im)
     print time()-t

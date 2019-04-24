@@ -16,11 +16,14 @@ from automap.main import debug_warped
 #automap('testmaps/satim.png', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/tunisia_pol_1990.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/cameroon_pol98.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/cameroon.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.2)
 #automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 #automap('testmaps/repcongo.png', textcolor=(120,120,120), colorthresh=25, textconf=60)
-#automap('testmaps/egypt_pol_1979.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
 #automap('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[2000,2500,4000,4500])
 #automap('testmaps/gmaps.png', textcolor=(80,80,80), colorthresh=25, textconf=60)
 #automap('testmaps/brazil_pol_1981.gif', textcolor=(0,0,0), colorthresh=25, textconf=60)
@@ -35,7 +38,7 @@ automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/namibia_homelands_78.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/namibia_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
-#automap('testmaps/washington_baltimore.jpg', textcolor=(50,50,50), colorthresh=30, textconf=60, view_result=True)
+#automap('testmaps/washington_baltimore.jpg', textcolor=(50,50,50), colorthresh=35, textconf=60)
 
 
 
@@ -48,7 +51,14 @@ automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/egypt_admn97.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
 #automap('testmaps/devils tower small.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, maxiter=3000, mintrials=1000)
 #automap('testmaps/brazil_army_amazon_1999.jpg', textcolor=(50,50,50), colorthresh=35, textconf=60, maxiter=30000, mintrials=1000, max_residual=0.5)
+#automap('testmaps/egypt_pol_1979.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60, max_residual=0.005)
+#automap('testmaps/CHHJ5246_Updated_areasOfConflict_Map_0217_V2.png', textcolor=(0,0,0), colorthresh=40, textconf=60)
+#automap('testmaps/korean_war_april_1951.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
 
+#automap('testmaps/zaire_map.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/russia_autonomous92.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/algeria_rel79.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/france_admin91.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 
 
