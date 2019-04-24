@@ -3,22 +3,11 @@
 
 import itertools
 
-import geopy
-
 from . import shapematch
 
+from . import geocode
+coder = geocode.Online()
 
-def geocode(name, limit=10):
-    coder = geopy.geocoders.Nominatim()
-    ms = coder.geocode(name, exactly_one=False, limit=limit) or []
-    for m in ms:
-        yield {'type': 'Feature',
-               'properties': {'name': m.address,
-                              },
-               'geometry': {'type': 'Point',
-                            'coordinates': (m.longitude, m.latitude)
-                            },
-               }
 
 def triangulate(names, positions, matchcandidates=None):
     assert len(names) == len(positions)
@@ -40,7 +29,7 @@ def triangulate(names, positions, matchcandidates=None):
     else:
         matchcandidates = []
         for name in names:
-            match = list(geocode(name))
+            match = list(coder.geocode(name))
             if match:
                 matchcandidates.append(match)
 
@@ -145,7 +134,7 @@ def triangulate_add(origs, matches, add, addcandidates=None):
     if addcandidates:
         match = addcandidates
     else:
-        match = list(geocode(addname))
+        match = list(coder.geocode(addname))
         if not match:
             return False
             

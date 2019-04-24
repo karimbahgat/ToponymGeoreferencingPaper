@@ -1,5 +1,6 @@
 
-from .triangulate import triangulate, triangulate_add, geocode
+from . import geocode
+from .triangulate import triangulate, triangulate_add
 from .shapematch import normalize
 from .rmse import optimal_rmse
 
@@ -1092,12 +1093,14 @@ def triang(test, matchcandidates=None):
 def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, debug=False):
     # filter to those that can be geocoded
     print 'geocode and filter'
+    coder = geocode.Online()
+    
     import time
     testres = []
     for nxtname,nxtpos in test:
         print 'geocoding',nxtname
         try:
-            res = list(geocode(nxtname, maxcandidates))
+            res = list(coder.geocode(nxtname)) #, maxcandidates)
             if res:
                 testres.append((nxtname,nxtpos,res))
                 #time.sleep(0.1)
