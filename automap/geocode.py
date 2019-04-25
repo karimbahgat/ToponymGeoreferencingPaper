@@ -48,6 +48,25 @@ class Online(object):
 
 
 
+class OptimizedCoder(object):
+    def __init__(self, path=None):
+        self.path = path or r'C:\Users\kimok\Desktop\gazetteer data\optim\gazetteers.db'
+        self.locs = gs.Table(self.path, 'locs')
+        self.names = gs.Table(self.path, 'names')
+
+    def geocode(self, name, limit=10):
+        # NOT CORRRECT QUERY, RETURNS DUPLICATES
+        results = self.locs.workspace.db.cursor().execute("SELECT locs.data, locs.id, GROUP_CONCAT(names.name, '|'), locs.geom FROM locs, names, (SELECT data,id FROM names WHERE name = ?) AS m WHERE locs.id=m.id AND locs.data=m.data and names.id=m.id and names.data=m.data GROUP BY m.data,m.id", (name,))
+        results = ({'type': 'Feature',
+                   'properties': {'data':data,
+                                  'id':ID,
+                                  'name':names,
+                                  },
+                   'geometry': geom.__geo_interface__,
+                   } for data,ID,names,geom in results)
+        return results #Matches(results)
+
+
 
 class SQLiteCoder(object):
     def __init__(self, db=None, table=None):
@@ -86,4 +105,13 @@ class OSM(SQLiteCoder):
     db = r'C:\Users\kimok\Desktop\gazetteer data\prepped\osm.db'
     table = 'data'
 
+
+class CIESIN(SQLiteCoder):
+    db = r'C:\Users\kimok\Desktop\gazetteer data\prepped\ciesin.db'
+    table = 'data'
+
+
+class NatEarth(SQLiteCoder):
+    db = r'C:\Users\kimok\Desktop\gazetteer data\prepped\natearth.db'
+    table = 'data'
 

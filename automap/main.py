@@ -2,12 +2,13 @@
 from . import geocode
 from .triangulate import triangulate, triangulate_add
 from .shapematch import normalize
-from .rmse import optimal_rmse
+from .rmse import optimal_rmse, polynomial
 
 import os
 import itertools
 import tempfile
 import time
+import re
 
 import pythongis as pg
 
@@ -721,7 +722,7 @@ def process_text(data, textconf):
         # text
         r['text'] = r.get('text')
         if not r['text']: continue
-        r['text_clean'] = r['text'].strip(''' *'".,:;''')
+        r['text_clean'] = re.sub('^\\W+|\\W+$', '', r['text'], flags=re.UNICODE) # strips nonalpha chars from start/end
         if not r['text_clean']: continue
         r['numeric'] = r['text_clean'].replace(' ','').isnumeric()
         r['uppercase'] = r['text_clean'].isupper()
@@ -1093,14 +1094,14 @@ def triang(test, matchcandidates=None):
 def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, debug=False):
     # filter to those that can be geocoded
     print 'geocode and filter'
-    coder = geocode.Online()
+    coder = geocode.OptimizedCoder()
     
     import time
     testres = []
     for nxtname,nxtpos in test:
         print 'geocoding',nxtname
         try:
-            res = list(coder.geocode(nxtname)) #, maxcandidates)
+            res = list(coder.geocode(nxtname, maxcandidates))
             if res:
                 testres.append((nxtname,nxtpos,res))
                 #time.sleep(0.1)
@@ -1124,7 +1125,7 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
     # sort by length of possible geocodings, ie try most unique first --> faster+accurate
     combis = sorted(combis, key=lambda gr: sum((len(res) for nxtname,nxtpos,res in gr)))
 
-    print '\n'+'finding all possible triangles'
+    print '\n'+'finding all possible triangles of {} possible combinations'.format(len(combis))
     triangles = []
     for i,tri in enumerate(combis):
         if debug:
@@ -1189,8 +1190,8 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
         if i >= maxiter:
             break
 
-    # of all the trial triangles, choose only the one with longest chain of points and lowest diff
-    triangles = sorted(triangles, key=lambda(v,f,d): (-len(v),-d) )
+    # of all the trial triangles, choose only the one with lowest diff and longest chain of points
+    triangles = sorted(triangles, key=lambda(v,f,d): (d,-len(v)) )
     orignames,origcoords = [],[]
     matchnames,matchcoords = [],[]
     print '\n'+'Final matchset:'
@@ -1217,6 +1218,14 @@ def optimal_warp_order(tiepoints):
     else:
         warp_order = 1
     return warp_order
+
+##def optimal_warp_order(tiepoints):
+##    frompoints, topoints = zip(*tiepoints)
+##    rmses = [polynomial(order, frompoints, topoints)[3]
+##             for order in range(1,3+1)]
+##    print rmses
+##    order = rmses.index(min(rmses)) + 1
+##    return order
 
 def warp(im, outpath, tiepoints, order=None):
     import os
@@ -1267,7 +1276,7 @@ def debug_ocr(im, outpath, data, controlpoints, origs):
     for r in data:
         top,left,w,h = [r[k] for k in 'top left width height'.split()]
         box = [left, top, left+w, top+h]
-        text = r.get('text','[?]')
+        text = r.get('text_clean','[?]')
         #print box,text
         c.draw_box(bbox=box, fillcolor=None, outlinecolor=(0,255,0))
         c.draw_text(text, xy=(left,top), anchor='sw', textsize=6, textcolor=(0,255,0)) #bbox=box)
@@ -1549,9 +1558,8 @@ def drawpoints(img):
                 name = entry.get()
                 print x,y,name
 
-                import geopy
-                coder = geopy.geocoders.Nominatim()
-                ms = coder.geocode(name, exactly_one=False, limit=100)
+                coder = geocode.OptimizedCoder()
+                ms = coder.geocode(name, limit=10)
                 if ms:
                     points.append((name, (x,y)))
                     
