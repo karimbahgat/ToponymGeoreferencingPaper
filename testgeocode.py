@@ -43,7 +43,7 @@ coder = geocode.OptimizedCoder()
 #fsdfs
 
 #coder.stream.workspace.db.cursor().execute('PRAGMA case_sensitive_like = ON')
-for name in 'Quargla|new york|paris|oslo|tokyo|williamsburg'.split('|'):
+for name in 'Boa Vista|Quargla|new york|paris|oslo|tokyo|williamsburg'.split('|'):
     print name
     t = time()
     res = list(coder.geocode(name.title(), limit=None))

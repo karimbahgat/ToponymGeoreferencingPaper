@@ -1091,7 +1091,7 @@ def triang(test, matchcandidates=None):
         #viewmatch(positions, f)
     return matches
 
-def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, debug=False):
+def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, source=False, debug=False):
     # filter to those that can be geocoded
     print 'geocode and filter'
     coder = geocode.OptimizedCoder()
@@ -1103,6 +1103,8 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
         try:
             res = list(coder.geocode(nxtname, maxcandidates))
             if res:
+                if source:
+                    res = [r for r in res if r['properties']['data']==source]
                 testres.append((nxtname,nxtpos,res))
                 #time.sleep(0.1)
         except Exception as err:
@@ -1443,7 +1445,11 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
     
     print 'finding matches'
-    origs,matches = find_matches(points, matchthresh, **kwargs)
+##    for src in 'un natearth ciesin osm geonames gns'.split():
+##        print src
+##        try: origs,matches = find_matches(points, matchthresh, source=src, **kwargs)
+##        except Exception as err: print err
+    origs,matches = find_matches(points, matchthresh, source='gns', **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)

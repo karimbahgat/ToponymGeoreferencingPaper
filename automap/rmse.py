@@ -73,7 +73,52 @@ def polynomial(order, frompoints, topoints):
     mox = math.sqrt(V_X_sum_sq/(n))
     moy = math.sqrt(V_Y_sum_sq/(n))
 
-    return V_X, V_Y, V_XY, mo, mox, moy, predXs, predYs
+    return V_X, V_Y, V_XY, mo, mox, moy, predXs, predYs, aaa_X[0], bbb_Y[0]
+
+def predict(order, points, coeff_x, coeff_y):
+    points = np.array(points)
+
+    if order == 1:
+        #X = a0 + a1x + a2y
+        #Y = b0 + b1x + b2y
+        Axy = np.zeros((len(points), 3), dtype=np.float)
+        Axy[:, 0] = 1
+        Axy[:, 1:3] = points[:, 0:2]
+
+    if order == 2:
+        Axy = np.zeros((len(points), 6), dtype=np.float)
+        Axy[:, 0] = 1 #a0
+        Axy[:, 1] = points[ : , 0] # a1
+        Axy[:, 2] = points[ : , 1] # a2
+        Axy[:, 3] = points[ : , 0] * points[ : , 1] # ...
+        Axy[:, 4] = points[ : , 0] * points[ : , 0]
+        Axy[:, 5] = points[ : , 1] * points[ : , 1]
+
+    elif order == 3:
+        #X = a0 + a1x + a2y + a3xy + a4x^2 + a5y^2 + a6x^3 + a7x^2y + a8xy^2 + a9y^3
+        #Y = b0 + b1x + b2y + b3xy + b4x^2 + b5y^2 + b6x^3 + b7x^2y + b8xy^2 + b9y^3
+        Axy = np.zeros((len(points), 10), dtype=np.float)
+        Axy[:, 0] = 1 #a0
+        Axy[:, 1] = points[ : , 0] # a1
+        Axy[:, 2] = points[ : , 1] # a2
+        Axy[:, 3] = points[ : , 0] * points[ : , 1] # ...
+        Axy[:, 4] = points[ : , 0] * points[ : , 0]
+        Axy[:, 5] = points[ : , 1] * points[ : , 1] #
+        Axy[:, 6] = points[ : , 0] * points[ : , 0] * points[ : , 0]
+        Axy[:, 7] = points[ : , 0] * points[ : , 0] * points[ : , 1]
+        Axy[:, 8] = points[ : , 0] * points[ : , 1] * points[ : , 1]
+        Axy[:, 9] = points[ : , 1] * points[ : , 1] * points[ : , 1]
+
+    # predict
+    predXs = Axy.dot(coeff_x)
+    predYs = Axy.dot(coeff_y)
+
+    # residuals
+##    V_X = points[:, 2] - np.array(predXs)
+##    V_Y = points[:, 3] - np.array(predYs)
+##    V_XY = np.sqrt(V_X**2 + V_Y**2)
+
+    return np.column_stack((predXs, predYs))
 
 def optimal_rmse(order, frompoints, topoints, max_residual=0.1, min_points=3):
     # try all combinations, but not physically possible
@@ -115,7 +160,7 @@ def optimal_rmse(order, frompoints, topoints, max_residual=0.1, min_points=3):
     while True:
         if len(frompoints) == min_points:
             break
-        res_x, res_y, res_xy, rmse, rmse_x, rmse_y, pred_x, pred_y = polynomial(order, frompoints, topoints)
+        res_x, res_y, res_xy, rmse, rmse_x, rmse_y, pred_x, pred_y, coeff_x, coeff_y = polynomial(order, frompoints, topoints)
         print 'RMSE = %s' % rmse
         max_i = np.argmax(res_xy)
         if res_xy[max_i] > max_residual:

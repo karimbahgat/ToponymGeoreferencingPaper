@@ -15,9 +15,9 @@ from automap.main import debug_warped
 
 #automap('testmaps/satim.png', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
-#automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/tunisia_pol_1990.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/cameroon_pol98.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/cameroon.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.2)
@@ -27,7 +27,7 @@ automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[2000,2500,4000,4500])
 #automap('testmaps/gmaps.png', textcolor=(80,80,80), colorthresh=25, textconf=60)
 #automap('testmaps/brazil_pol_1981.gif', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.4)
-automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.4)
+#automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.4)
 
 #automap('testmaps/vietnam_pol92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
 #automap('testmaps/vietnam_admin92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
