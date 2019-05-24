@@ -1091,10 +1091,14 @@ def triang(test, matchcandidates=None):
         #viewmatch(positions, f)
     return matches
 
-def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, source=False, debug=False):
+def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, source='gns', debug=False):
     # filter to those that can be geocoded
     print 'geocode and filter'
     coder = geocode.OptimizedCoder()
+
+    if source == 'best' or source == 'avg':
+        mintrials = 30
+        maxiter = 10000
     
     import time
     testres = []
@@ -1103,7 +1107,23 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
         try:
             res = list(coder.geocode(nxtname, maxcandidates))
             if res:
-                if source:
+                if source == 'avg':
+                    import math
+                    resnew = []
+                    for r in res:
+                        mayberes = [r2 for r2 in res if r != r2 and r['properties']['data'] != r2['properties']['data']]
+                        x,y = r['geometry']['coordinates']
+                        mayberes = [r2 for r2 in mayberes if math.hypot(abs(r2['geometry']['coordinates'][0]-x), abs(r2['geometry']['coordinates'][1]-y)) < 0.5]
+                        if mayberes:
+                            xs,ys = zip(*[r2['geometry']['coordinates'] for r2 in mayberes])
+                            xm = sum(xs)/float(len(xs))
+                            ym = sum(ys)/float(len(ys))
+                            r['geometry'] = dict(type='Point', coordinates=(xm,ym))
+                        resnew.append(r)
+                    res = resnew
+                elif source == 'best':
+                    pass # just keep all the results and choose best matching ones
+                else:
                     res = [r for r in res if r['properties']['data']==source]
                 testres.append((nxtname,nxtpos,res))
                 #time.sleep(0.1)
@@ -1445,20 +1465,29 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
     
     print 'finding matches'
-##    for src in 'un natearth ciesin osm geonames gns'.split():
+
+    # (experimental)
+##    for src in 'avg un natearth ciesin osm geonames gns'.split() + [None]:
 ##        print src
-##        try: origs,matches = find_matches(points, matchthresh, source=src, **kwargs)
-##        except Exception as err: print err
+##        try:
+##            origs,matches = find_matches(points, matchthresh, source=src, **kwargs)
+##            orignames,origcoords = zip(*origs)
+##            matchnames,matchcoords = zip(*matches)
+##            tiepoints = zip(origcoords, matchcoords)
+##            warp_order_auto = optimal_warp_order(tiepoints)
+##            frompoints,topoints = zip(*tiepoints)
+##            best, best_frompoints, best_topoints, best_residuals = optimal_rmse(warp_order or warp_order_auto, frompoints, topoints, max_residual=max_residual)
+##            print 'RMSE:', best
+##        except Exception as err:
+##            print err
+##    fdsfds
+        
     origs,matches = find_matches(points, matchthresh, source='gns', **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
 
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
-
-    #print tiepoints
-    #for on,mc,mn in zip(orignames,matchcoords,matchnames):
-    #    print on,mc,mn
 
     # determine transform method
     if not warp_order:

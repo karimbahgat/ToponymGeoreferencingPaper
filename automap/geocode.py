@@ -61,6 +61,7 @@ class OptimizedCoder(object):
                    'properties': {'data':data,
                                   'id':ID,
                                   'name':names,
+                                  'search':name,
                                   },
                    'geometry': geom.__geo_interface__,
                    } for data,ID,names,geom in results)

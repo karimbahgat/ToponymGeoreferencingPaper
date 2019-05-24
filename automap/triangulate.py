@@ -6,7 +6,7 @@ import itertools
 from . import shapematch
 
 from . import geocode
-coder = geocode.Online()
+coder = geocode.OptimizedCoder()
 
 
 def triangulate(names, positions, matchcandidates=None):
