@@ -1139,7 +1139,24 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
     for nxtname,nxtpos,res in testres:
         print nxtname,len(res)
 
-    # find all triangles from all possible combinations        
+    ### TEST: exhaustive search (experimental, not yet working)
+##    n_combi = len(testres)
+##    combis = list(itertools.combinations(testres, n_combi))
+##    print '\n'+'finding all possible triangles of {} possible combinations'.format(len(combis))
+##    triangles = []
+##    for i,tri in enumerate(combis):
+##        print '-----'
+##        print 'try triangle %s of %s' % (i, len(combis))
+##        try: best = triang([tr[:2] for tr in tri],
+##                           matchcandidates=[tr[2] for tr in tri])
+##        except Exception as err: print 'EXCEPTION RAISED:',err
+##        if best:
+##            f,diff,diffs = best[0]
+##            valid = [tr[:2] for tr in tri]
+##            triangles.append((valid, f, diff))
+    ### END TEST
+
+    # find all triangles from all possible 3-point combinations
     combis = itertools.combinations(testres, n_combi)
     # sort randomly to avoid local minima
     from random import uniform
@@ -1334,7 +1351,7 @@ def debug_warped(pth, outpath, controlpoints):
     m.save(outpath)
     
 
-def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, warp_order=None, max_residual=0.05, **kwargs):
+def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, source='gns', warp_order=None, max_residual=0.05, **kwargs):
     start = time.time()
     
     print 'loading image', inpath
@@ -1482,7 +1499,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 ##            print err
 ##    fdsfds
         
-    origs,matches = find_matches(points, matchthresh, source='gns', **kwargs)
+    origs,matches = find_matches(points, matchthresh, **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)

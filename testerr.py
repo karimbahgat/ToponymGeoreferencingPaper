@@ -39,5 +39,6 @@ print dists
 
 # show
 from PIL import Image, ImageOps
+print dists.min(), dists.mean(), dists.max()
 im = Image.fromarray((dists*(255.0/dists.max())).reshape((rast.height, rast.width)).T)
 im.show()

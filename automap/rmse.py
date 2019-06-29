@@ -86,6 +86,8 @@ def predict(order, points, coeff_x, coeff_y):
         Axy[:, 1:3] = points[:, 0:2]
 
     if order == 2:
+        #X = a0 + a1x + a2y + a3xy + a4x^2 + a5y^2
+        #Y = b0 + b1x + b2y + b3xy + b4x^2 + b5y^2
         Axy = np.zeros((len(points), 6), dtype=np.float)
         Axy[:, 0] = 1 #a0
         Axy[:, 1] = points[ : , 0] # a1
@@ -112,6 +114,22 @@ def predict(order, points, coeff_x, coeff_y):
     # predict
     predXs = Axy.dot(coeff_x)
     predYs = Axy.dot(coeff_y)
+
+    # experiment with the inverse transform
+    # in the case of affine, stacking coeff_x and coeff_y and 0,0,1 becomes the A matrix
+    # when inverted becomes the inverted coefficients
+##    print coeff_x
+##    print coeff_y
+##    print np.row_stack((coeff_x, coeff_y))
+##    print points
+##    print Axy.shape
+##    inv = np.linalg.inv(Axy)
+##    print predXs
+##    print predYs
+##    predXs = inv.dot(coeff_x)
+##    predYs = inv.dot(coeff_y)
+##    print predXs
+##    print predYs
 
     # residuals
 ##    V_X = points[:, 2] - np.array(predXs)
