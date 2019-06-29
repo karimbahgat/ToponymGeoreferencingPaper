@@ -1,6 +1,10 @@
 
+print 'importing libs'
+
 from automap import automap
 from automap.main import debug_warped
+
+print 'beginning'
 
 # debug
 ##import pythongis as pg

@@ -573,7 +573,8 @@ def color_edges(im, colorthresh=10):
     #diff_im = diff_im_flat.reshape((im.height, im.width)).astype(np.uint8)
     #ret,diff_im = cv2.threshold(diff_im,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     
-    print diff_im.min(), diff_im.mean(), diff_im.max()
+    #print diff_im.min(), diff_im.mean(), diff_im.max()
+    
     #quant.show()
     #PIL.Image.fromarray(diff_im).show()
 
@@ -605,7 +606,6 @@ def image_segments(im):
     #PIL.Image.fromarray(mask_arr).show()
 
     # detect contours
-    print mask_arr.dtype
     contours,_ = cv2.findContours(mask_arr.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
     # draw them
@@ -1367,6 +1367,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     outfold,outfil = os.path.split(outpath)
 
     # partition image
+    print 'image segmentation'
     mapp_poly,box_polys = image_segments(im)
     #im.show()
 
@@ -1385,8 +1386,10 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     # consider doing threshold -> upscale if memoryerror...
 
     # upscale for better ocr
-    print 'upscaling'
-    im_prep = im_prep.resize((im_prep.size[0]*2, im_prep.size[1]*2), PIL.Image.LANCZOS)
+    upscale = True
+    if upscale:
+        print 'upscaling'
+        im_prep = im_prep.resize((im_prep.size[0]*2, im_prep.size[1]*2), PIL.Image.LANCZOS)
 
     # precalc color differences (MAYBE move to inside threshold?)
     print 'quantize'
@@ -1415,13 +1418,23 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
         # threshold
         print 'thresholding', color
-        im_prep_thresh,mask = threshold(im_prep, color, colorthresh)
+        im_prep_thresh,mask = threshold(im_prep, color, colorthresh)       
+
+        # upscale for better ocr (doing it here means faster but worse quality and ocr)
+##        upscale = True
+##        if upscale:
+##            print 'upscaling'
+##            #im_prep_thresh = im_prep_thresh.resize((im_prep.size[0]*4, im_prep.size[1]*4), PIL.Image.NEAREST).resize((im_prep.size[0]*2, im_prep.size[1]*2), PIL.Image.ANTIALIAS)
+##            im_prep_thresh = im_prep_thresh.resize((im_prep.size[0]*4, im_prep.size[1]*4), PIL.Image.LANCZOS)
+
+        # debug prepped
         debugpath = os.path.join(outfold, infil+'_debug_prep.png')
         debug_prep(im_prep_thresh, debugpath)
 
         # ocr
         print 'detecting text'
         subdata = detect_data(im_prep_thresh)
+        print 'processing text'
         subdata = process_text(subdata, textconf)
 
         # assign text characteristics
@@ -1429,12 +1442,14 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
             dct['color'] = color
 
         # filter out duplicates from previous loop, in case includes some of the same pixels
+        print '(skip duplicates)',len(subdata),len(data)
         subdata = [r for r in subdata
                    if (r['top'],r['left'],r['width'],r['height'])
                    not in [(dr['top'],dr['left'],dr['width'],dr['height']) for dr in data]
                    ]
 
         # connect text data
+        print '(connecting texts)'
         subdata = connect_text(subdata)
 
         # detect text coordinates
@@ -1445,13 +1460,14 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
         print 'text data size', len(subdata), len(data)
 
     # downscale the data coordinates of the upscaled image back to original coordinates
-    for r in data: 
-        for k in 'top left width height'.split():
-            r[k] = int(r[k]) / 2
-        # same for points
-        if 'anchor' in r:
-            x,y = r['anchor']
-            r['anchor'] = (x/2, y/2)
+    if upscale:
+        for r in data: 
+            for k in 'top left width height'.split():
+                r[k] = int(r[k]) / 2
+            # same for points
+            if 'anchor' in r:
+                x,y = r['anchor']
+                r['anchor'] = (x/2, y/2)
 
     # print map metadata
     print 'map metadata:'
