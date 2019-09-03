@@ -46,4 +46,5 @@ Temporary Items
 *.pyc
 
 # Folders
-testmaps/
+tests/testmaps/
+simulations/maps/
