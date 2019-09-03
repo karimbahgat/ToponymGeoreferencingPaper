@@ -50,7 +50,7 @@ class Online(object):
 
 class OptimizedCoder(object):
     def __init__(self, path=None):
-        self.path = path or r'C:\Users\kimok\Desktop\gazetteer data\optim\gazetteers.db'
+        self.path = path or r'C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db'
         self.locs = gs.Table(self.path, 'locs')
         self.names = gs.Table(self.path, 'names')
 
@@ -93,26 +93,26 @@ class SQLiteCoder(object):
 
 
 class GNS(SQLiteCoder):
-    db = r'C:\Users\kimok\Desktop\gazetteer data\prepped\gns.db'
+    db = r'C:\Users\kimok\Desktop\BIGDATA\gazetteer data\prepped\gns.db'
     table = 'data'
 
 
 class GeoNames(SQLiteCoder):
-    db = r'C:\Users\kimok\Desktop\gazetteer data\prepped\geonames.db'
+    db = r'C:\Users\kimok\Desktop\BIGDATA\gazetteer data\prepped\geonames.db'
     table = 'data'
 
 
 class OSM(SQLiteCoder):
-    db = r'C:\Users\kimok\Desktop\gazetteer data\prepped\osm.db'
+    db = r'C:\Users\kimok\Desktop\BIGDATA\gazetteer data\prepped\osm.db'
     table = 'data'
 
 
 class CIESIN(SQLiteCoder):
-    db = r'C:\Users\kimok\Desktop\gazetteer data\prepped\ciesin.db'
+    db = r'C:\Users\kimok\Desktop\BIGDATA\gazetteer data\prepped\ciesin.db'
     table = 'data'
 
 
 class NatEarth(SQLiteCoder):
-    db = r'C:\Users\kimok\Desktop\gazetteer data\prepped\natearth.db'
+    db = r'C:\Users\kimok\Desktop\BIGDATA\gazetteer data\prepped\natearth.db'
     table = 'data'
 

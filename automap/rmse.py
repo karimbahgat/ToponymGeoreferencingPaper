@@ -75,7 +75,7 @@ def polynomial(order, frompoints, topoints):
 
     return V_X, V_Y, V_XY, mo, mox, moy, predXs, predYs, aaa_X[0], bbb_Y[0]
 
-def predict(order, points, coeff_x, coeff_y):
+def predict(order, points, coeff_x, coeff_y, invert=False):
     points = np.array(points)
 
     if order == 1:
@@ -112,6 +112,14 @@ def predict(order, points, coeff_x, coeff_y):
         Axy[:, 9] = points[ : , 1] * points[ : , 1] * points[ : , 1]
 
     # predict
+    if invert:
+        A = np.eye(len(coeff_x))
+        A[1,:] = coeff_x
+        A[2,:] = coeff_y
+        Ainv = np.linalg.inv(A)
+        coeff_x = Ainv[1,:]
+        coeff_y = Ainv[2,:]
+
     predXs = Axy.dot(coeff_x)
     predYs = Axy.dot(coeff_y)
 

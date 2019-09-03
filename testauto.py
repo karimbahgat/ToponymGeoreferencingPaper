@@ -17,6 +17,10 @@ print 'beginning'
 
 # works
 
+#automap('testmaps/HandDrawnMap.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/old map sketch.jpg', textcolor=(90,90,90), colorthresh=25, textconf=60)
+#fdsf
+
 #automap('testmaps/satim.png', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)

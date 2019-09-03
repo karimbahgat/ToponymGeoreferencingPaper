@@ -2,7 +2,7 @@
 from . import geocode
 from .triangulate import triangulate, triangulate_add
 from .shapematch import normalize
-from .rmse import optimal_rmse, polynomial
+from .rmse import optimal_rmse, polynomial, predict
 
 import os
 import itertools
@@ -1266,27 +1266,84 @@ def optimal_warp_order(tiepoints):
 ##    order = rmses.index(min(rmses)) + 1
 ##    return order
 
-def warp(im, outpath, tiepoints, order=None):
-    import os
+##def warp(im, outpath, tiepoints, order=None):
+##    import os
+##    print 'control points:', tiepoints
+##
+##    gdal_trans_in = os.path.join(tempfile.gettempdir(), next(tempfile._get_candidate_names()) + '.tif')
+##    gdal_trans_out = os.path.join(tempfile.gettempdir(), next(tempfile._get_candidate_names()) + '.tif')
+##    im.save(gdal_trans_in)
+##    
+##    gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
+##    call = 'gdal_translate -of GTiff {gcptext} "{gdal_trans_in}" "{gdal_trans_out}"'.format(gcptext=gcptext, gdal_trans_in=gdal_trans_in, gdal_trans_out=gdal_trans_out)
+##    os.system(call) 
+##    
+##    opts = '-r bilinear -co COMPRESS=NONE -dstalpha -overwrite'
+##    if order:
+##        if order == 'tps': opts += ' -tps'
+##        else: opts += ' -order {}'.format(order)
+##    call = 'gdalwarp {options} "{gdal_trans_out}" "{outpath}"'.format(options=opts, gdal_trans_out=gdal_trans_out, outpath=outpath)
+##    os.system(call)
+##
+##    os.remove(gdal_trans_in)
+##    os.remove(gdal_trans_out)
+
+def warp(im, outpath, tiepoints, order):
     print 'control points:', tiepoints
-
-    gdal_trans_in = os.path.join(tempfile.gettempdir(), next(tempfile._get_candidate_names()) + '.tif')
-    gdal_trans_out = os.path.join(tempfile.gettempdir(), next(tempfile._get_candidate_names()) + '.tif')
-    im.save(gdal_trans_in)
-    
-    gcptext = ' '.join('-gcp {0} {1} {2} {3}'.format(imgx,imgy,geox,geoy) for (imgx,imgy),(geox,geoy) in tiepoints)
-    call = 'gdal_translate -of GTiff {gcptext} "{gdal_trans_in}" "{gdal_trans_out}"'.format(gcptext=gcptext, gdal_trans_in=gdal_trans_in, gdal_trans_out=gdal_trans_out)
-    os.system(call) 
-    
-    opts = '-r bilinear -co COMPRESS=NONE -dstalpha -overwrite'
-    if order:
-        if order == 'tps': opts += ' -tps'
-        else: opts += ' -order {}'.format(order)
-    call = 'gdalwarp {options} "{gdal_trans_out}" "{outpath}"'.format(options=opts, gdal_trans_out=gdal_trans_out, outpath=outpath)
-    os.system(call)
-
-    os.remove(gdal_trans_in)
-    os.remove(gdal_trans_out)
+    print 'fitting warp polynomial'
+    coeff_x, coeff_y = polynomial(order, *zip(*tiepoints))[-2:]
+    pixels = []
+    for row in range(im.size[1]):
+        for col in range(im.size[0]):
+            pixels.append((col,row))
+    print 'calculating coordinate bounds'
+    pred = predict(order, pixels, coeff_x, coeff_y)
+    xmin,ymin,xmax,ymax = pred[:,0].min(), pred[:,1].min(), pred[:,0].max(), pred[:,1].max()
+    aspect = (ymax-ymin) / float(xmax-xmin)
+    w,h = int(im.size[0]), int(im.size[1]*aspect)
+    xoff,yoff = xmin,ymin
+    xscale = (xmax-xmin)/w
+    yscale = (ymax-ymin)/h
+    if pred[0,1] > pred[-1,1]:
+        yoff = ymax
+        yscale *= -1
+    out = pg.RasterData(width=w, height=h, mode='int8', affine=[xscale,0,xoff, 0,yscale,yoff])
+    #for _ in range(4):
+    #    out.add_band()
+    print 'backwards mapping and resampling'
+    coords = []
+    for row in range(out.height):
+        y = yoff + row*yscale
+        for col in range(out.width):
+            x = xoff + col*xscale
+            coords.append((x,y))
+    backpred = predict(order, coords, coeff_x, coeff_y, invert=True)
+    backpred = backpred.reshape((out.height,out.width,2))
+    print 'writing to output'
+    # slow, can prob optimize even more by using direct numpy indexing
+    outarr = np.zeros((h, w, len(im.mode)), dtype=np.int8)
+    imload = im.load()
+    for row in range(out.height):
+        for col in range(out.width):
+            origcol,origrow = backpred[row,col]
+            origcol,origrow = map(int, (origcol,origrow))
+            try:
+                #for i,val in enumerate(imload[origcol,origrow]):
+                #    outarr[row,col,i] = val
+                outarr[row,col,:] = imload[origcol,origrow]
+                #r,g,b,a = imload[origcol,origrow]
+                #out.bands[0].set(col, row, r)
+                #out.bands[1].set(col, row, g)
+                #out.bands[2].set(col, row, b)
+                #out.bands[3].set(col, row, a)
+                
+            except:
+                pass
+    for i in range(len(im.mode)):
+        bandim = PIL.Image.fromarray(outarr[:,:,i]).convert('L')
+        out.add_band(img=bandim)
+    out.save(outpath)
+    return out
 
 def final_controlpoints(tiepoints, residuals, origs, matches, outpath=False):
     controlpoints = []
