@@ -40,10 +40,10 @@ def _sampleplaces(bbox, n, distribution):
             raise Exception('Distribution type {} is not a valid option'.format(distribution))
         bufbox = [x-radius, y-radius, x+radius, y+radius]
         for r in places.quick_overlap(bufbox): #intersection('geom', bufbox):
-            print '---'
-            print x,y
-            print bufbox
-            print r.bbox
+            #print '---'
+            #print x,y
+            #print bufbox
+            #print r.bbox
             i += 1
             yield r
             # yield only first match inside bbox, then break
@@ -67,7 +67,7 @@ def get_mapplaces(bbox, quantity, distribution):
     mapplaces = pg.VectorData()
     mapplaces.fields = ['name']
     for f in _sampleplaces(bbox, quantity, distribution):
-        print f
+        #print f
         name = f['NAME'] #r['names'].split('|')[0]
         row = [name]
         mapplaces.add_feature(row, f.geometry) #r['geom'].__geo_interface__)
@@ -79,11 +79,12 @@ def get_mapplaces(bbox, quantity, distribution):
 # render map
 def render_map(name, bbox, mapplaces, regionopts, qualityopts, anchoropts, textopts):
     # determine resolution
-    pixelwidth = qualityopts['resolution']
-    pixelheight = int(pixelwidth * regionopts['aspect'])
+    width = 4000
+    height = int(width * regionopts['aspect'])
     
     # render pure map image
-    m = pg.renderer.Map(pixelwidth, pixelheight, background='white')
+    m = pg.renderer.Map(width, height,
+                        background='white')
     m.add_layer(countries, fillcolor=(255,222,173))
     m.add_layer(mapplaces,
                 text=lambda f: f['name'],
@@ -91,9 +92,16 @@ def render_map(name, bbox, mapplaces, regionopts, qualityopts, anchoropts, texto
                 **anchoropts)
     m.zoom_bbox(*bbox)
 
+    # downscale to resolution
+    ratio = qualityopts['resolution'] / float(width)
+    newwidth = qualityopts['resolution']
+    newheight = int(height * ratio)
+
     # save
     imformat = qualityopts['format']
     m.save('maps/{}_image.{}'.format(name, imformat))
+
+    m.img.resize((newwidth, newheight), 1).save('maps/{}_image.{}'.format(name, imformat))
 
     # store rendering with original geo coordinates
     affine = m.drawer.coordspace_transform
@@ -148,14 +156,20 @@ if __name__ == '__main__':
     places.create_spatial_index()
 
     # simulate
-    simulate_map('test',
-                 regionopts={'center':(10,10), 'extent':20.0, 'aspect':0.5},
-                 qualityopts={'resolution':500, 'format':'gif'},
-                 projopts=None,
-                 placeopts={'quantity':40, 'distribution':'random'},
-                 anchoropts={'fillcolor':'black', 'fillsize':0.1},
-                 textopts={'textsize':6, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0},
-                 )
+    i = 1
+    for resolution in [100, 500, 1000, 2000, 4000]:
+        for textsize in [14, 18, 22]:
+            name = 'sim_{}'.format(i)
+            print(name)
+            simulate_map(name,
+                         regionopts={'center':(10,10), 'extent':20.0, 'aspect':0.70744225834}, # A4 portrait aspect ratio
+                         qualityopts={'resolution':resolution, 'format':'gif'},
+                         projopts=None,
+                         placeopts={'quantity':40, 'distribution':'random'},
+                         anchoropts={'fillcolor':'black', 'fillsize':0.1},
+                         textopts={'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0},
+                         )
+            i += 1
 
     
 
