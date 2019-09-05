@@ -23,7 +23,7 @@ print 'beginning'
 
 #automap('testmaps/satim.png', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
-automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, warp_order=1)
 #automap('testmaps/tunisia_pol_1990.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)

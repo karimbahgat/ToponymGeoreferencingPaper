@@ -1300,10 +1300,10 @@ def warp(im, outpath, tiepoints, order):
     pred = predict(order, pixels, coeff_x, coeff_y)
     xmin,ymin,xmax,ymax = pred[:,0].min(), pred[:,1].min(), pred[:,0].max(), pred[:,1].max()
     aspect = (ymax-ymin) / float(xmax-xmin)
-    w,h = int(im.size[0]), int(im.size[1]*aspect)
+    w,h = int(im.size[0]), int(im.size[0]*aspect)
     xoff,yoff = xmin,ymin
-    xscale = (xmax-xmin)/w
-    yscale = (ymax-ymin)/h
+    xscale = (xmax-xmin)/float(w)
+    yscale = (ymax-ymin)/float(h)
     if pred[0,1] > pred[-1,1]:
         yoff = ymax
         yscale *= -1

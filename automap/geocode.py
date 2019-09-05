@@ -1,6 +1,5 @@
 
 import geostream as gs
-import geopy
 
 
 ##class Matches(object):
@@ -33,6 +32,7 @@ import geopy
 
 class Online(object):
     def __init__(self):
+        import geopy
         self.coder = geopy.geocoders.Nominatim()
 
     def geocode(self, name, limit=10):

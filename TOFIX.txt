@@ -1,0 +1,3 @@
+
+- warp() doesnt work correctly for >1 order. probably due to incorrect matrix inversion during backwards sampling in rmse.predict() for >1 order. 
+- ...
