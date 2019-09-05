@@ -77,15 +77,19 @@ def get_mapplaces(bbox, quantity, distribution):
 
 
 # render map
-def render_map(name, bbox, mapplaces, regionopts, qualityopts, anchoropts, textopts):
+def render_map(name, bbox, mapplaces, datas, regionopts, qualityopts, anchoropts, textopts):
     # determine resolution
     width = 4000
     height = int(width * regionopts['aspect'])
     
     # render pure map image
     m = pg.renderer.Map(width, height,
-                        background='white')
-    m.add_layer(countries, fillcolor=(255,222,173))
+                        background=(91,181,200))
+    m.add_layer(countries, fillcolor=(255,222,173), outlinewidth=0.18)
+
+    for data,style in datas:
+        m.add_layer(data, **style)
+        
     m.add_layer(mapplaces,
                 text=lambda f: f['name'],
                 textoptions=textopts,
@@ -109,27 +113,6 @@ def render_map(name, bbox, mapplaces, regionopts, qualityopts, anchoropts, texto
     r.set_geotransform(affine=m.drawer.coordspace_invtransform)
     r.save('maps/{}_truth.tif'.format(name))
 
-    return m
-
-
-
-
-####################
-# MAIN
-
-def simulate_map(prefix, regionopts, qualityopts, projopts, placeopts, anchoropts, textopts):
-    name = prefix #formatname(prefix)
-
-    # region
-    bbox = mapregion(**regionopts)
-
-    # places
-    mapplaces = get_mapplaces(bbox, **placeopts)
-    # apply projection...
-
-    # render
-    mapp = render_map(name, bbox, mapplaces, regionopts, qualityopts, anchoropts, textopts)
-
     # store the original place coordinates
     mapplaces.add_field('col')
     mapplaces.add_field('row')
@@ -137,12 +120,18 @@ def simulate_map(prefix, regionopts, qualityopts, projopts, placeopts, anchoropt
     mapplaces.add_field('y')
     for f in mapplaces:
         x,y = f.geometry['coordinates']
-        col,row = mapp.drawer.coord2pixel(x,y)
+        col,row = m.drawer.coord2pixel(x,y)
         f['col'] = col
         f['row'] = row
         f['x'] = x
         f['y'] = y
     mapplaces.save('maps/{}_placenames.geojson'.format(name))
+
+    return m
+
+
+
+
 
 
 
@@ -150,26 +139,66 @@ def simulate_map(prefix, regionopts, qualityopts, projopts, placeopts, anchoropt
 # RUN
 
 if __name__ == '__main__':
+    import itertools
+    
     # load data
     countries = pg.VectorData("data/ne_10m_admin_0_countries.shp")
     places = pg.VectorData("data/ne_10m_populated_places.shp") 
     places.create_spatial_index()
+    rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
+    rivers.create_spatial_index()
+    urban = pg.VectorData("data/ne_10m_urban_areas.shp") 
+    urban.create_spatial_index()
+    roads = pg.VectorData("data/ne_10m_roads.shp") 
+    roads.create_spatial_index()
 
     # simulate
     i = 1
-    for resolution in [100, 500, 1000, 2000, 4000]:
-        for textsize in [14, 18, 22]:
-            name = 'sim_{}'.format(i)
-            print(name)
-            simulate_map(name,
-                         regionopts={'center':(10,10), 'extent':20.0, 'aspect':0.70744225834}, # A4 portrait aspect ratio
-                         qualityopts={'resolution':resolution, 'format':'gif'},
-                         projopts=None,
-                         placeopts={'quantity':40, 'distribution':'random'},
-                         anchoropts={'fillcolor':'black', 'fillsize':0.1},
-                         textopts={'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0},
-                         )
-            i += 1
+
+    # region
+    for _region_ in [None]:
+        regionopts = {'center':(10,10), 'extent':20.0, 'aspect':0.70744225834}
+        bbox = mapregion(**regionopts)
+
+        # places
+        for placeoptvals in itertools.product([10, 20, 40, 80], ['random']):
+            #placeopts = {'quantity':40, 'distribution':'random'}
+            placeopts = dict(zip(['quantity','distribution'], placeoptvals))
+            mapplaces = get_mapplaces(bbox, **placeopts)
+
+            # data noise
+            for datas in [[ (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08}),
+                            (urban, {'fillcolor':(209,194,151)}),
+                            (roads, {'fillcolor':(187,0,0), 'fillsize':0.08}),
+                             ]]:
+
+                # apply projection
+                # ...
+
+                # resolutions
+                for resolution in [500, 1000, 2000, 4000]:
+
+                    # ALSO DO
+                    # - metadata noise: ie big title + notebox
+                    # - ...
+
+                    # textsizes
+                    for textsize in [14, 18, 22]:
+                        name = 'sim_{}'.format(i)
+                        print(name)
+
+                        # render
+                        render_map(name,
+                                     bbox,
+                                     mapplaces,
+                                     datas,
+                                     regionopts=regionopts,
+                                     qualityopts={'resolution':resolution, 'format':'gif'},
+                                     anchoropts={'fillcolor':'black', 'fillsize':0.1},
+                                     textopts={'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0},
+                                     )
+                        
+                        i += 1
 
     
 
