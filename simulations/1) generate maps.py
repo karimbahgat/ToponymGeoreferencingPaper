@@ -77,35 +77,52 @@ def get_mapplaces(bbox, quantity, distribution):
 
 
 # render map
-def render_map(name, bbox, mapplaces, datas, regionopts, qualityopts, anchoropts, textopts):
+def render_map(name, bbox, mapplaces, datas, regionopts, noiseopts, anchoropts, textopts, metaopts):
     # determine resolution
-    width = 4000
+    width = 2000 #4000
     height = int(width * regionopts['aspect'])
     
     # render pure map image
     m = pg.renderer.Map(width, height,
+                        title=metaopts['title'],
+                        titleoptions=metaopts['titleoptions'],
                         background=(91,181,200))
-    m.add_layer(countries, fillcolor=(255,222,173), outlinewidth=0.18)
+    if metaopts['arealabels']:
+        arealabels = {'text':lambda f: f['NAME'].upper(), 'textoptions': {'textsize':textopts['textsize']*1.5}}
+    else:
+        arealabels = {}
+    m.add_layer(projcountries, fillcolor=(255,222,173), outlinewidth=0.2, outlinecolor=(100,100,100),
+                legendoptions={'title':'Country border'},
+                **arealabels)
 
-    for data,style in datas:
-        m.add_layer(data, **style)
+    for datadef in datas:
+        if datadef:
+            data,style = datadef
+            m.add_layer(data, **style)
         
     m.add_layer(mapplaces,
                 text=lambda f: f['name'],
                 textoptions=textopts,
+                legendoptions={'title':'Populated place'},
                 **anchoropts)
     m.zoom_bbox(*bbox)
 
+    if metaopts['legend']:
+        m.add_legend(legendoptions={'padding':0, 'direction':'s'})
+
+    # note...
+
     # downscale to resolution
-    ratio = qualityopts['resolution'] / float(width)
-    newwidth = qualityopts['resolution']
+    ratio = noiseopts['resolution'] / float(width)
+    newwidth = noiseopts['resolution']
     newheight = int(height * ratio)
 
     # save
-    imformat = qualityopts['format']
-    m.save('maps/{}_image.{}'.format(name, imformat))
+    imformat = noiseopts['format']
+    m.render_all(antialias=True) #save('maps/{}_image.png'.format(name, imformat))
+    m.img.convert('RGB').save('maps/{}_image.{}'.format(name, imformat))
 
-    m.img.resize((newwidth, newheight), 1).save('maps/{}_image.{}'.format(name, imformat))
+    m.img.resize((newwidth, newheight), 1).convert('RGB').save('maps/{}_image.{}'.format(name, imformat))
 
     # store rendering with original geo coordinates
     affine = m.drawer.coordspace_transform
@@ -114,6 +131,7 @@ def render_map(name, bbox, mapplaces, datas, regionopts, qualityopts, anchoropts
     r.save('maps/{}_truth.tif'.format(name))
 
     # store the original place coordinates
+    # WARNING: NOT CORRECT FOR THE LOWER RESOLUTIONS...
     mapplaces.add_field('col')
     mapplaces.add_field('row')
     mapplaces.add_field('x')
@@ -155,50 +173,103 @@ if __name__ == '__main__':
     # simulate
     i = 1
 
+    # options
+    n = 10
+    centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)]
+    extents = [40, 20, 5, 1]
+    quantities = [10, 20, 40, 80] 
+    distributions = ['random']
+    alldatas = [    
+                   [
+                    (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08, 'legendoptions':{'title':'Rivers'}}), # three layers
+                    (urban, {'fillcolor':(209,194,151), 'legendoptions':{'title':'Urban area'}}),
+                    (roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),
+                     ],
+                   [], # no data layers
+                ]
+    projections = [#'+init=EPSG:3857', # Web Mercator
+                   #'+init=ESRI:54009', # World Mollweide
+                   #'+init=ESRI:54030', # Robinson
+                   '', # lat/lon
+                   ]
+    resolutions = [2000, 1000, 500] #, 4000]
+    imformats = ['jpg','png']
+    noises = [] # ADD RANDOM PIXEL NOISE TO IMAGE ?? 
+    textsizes = [18-8]
+    metas = [{'title':'This is the Map Title','legend':True,'arealabels':False}, # meta boxes
+             {'title':'','legend':False,'arealabels':True}, # area labels
+             {'title':'','legend':False,'arealabels':False}] # nothing
+
+##    import itertools
+##    combis = list(itertools.product(centers,extents,quantities,distributions,alldatas,projections,resolutions,imformats,textsizes,metas))
+##    print(len(combis), 'permutations')
+##    fsddf
+
     # region
-    for _region_ in [None]:
-        regionopts = {'center':(10,10), 'extent':20.0, 'aspect':0.70744225834}
+    for center,extent in itertools.product(centers, extents):
+        regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
         bbox = mapregion(**regionopts)
 
         # places
-        for placeoptvals in itertools.product([10, 20, 40, 80], ['random']):
+        for quantity,distribution in itertools.product(quantities,distributions):
             #placeopts = {'quantity':40, 'distribution':'random'}
-            placeopts = dict(zip(['quantity','distribution'], placeoptvals))
+            placeopts = {'quantity':quantity, 'distribution':distribution}
             mapplaces = get_mapplaces(bbox, **placeopts)
 
             # data noise
-            for datas in [[ (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08}),
-                            (urban, {'fillcolor':(209,194,151)}),
-                            (roads, {'fillcolor':(187,0,0), 'fillsize':0.08}),
-                             ]]:
+            for datas in alldatas:
 
-                # apply projection
-                # ...
+                # projections
+                # UGLY...
+                for projection in projections:
+                    projdatas = []
+                    for datadef in datas:
+                        if datadef:
+                            data,style = datadef
+                            if projection:
+                                data.crs = '+init=EPSG:4326' # WGS84 unprojected
+                                data = data.manage.reproject(projection)
+                            projdatas.append((data,style))
+                    if projection:
+                        countries.crs = '+init=EPSG:4326' # WGS84 unprojected
+                        projcountries = countries.manage.reproject(projection)
+                        mapplaces.crs = '+init=EPSG:4326' # WGS84 unprojected
+                        projmapplaces = mapplaces.manage.reproject(projection)
+                    else:
+                        projcountries = countries
+                        projmapplaces = mapplaces
 
-                # resolutions
-                for resolution in [500, 1000, 2000, 4000]:
+                    # resolutions
+                    for resolution,imformat in itertools.product(resolutions, imformats): #, 4000]:
+                        noiseopts = {'resolution':resolution, 'format':imformat}
 
-                    # ALSO DO
-                    # - metadata noise: ie big title + notebox
-                    # - ...
+                        # metadata
+                        for meta in metas:
+                            metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
 
-                    # textsizes
-                    for textsize in [14, 18, 22]:
-                        name = 'sim_{}'.format(i)
-                        print(name)
+                            # textsizes
+                            for textsize in textsizes:
+                                textopts = {'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+                                anchoropts = {'fillcolor':'black', 'fillsize':0.1}
+                                
+                                name = 'sim_{}'.format(i)
+                                print(name)
+                                for opts in [regionopts,placeopts,projection,datas,textopts,metaopts]:
+                                    print(opts)
 
-                        # render
-                        render_map(name,
-                                     bbox,
-                                     mapplaces,
-                                     datas,
-                                     regionopts=regionopts,
-                                     qualityopts={'resolution':resolution, 'format':'gif'},
-                                     anchoropts={'fillcolor':'black', 'fillsize':0.1},
-                                     textopts={'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0},
-                                     )
-                        
-                        i += 1
+                                # render
+                                render_map(name,
+                                             bbox,
+                                             projmapplaces,
+                                             projdatas,
+                                             regionopts=regionopts,
+                                             noiseopts=noiseopts,
+                                             anchoropts=anchoropts,
+                                             textopts=textopts,
+                                             metaopts=metaopts,
+                                             )
+                                
+                                i += 1
 
     
 
