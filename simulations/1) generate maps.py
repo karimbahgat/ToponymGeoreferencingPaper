@@ -77,7 +77,7 @@ def get_mapplaces(bbox, quantity, distribution):
 
 
 # render map
-def render_map(name, bbox, mapplaces, datas, regionopts, noiseopts, anchoropts, textopts, metaopts):
+def render_map(name, bbox, mapplaces, datas, regionopts, projection, noiseopts, anchoropts, textopts, metaopts):
     # determine resolution
     width = 2000 #4000
     height = int(width * regionopts['aspect'])
@@ -86,12 +86,13 @@ def render_map(name, bbox, mapplaces, datas, regionopts, noiseopts, anchoropts, 
     m = pg.renderer.Map(width, height,
                         title=metaopts['title'],
                         titleoptions=metaopts['titleoptions'],
-                        background=(91,181,200))
+                        background=(91,181,200),
+                        crs=projection)
     if metaopts['arealabels']:
         arealabels = {'text':lambda f: f['NAME'].upper(), 'textoptions': {'textsize':textopts['textsize']*1.5}}
     else:
         arealabels = {}
-    m.add_layer(projcountries, fillcolor=(255,222,173), outlinewidth=0.2, outlinecolor=(100,100,100),
+    m.add_layer(countries, fillcolor=(255,222,173), outlinewidth=0.2, outlinecolor=(100,100,100),
                 legendoptions={'title':'Country border'},
                 **arealabels)
 
@@ -175,7 +176,7 @@ if __name__ == '__main__':
 
     # options
     n = 10
-    centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)]
+    centers = [(-116,40)] #(uniform(-160,160),uniform(-60,60)) for _ in range(n)]
     extents = [40, 20, 5, 1]
     quantities = [10, 20, 40, 80] 
     distributions = ['random']
@@ -187,10 +188,10 @@ if __name__ == '__main__':
                      ],
                    [], # no data layers
                 ]
-    projections = [#'+init=EPSG:3857', # Web Mercator
+    projections = [#'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
                    #'+init=ESRI:54009', # World Mollweide
-                   #'+init=ESRI:54030', # Robinson
-                   '', # lat/lon
+                   '+init=ESRI:54030', # Robinson
+                   None, # lat/lon
                    ]
     resolutions = [2000, 1000, 500] #, 4000]
     imformats = ['jpg','png']
@@ -222,22 +223,23 @@ if __name__ == '__main__':
                 # projections
                 # UGLY...
                 for projection in projections:
-                    projdatas = []
-                    for datadef in datas:
-                        if datadef:
-                            data,style = datadef
-                            if projection:
-                                data.crs = '+init=EPSG:4326' # WGS84 unprojected
-                                data = data.manage.reproject(projection)
-                            projdatas.append((data,style))
-                    if projection:
-                        countries.crs = '+init=EPSG:4326' # WGS84 unprojected
-                        projcountries = countries.manage.reproject(projection)
-                        mapplaces.crs = '+init=EPSG:4326' # WGS84 unprojected
-                        projmapplaces = mapplaces.manage.reproject(projection)
-                    else:
-                        projcountries = countries
-                        projmapplaces = mapplaces
+                    
+##                    projdatas = []
+##                    for datadef in datas:
+##                        if datadef:
+##                            data,style = datadef
+##                            if projection:
+##                                data.crs = '+init=EPSG:4326' # WGS84 unprojected
+##                                data = data.manage.reproject(projection)
+##                            projdatas.append((data,style))
+##                    if projection:
+##                        countries.crs = '+init=EPSG:4326' # WGS84 unprojected
+##                        projcountries = countries.manage.reproject(projection)
+##                        mapplaces.crs = '+init=EPSG:4326' # WGS84 unprojected
+##                        projmapplaces = mapplaces.manage.reproject(projection)
+##                    else:
+##                        projcountries = countries
+##                        projmapplaces = mapplaces
 
                     # resolutions
                     for resolution,imformat in itertools.product(resolutions, imformats): #, 4000]:
@@ -260,14 +262,22 @@ if __name__ == '__main__':
                                 # render
                                 render_map(name,
                                              bbox,
-                                             projmapplaces,
-                                             projdatas,
+                                             mapplaces,
+                                             datas,
                                              regionopts=regionopts,
+                                             projection=projection,
                                              noiseopts=noiseopts,
                                              anchoropts=anchoropts,
                                              textopts=textopts,
                                              metaopts=metaopts,
                                              )
+
+                                # ADD GAZETTEER DISTORTION PARAM
+
+                                # ITER RESOLUTIONS HERE
+                                # AND IMFORMAT
+
+                                # SEPARATE SAVE FUNC
                                 
                                 i += 1
 
