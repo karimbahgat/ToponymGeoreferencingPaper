@@ -77,9 +77,9 @@ def get_mapplaces(bbox, quantity, distribution):
 
 
 # render map
-def render_map(name, bbox, mapplaces, datas, regionopts, projection, noiseopts, anchoropts, textopts, metaopts):
+def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, anchoropts, textopts, metaopts):
     # determine resolution
-    width = 2000 #4000
+    width = resolution
     height = int(width * regionopts['aspect'])
     
     # render pure map image
@@ -113,14 +113,22 @@ def render_map(name, bbox, mapplaces, datas, regionopts, projection, noiseopts, 
 
     # note...
 
+    m.render_all(antialias=True)
+
+    return m
+
+# save map
+def save_map(name, mapp, mapplaces, noiseopts):
+    
     # downscale to resolution
+    width,height = mapp.width, mapp.height
     ratio = noiseopts['resolution'] / float(width)
     newwidth = noiseopts['resolution']
     newheight = int(height * ratio)
 
     # save
+    m = mapp
     imformat = noiseopts['format']
-    m.render_all(antialias=True) #save('maps/{}_image.png'.format(name, imformat))
     m.img.convert('RGB').save('maps/{}_image.{}'.format(name, imformat))
 
     m.img.resize((newwidth, newheight), 1).convert('RGB').save('maps/{}_image.{}'.format(name, imformat))
@@ -145,9 +153,6 @@ def render_map(name, bbox, mapplaces, datas, regionopts, projection, noiseopts, 
         f['x'] = x
         f['y'] = y
     mapplaces.save('maps/{}_placenames.geojson'.format(name))
-
-    return m
-
 
 
 
@@ -190,7 +195,7 @@ if __name__ == '__main__':
                 ]
     projections = [#'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
                    #'+init=ESRI:54009', # World Mollweide
-                   '+init=ESRI:54030', # Robinson
+                   #'+init=ESRI:54030', # Robinson
                    None, # lat/lon
                    ]
     resolutions = [2000, 1000, 500] #, 4000]
@@ -241,43 +246,40 @@ if __name__ == '__main__':
 ##                        projcountries = countries
 ##                        projmapplaces = mapplaces
 
-                    # resolutions
-                    for resolution,imformat in itertools.product(resolutions, imformats): #, 4000]:
-                        noiseopts = {'resolution':resolution, 'format':imformat}
+                    # metadata
+                    for meta in metas:
+                        metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
 
-                        # metadata
-                        for meta in metas:
-                            metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+                        # textsizes
+                        for textsize in textsizes:
+                            textopts = {'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+                            anchoropts = {'fillcolor':'black', 'fillsize':0.1}
 
-                            # textsizes
-                            for textsize in textsizes:
-                                textopts = {'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
-                                anchoropts = {'fillcolor':'black', 'fillsize':0.1}
-                                
-                                name = 'sim_{}'.format(i)
-                                print(name)
-                                for opts in [regionopts,placeopts,projection,datas,textopts,metaopts]:
-                                    print(opts)
-
-                                # render
-                                render_map(name,
-                                             bbox,
+                            # render
+                            mapp = render_map(bbox,
                                              mapplaces,
                                              datas,
+                                             resolutions[0],
                                              regionopts=regionopts,
                                              projection=projection,
-                                             noiseopts=noiseopts,
                                              anchoropts=anchoropts,
                                              textopts=textopts,
                                              metaopts=metaopts,
                                              )
 
-                                # ADD GAZETTEER DISTORTION PARAM
+                            # ADD GAZETTEER DISTORTION PARAM
 
-                                # ITER RESOLUTIONS HERE
-                                # AND IMFORMAT
+                            # resolutions
+                            for resolution,imformat in itertools.product(resolutions, imformats):
 
-                                # SEPARATE SAVE FUNC
+                                name = 'sim_{}'.format(i)
+                                print(name)
+                                for opts in [regionopts,placeopts,projection,datas,textopts,metaopts]:
+                                    print(opts)
+
+                                noiseopts = {'resolution':resolution, 'format':imformat}
+
+                                save_map(name, mapp, mapplaces, noiseopts)
                                 
                                 i += 1
 
