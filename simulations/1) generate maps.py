@@ -2,6 +2,8 @@
 import pythongis as pg
 
 from random import uniform
+import math
+import json
 
 
 
@@ -22,34 +24,55 @@ def mapregion(center, extent, aspect):
     bbox = [lon-width/2.0, lat-height/2.0, lon+width/2.0, lat+height/2.0]
     return bbox
 
-
+# check valid map region
+def valid_mapregion(bbox):
+    bw = abs(bbox[0]-bbox[2])
+    bh = abs(bbox[1]-bbox[3])
+    window_area = bw * bh
+    crop = countries.manage.crop(bbox)
+    crop = crop.aggregate(lambda f: 1, 'union')
+    if len(crop):
+        land = list(crop)[0].get_shapely()
+        if (land.area / window_area) > 0.5:
+            return True
 
 # sample n places within focus region
 def _sampleplaces(bbox, n, distribution):
     '''
     Samples...
     '''
-    radius = 0.1
-    i = 0
-    print 'target box',bbox
-    while True:
-        if distribution == 'random':
-            x = uniform(bbox[0], bbox[2])
-            y = uniform(bbox[1], bbox[3])
-        else:
-            raise Exception('Distribution type {} is not a valid option'.format(distribution))
-        bufbox = [x-radius, y-radius, x+radius, y+radius]
-        for r in places.quick_overlap(bufbox): #intersection('geom', bufbox):
-            #print '---'
-            #print x,y
-            #print bufbox
-            #print r.bbox
-            i += 1
+    print('target box',bbox)
+    hits = list(places.quick_overlap(bbox))
+
+    if len(hits) > n:
+        radius = 0.5
+        i = 0
+        while True:
+            if distribution == 'random':
+                x = uniform(bbox[0], bbox[2])
+                y = uniform(bbox[1], bbox[3])
+            else:
+                raise Exception('Distribution type {} is not a valid option'.format(distribution))
+            bufbox = [x-radius, y-radius, x+radius, y+radius]
+            def dist(f):
+                fx,fy = f.geometry['coordinates']
+                return math.hypot(x-fx, y-fy)
+            sortplaces = sorted(places.quick_overlap(bufbox), key=dist)
+            for r in sortplaces: #intersection('geom', bufbox):
+                #print '---'
+                #print x,y
+                #print bufbox
+                #print r.bbox
+                i += 1
+                yield r
+                # yield only first match inside bbox, then break
+                break
+            if i >= n:
+                break
+
+    else:
+        for r in hits:
             yield r
-            # yield only first match inside bbox, then break
-            break
-        if i >= n-1:
-            break
 
 # get map places
 def get_mapplaces(bbox, quantity, distribution):
@@ -68,13 +91,11 @@ def get_mapplaces(bbox, quantity, distribution):
     mapplaces.fields = ['name']
     for f in _sampleplaces(bbox, quantity, distribution):
         #print f
-        name = f['NAME'] #r['names'].split('|')[0]
+        name = f['Name1'].title() #r['names'].split('|')[0]
         row = [name]
         mapplaces.add_feature(row, f.geometry) #r['geom'].__geo_interface__)
             
     return mapplaces
-
-
 
 # render map
 def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, anchoropts, textopts, metaopts):
@@ -89,10 +110,12 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
                         background=(91,181,200),
                         crs=projection)
     if metaopts['arealabels']:
-        arealabels = {'text':lambda f: f['NAME'].upper(), 'textoptions': {'textsize':textopts['textsize']*1.5}}
+        arealabels = {'text':lambda f: f['NAME'].upper(), 'textoptions': {'textsize':textopts['textsize']*1.5, 'textcolor':(88,88,88)}}
+        rencountries = countries.manage.crop(bbox)
     else:
         arealabels = {}
-    m.add_layer(countries, fillcolor=(255,222,173), outlinewidth=0.2, outlinecolor=(100,100,100),
+        rencountries = countries
+    m.add_layer(rencountries, fillcolor=(255,222,173), outlinewidth=0.2, outlinecolor=(100,100,100),
                 legendoptions={'title':'Country border'},
                 **arealabels)
 
@@ -118,7 +141,8 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
     return m
 
 # save map
-def save_map(name, mapp, mapplaces, noiseopts):
+def save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts):
+    print('SAVING:',name)
     
     # downscale to resolution
     width,height = mapp.width, mapp.height
@@ -154,6 +178,19 @@ def save_map(name, mapp, mapplaces, noiseopts):
         f['y'] = y
     mapplaces.save('maps/{}_placenames.geojson'.format(name))
 
+    # save options as json
+    opts = dict(name=name,
+              resolution=resolution,
+              regionopts=regionopts,
+              projection=projection,
+              anchoropts=anchoropts,
+              textopts=textopts,
+              metaopts=metaopts,
+              noiseopts=noiseopts,
+              )
+    with open('maps/{}_opts.json'.format(name), 'w') as fobj:
+        fobj.write(json.dumps(opts))
+
 
 
 
@@ -167,7 +204,8 @@ if __name__ == '__main__':
     
     # load data
     countries = pg.VectorData("data/ne_10m_admin_0_countries.shp")
-    places = pg.VectorData("data/ne_10m_populated_places.shp") 
+    #places = pg.VectorData("data/ne_10m_populated_places.shp")
+    places = pg.VectorData(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_settlement_points_v1.01.shp", encoding='latin')
     places.create_spatial_index()
     rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
     rivers.create_spatial_index()
@@ -177,114 +215,234 @@ if __name__ == '__main__':
     roads.create_spatial_index()
 
     # simulate
-    i = 1
+    i = 156
 
     # options
-    n = 10
-    centers = [(-116,40)] #(uniform(-160,160),uniform(-60,60)) for _ in range(n)]
-    extents = [40, 20, 5, 1]
-    quantities = [10, 20, 40, 80] 
+    n = 5
+    #centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)] # (-116,40)
+    extents = [10] + [40, 20] + [5, 1, 0.5, 0.1]
+    quantities = [80, 40, 20, 10]
     distributions = ['random']
-    alldatas = [    
-                   [
+    alldatas = [
+                    [], # no data layers
+                    [
                     (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08, 'legendoptions':{'title':'Rivers'}}), # three layers
                     (urban, {'fillcolor':(209,194,151), 'legendoptions':{'title':'Urban area'}}),
                     (roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),
                      ],
-                   [], # no data layers
                 ]
-    projections = [#'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
-                   #'+init=ESRI:54009', # World Mollweide
-                   #'+init=ESRI:54030', # Robinson
-                   None, # lat/lon
+    projections = [None, # lat/lon
+                   '+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
+                   '+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
+                   '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
                    ]
     resolutions = [2000, 1000, 500] #, 4000]
-    imformats = ['jpg','png']
-    noises = [] # ADD RANDOM PIXEL NOISE TO IMAGE ?? 
-    textsizes = [18-8]
-    metas = [{'title':'This is the Map Title','legend':True,'arealabels':False}, # meta boxes
-             {'title':'','legend':False,'arealabels':True}, # area labels
-             {'title':'','legend':False,'arealabels':False}] # nothing
-
-##    import itertools
-##    combis = list(itertools.product(centers,extents,quantities,distributions,alldatas,projections,resolutions,imformats,textsizes,metas))
-##    print(len(combis), 'permutations')
-##    fsddf
+    imformats = ['png','jpg']
+    textsizes = [8] #18
+    metas = [{'title':'','legend':False,'arealabels':False}, # nothing
+             {'title':'This is the Map Title','legend':True,'arealabels':True}, # meta boxes and area labels
+             ]
 
     # region
-    for center,extent in itertools.product(centers, extents):
+    ci = 0
+    while ci < n:
+        center = (uniform(-160,160),uniform(-60,60))
+        
+        print('-------')
+        print('CENTER:',center)
+
+        # first render simple version
+        print('SIMPLE')
+        name = 'sim_{}'.format(i)
+
+        extent = extents[0]
+        quantity = quantities[0]
+        distribution = distributions[0]
+        datas = alldatas[0]
+        projection = projections[0]
+        resolution = resolutions[0]
+        imformat = imformats[0]
+        resolution = resolutions[0]
+        textsize = textsizes[0]
+        meta = metas[0]
+
         regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
         bbox = mapregion(**regionopts)
+        if not valid_mapregion(bbox):
+            print('!!! Not enough land area, skipping')
+            continue
+        
+        placeopts = {'quantity':quantity, 'distribution':distribution}
+        mapplaces = get_mapplaces(bbox, **placeopts)
+        if len(mapplaces) < quantity:
+            print('!!! Not enough places, skipping')
+            continue
 
-        # places
-        for quantity,distribution in itertools.product(quantities,distributions):
-            #placeopts = {'quantity':40, 'distribution':'random'}
+        ci += 1
+        
+        metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+        textopts = {'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+        anchoropts = {'fillcolor':'black', 'fillsize':0.1}
+        noiseopts = {'resolution':resolution, 'format':imformat}
+
+        mapp = render_map(bbox,
+                         mapplaces,
+                         datas,
+                         resolution,
+                         regionopts=regionopts,
+                         projection=projection,
+                         anchoropts=anchoropts,
+                         textopts=textopts,
+                         metaopts=metaopts,
+                         )
+
+        save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
+        i += 1
+
+        # then render complex version (alldata, allmeta)
+        print('COMPLEX')
+        name = 'sim_{}'.format(i)
+        
+        datas = alldatas[-1]
+        meta = metas[-1]
+
+        metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+        textopts = {'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+        anchoropts = {'fillcolor':'black', 'fillsize':0.1}
+        noiseopts = {'resolution':resolution, 'format':imformat}
+
+        mapp = render_map(bbox,
+                         mapplaces,
+                         datas,
+                         resolution,
+                         regionopts=regionopts,
+                         projection=projection,
+                         anchoropts=anchoropts,
+                         textopts=textopts,
+                         metaopts=metaopts,
+                         )
+
+        save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
+        i += 1
+
+        # (reset)
+        datas = alldatas[0]
+        meta = metas[0]
+        metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+
+        # then vary projections
+        for projection in projections[1:]:
+            print('PROJECTION',projection)
+            name = 'sim_{}'.format(i)
+
+            mapp = render_map(bbox,
+                             mapplaces,
+                             datas,
+                             resolution,
+                             regionopts=regionopts,
+                             projection=projection,
+                             anchoropts=anchoropts,
+                             textopts=textopts,
+                             metaopts=metaopts,
+                             )
+
+            save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
+            i += 1
+
+        # (reset)
+        projection = projections[0]
+
+        # then vary resolutions + imformat
+        for resolution,imformat in itertools.product(resolutions, imformats):
+            print('RESOLUTION',resolution)
+            print('IMFORMAT',imformat)
+            name = 'sim_{}'.format(i)
+
+            noiseopts = {'resolution':resolution, 'format':imformat}
+
+            save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
+            i += 1
+
+        # (reset)
+        resolution = resolutions[0]
+        imformat = imformats[0]
+        noiseopts = {'resolution':resolution, 'format':imformat}
+
+
+        # then vary quantity
+        for quantity in quantities[1:]:
+            print('QUANTITY',quantity)
+            name = 'sim_{}'.format(i)
+
             placeopts = {'quantity':quantity, 'distribution':distribution}
             mapplaces = get_mapplaces(bbox, **placeopts)
 
-            # data noise
-            for datas in alldatas:
+            metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+            textopts = {'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+            anchoropts = {'fillcolor':'black', 'fillsize':0.1}
+            noiseopts = {'resolution':resolution, 'format':imformat}
 
-                # projections
-                # UGLY...
-                for projection in projections:
-                    
-##                    projdatas = []
-##                    for datadef in datas:
-##                        if datadef:
-##                            data,style = datadef
-##                            if projection:
-##                                data.crs = '+init=EPSG:4326' # WGS84 unprojected
-##                                data = data.manage.reproject(projection)
-##                            projdatas.append((data,style))
-##                    if projection:
-##                        countries.crs = '+init=EPSG:4326' # WGS84 unprojected
-##                        projcountries = countries.manage.reproject(projection)
-##                        mapplaces.crs = '+init=EPSG:4326' # WGS84 unprojected
-##                        projmapplaces = mapplaces.manage.reproject(projection)
-##                    else:
-##                        projcountries = countries
-##                        projmapplaces = mapplaces
+            mapp = render_map(bbox,
+                             mapplaces,
+                             datas,
+                             resolution,
+                             regionopts=regionopts,
+                             projection=projection,
+                             anchoropts=anchoropts,
+                             textopts=textopts,
+                             metaopts=metaopts,
+                             )
 
-                    # metadata
-                    for meta in metas:
-                        metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+            save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
+            i += 1
 
-                        # textsizes
-                        for textsize in textsizes:
-                            textopts = {'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
-                            anchoropts = {'fillcolor':'black', 'fillsize':0.1}
+        # (reset)
+        quantity = quantities[0]
+        placeopts = {'quantity':quantity, 'distribution':distribution}
+        mapplaces = get_mapplaces(bbox, **placeopts)
 
-                            # render
-                            mapp = render_map(bbox,
-                                             mapplaces,
-                                             datas,
-                                             resolutions[0],
-                                             regionopts=regionopts,
-                                             projection=projection,
-                                             anchoropts=anchoropts,
-                                             textopts=textopts,
-                                             metaopts=metaopts,
-                                             )
+        # then vary distribution
+        # ...
 
-                            # ADD GAZETTEER DISTORTION PARAM
+        # then vary extents
+        for extent in extents[1:]:
+            print('EXTENT:',extent)
+            name = 'sim_{}'.format(i)
 
-                            # resolutions
-                            for resolution,imformat in itertools.product(resolutions, imformats):
+            regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
+            bbox = mapregion(**regionopts)
+            if not valid_mapregion(bbox):
+                print('!!! Not enough land area, skipping')
+                continue
 
-                                name = 'sim_{}'.format(i)
-                                print(name)
-                                for opts in [regionopts,placeopts,projection,datas,textopts,metaopts]:
-                                    print(opts)
+            placeopts = {'quantity':quantity, 'distribution':distribution}
+            mapplaces = get_mapplaces(bbox, **placeopts)
+            if len(mapplaces) < 10:
+                print('!!! Not Enough Places, Skipping')
+                continue
+            placeopts['quantity'] = len(mapplaces) # in case available places is less than desired
+            
+            metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+            textopts = {'textsize':textsize, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+            anchoropts = {'fillcolor':'black', 'fillsize':0.1}
+            noiseopts = {'resolution':resolution, 'format':imformat}
 
-                                noiseopts = {'resolution':resolution, 'format':imformat}
+            mapp = render_map(bbox,
+                             mapplaces,
+                             datas,
+                             resolution,
+                             regionopts=regionopts,
+                             projection=projection,
+                             anchoropts=anchoropts,
+                             textopts=textopts,
+                             metaopts=metaopts,
+                             )
 
-                                save_map(name, mapp, mapplaces, noiseopts)
-                                
-                                i += 1
+            save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
+            i += 1
 
-    
 
+        
 
 
 
