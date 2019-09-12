@@ -1408,7 +1408,7 @@ def debug_warped(pth, outpath, controlpoints):
     m.save(outpath)
     
 
-def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, source='gns', warp_order=None, max_residual=0.05, **kwargs):
+def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, source='gns', warp_order=None, max_residual=0.05, debug=False, **kwargs):
     start = time.time()
     
     print 'loading image', inpath
@@ -1485,8 +1485,9 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 ##            im_prep_thresh = im_prep_thresh.resize((im_prep.size[0]*4, im_prep.size[1]*4), PIL.Image.LANCZOS)
 
         # debug prepped
-        debugpath = os.path.join(outfold, infil+'_debug_prep.png')
-        debug_prep(im_prep_thresh, debugpath)
+        if debug:
+            debugpath = os.path.join(outfold, infil+'_debug_prep.png')
+            debug_prep(im_prep_thresh, debugpath)
 
         # ocr
         print 'detecting text'
@@ -1608,14 +1609,16 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     controlpoints = final_controlpoints(tiepoints, best_residuals, origs, matches, outpath=cppath)
 
     # draw data onto image
-    debugpath = os.path.join(outfold, infil+'_debug_ocr.png')
-    debug_ocr(im, debugpath, data, controlpoints, origs)
+    if debug:
+        debugpath = os.path.join(outfold, infil+'_debug_ocr.png')
+        debug_ocr(im, debugpath, data, controlpoints, origs)
 
     # view warpedp
     print '\n'+'finished!'
     print 'total runtime: {:.1f} seconds \n'.format(time.time() - start)
-    debugpath = os.path.join(outfold, infil+'_debug_warp.png')
-    debug_warped(outpath, debugpath, controlpoints)
+    if debug:
+        debugpath = os.path.join(outfold, infil+'_debug_warp.png')
+        debug_warped(outpath, debugpath, controlpoints)
 
 def drawpoints(img):
     import pythongis as pg

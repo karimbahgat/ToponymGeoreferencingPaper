@@ -199,6 +199,8 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchorop
 ####################
 # RUN
 
+fdasfasfafas
+
 if __name__ == '__main__':
     import itertools
     
@@ -215,10 +217,10 @@ if __name__ == '__main__':
     roads.create_spatial_index()
 
     # simulate
-    i = 156
+    i = 1
 
     # options
-    n = 5
+    n = 10
     #centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)] # (-116,40)
     extents = [10] + [40, 20] + [5, 1, 0.5, 0.1]
     quantities = [80, 40, 20, 10]

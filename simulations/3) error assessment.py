@@ -6,6 +6,8 @@ import numpy as np
 from geographiclib.geodesic import Geodesic
 from math import hypot
 
+# Measure positional error surface bw original simulated map coordinates and georeferenced map coordinates
+
 # OUTLINE
 # for instance:
 # - no projection difference + same gazetteer (should eliminate error from placename matching?)
@@ -21,43 +23,28 @@ from math import hypot
 ORDER = 1
 subsamp = 10
 
-####################
-# 1: Render some map with known parameters
-# see "generate maps.py"
 
 
 
 
-####################
-# 2: Georeference the map
-print('2: Georeferencing map')
+###############
+# LOAD TIEPOINTS
 
-# EITHER automated tool
-mapfit.automap('maps/test.png',
-               source='natearth',
-               textcolor=(0,0,0),
-               warp_order=ORDER,
-               )
+# EITHER from automated tool
 gcps = pg.VectorData('maps/test_controlpoints.geojson')
 frompoints = [(f['origx'],f['origy']) for f in gcps]
 topoints = [(f['matchx'],f['matchy']) for f in gcps]
 tiepoints = zip(frompoints, topoints)
 
 # OR use the actual coordinates for the rendered placenames (should be approx 0 error...)
-##im = Image.open('maps/test.png')
 ##places = pg.VectorData('maps/test_placenames.geojson')
 ##tiepoints = [((f['col'],f['row']),(f['x'],f['y'])) for f in places]
-##warped = mapfit.main.warp(im, 'maps/test_georeferenced.tif', tiepoints, order=ORDER)
-##cps = [('',oc,'',mc,[]) for oc,mc in tiepoints]
-##mapfit.main.debug_warped('maps/test_georeferenced.tif', 'maps/test_debug_warp.png', cps)
-
 
 
 
 
 ##################
-# 3: Measure positional error surface bw original simulated map coordinates and georeferenced map coordinates
-print('3: Measuring positional error')
+# RUN
 
 # EITHER dataset centric, since the purpose of georef is data capture, to see if we can recreate the original data
 # ...measured as avg deviation bw coordinates, one metric per dataset layer
@@ -70,9 +57,9 @@ print('3: Measuring positional error')
 
 print('setting up...')
 # original/simulated map
-ideal = pg.RasterData('maps/test.tif')
+ideal = pg.RasterData('maps/sim_{}_truth.tif')
 # georeferenced/transformed map
-actual = pg.RasterData('maps/test_georeferenced.tif')
+actual = pg.RasterData('maps/sim_{}_georeferenced.tif')
 print ideal.affine
 print actual.affine
 # create coordinate distortion grid as a smaller sampling of original grid, since dist calculations are slow
