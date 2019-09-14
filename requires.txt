@@ -1,4 +1,4 @@
-PIL
+Pillow
 numpy
 opencv-python
 colormath
@@ -7,3 +7,4 @@ scikit-learn
 pytesseract
 
 pythongis
+

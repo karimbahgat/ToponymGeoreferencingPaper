@@ -215,107 +215,107 @@ def prep_pool(pool):
 
 
 
-if __name__ == '__main__':
-    import pythongis as pg
-    from time import time
-    import cProfile
-
-    # selftest
-##    data = pg.VectorData(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp")
-##    test = data.select(lambda f: f['GEOUNIT']=='India').manage.clean(0.3)
-##    test = list(test)[0].geometry
+##if __name__ == '__main__':
+##    import pythongis as pg
+##    from time import time
+##    import cProfile
 ##
-##    feat,diff = find_country(test)
-##    print feat.row, diff
-##    feat.view()
-
-    # handdrawn test
-    test = {"type": "Polygon",
-            "coordinates": [
-          [
-            [
-              11.25,
-              57.51582286553883
-            ],
-            [
-              11.6015625,
-              59.88893689676585
-            ],
-            [
-              17.578125,
-              67.47492238478702
-            ],
-            [
-              31.289062500000004,
-              69.41124235697256
-            ],
-            [
-              28.4765625,
-              71.52490903732816
-            ],
-            [
-              13.7109375,
-              69.77895177646761
-            ],
-            [
-              2.4609375,
-              60.06484046010452
-            ],
-            [
-              4.5703125,
-              55.97379820507658
-            ],
-            [
-              11.25,
-              57.51582286553883
-            ]
-          ]
-        ]}
-    pool = pg.VectorData('countries_simple.geojson')
-    pool = prep_pool(pool)
-    matches = find_match_prepped(test, pool)
-    print [m['GEOUNIT'] for m,d,ds in matches[:3]]
-    fdsfs
-
-    # sourcetest
-    #pool = pg.VectorData(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp")
-    #pool = pool.manage.clean(0.01)
-    #pool.save('countries_simple.geojson')
-    pool = pg.VectorData('countries_simple.geojson')
-    #pool.view()
-    pool = prep_pool(pool)
-    
-    tests = pg.VectorData(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
-    for i,test in enumerate(tests):
-        print i,'matching...'
-        t=time()
-        matches = find_match_prepped(test.geometry, pool)
-        print time()-t
-        match,diff,diffs = matches[0]
-        print test['CNTRY_NAME'],'--->',match['GEOUNIT'],diff
-        print [(m['GEOUNIT'],d) for m,d,ds in matches[1:4]]
-        
-##        if 'Indonesia' in test['CNTRY_NAME']:
-##            #print sorted(diffs)
-##            for m,d,ds in matches:
-##                #print m['GEOUNIT'],d
-##                if 'Indonesia' in m['GEOUNIT']:
-##                    out = pg.VectorData()
-##                    out.add_feature([], normalize(test.geometry))
-##                    out.add_feature([], normalize(m.geometry))
-##                    out.view(fillcolor=None)
-##            out = pg.VectorData()
-##            out.add_feature([], normalize(test.geometry))
-##            out.add_feature([], normalize(match.geometry))
-##            out.view(fillcolor=None)
+##    # selftest
+####    data = pg.VectorData(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp")
+####    test = data.select(lambda f: f['GEOUNIT']=='India').manage.clean(0.3)
+####    test = list(test)[0].geometry
+####
+####    feat,diff = find_country(test)
+####    print feat.row, diff
+####    feat.view()
 ##
-##        if 0:
-##            out = pg.VectorData()
-##            out.add_feature([], normalize(test.geometry))
-##            out.add_feature([], normalize(match.geometry))
-##            out.view(fillcolor=None)
-
-        print '----'
+##    # handdrawn test
+##    test = {"type": "Polygon",
+##            "coordinates": [
+##          [
+##            [
+##              11.25,
+##              57.51582286553883
+##            ],
+##            [
+##              11.6015625,
+##              59.88893689676585
+##            ],
+##            [
+##              17.578125,
+##              67.47492238478702
+##            ],
+##            [
+##              31.289062500000004,
+##              69.41124235697256
+##            ],
+##            [
+##              28.4765625,
+##              71.52490903732816
+##            ],
+##            [
+##              13.7109375,
+##              69.77895177646761
+##            ],
+##            [
+##              2.4609375,
+##              60.06484046010452
+##            ],
+##            [
+##              4.5703125,
+##              55.97379820507658
+##            ],
+##            [
+##              11.25,
+##              57.51582286553883
+##            ]
+##          ]
+##        ]}
+##    pool = pg.VectorData('countries_simple.geojson')
+##    pool = prep_pool(pool)
+##    matches = find_match_prepped(test, pool)
+##    print [m['GEOUNIT'] for m,d,ds in matches[:3]]
+##    fdsfs
+##
+##    # sourcetest
+##    #pool = pg.VectorData(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp")
+##    #pool = pool.manage.clean(0.01)
+##    #pool.save('countries_simple.geojson')
+##    pool = pg.VectorData('countries_simple.geojson')
+##    #pool.view()
+##    pool = prep_pool(pool)
+##    
+##    tests = pg.VectorData(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp")
+##    for i,test in enumerate(tests):
+##        print i,'matching...'
+##        t=time()
+##        matches = find_match_prepped(test.geometry, pool)
+##        print time()-t
+##        match,diff,diffs = matches[0]
+##        print test['CNTRY_NAME'],'--->',match['GEOUNIT'],diff
+##        print [(m['GEOUNIT'],d) for m,d,ds in matches[1:4]]
+##        
+####        if 'Indonesia' in test['CNTRY_NAME']:
+####            #print sorted(diffs)
+####            for m,d,ds in matches:
+####                #print m['GEOUNIT'],d
+####                if 'Indonesia' in m['GEOUNIT']:
+####                    out = pg.VectorData()
+####                    out.add_feature([], normalize(test.geometry))
+####                    out.add_feature([], normalize(m.geometry))
+####                    out.view(fillcolor=None)
+####            out = pg.VectorData()
+####            out.add_feature([], normalize(test.geometry))
+####            out.add_feature([], normalize(match.geometry))
+####            out.view(fillcolor=None)
+####
+####        if 0:
+####            out = pg.VectorData()
+####            out.add_feature([], normalize(test.geometry))
+####            out.add_feature([], normalize(match.geometry))
+####            out.view(fillcolor=None)
+##
+##        print '----'
 
 
     

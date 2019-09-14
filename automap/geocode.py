@@ -1,5 +1,5 @@
 
-import geostream as gs
+import sqlite3
 
 
 ##class Matches(object):
@@ -51,12 +51,11 @@ class Online(object):
 class OptimizedCoder(object):
     def __init__(self, path=None):
         self.path = path or r'C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db'
-        self.locs = gs.Table(self.path, 'locs')
-        self.names = gs.Table(self.path, 'names')
+        self.db = sqlite3.connect(self.path)
 
     def geocode(self, name, limit=10):
         # NOT CORRRECT QUERY, RETURNS DUPLICATES
-        results = self.locs.workspace.db.cursor().execute("SELECT locs.data, locs.id, GROUP_CONCAT(names.name, '|'), locs.geom FROM locs, names, (SELECT data,id FROM names WHERE name = ?) AS m WHERE locs.id=m.id AND locs.data=m.data and names.id=m.id and names.data=m.data GROUP BY m.data,m.id", (name,))
+        results = self.db.cursor().execute("SELECT locs.data, locs.id, GROUP_CONCAT(names.name, '|'), locs.geom FROM locs, names, (SELECT data,id FROM names WHERE name = ?) AS m WHERE locs.id=m.id AND locs.data=m.data and names.id=m.id and names.data=m.data GROUP BY m.data,m.id", (name,))
         results = ({'type': 'Feature',
                    'properties': {'data':data,
                                   'id':ID,
@@ -71,17 +70,15 @@ class OptimizedCoder(object):
 
 class SQLiteCoder(object):
     def __init__(self, db=None, table=None):
-        if db: self.db = db
-        if table: self.table = table
-        self.stream = gs.Table(self.db, self.table)
+        self.path = db
+        self.db = sqlite3.connect(self.path)
+        self.table = table
 
     def geocode(self, name, limit=10):
         #where = u"names like '%{0}%'".format(name)
         where = u" '|' || names || '|' like '%|{0}|%' ".format(name)
         #where = u"names like '{0}|%' or names like '%|{0}|%' or names like '%|{0}'".format(name)
-        results = self.stream.select(['names','lon','lat'],
-                                     where=where,
-                                     limit=limit)
+        results = self.db.cursor.execute('select names,lon,lat from {table} where {where} limit {limit}'.format(table=self.table, where=where, limit=limit))
         results = ({'type': 'Feature',
                    'properties': {'name': names,
                                   },

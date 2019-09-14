@@ -221,7 +221,6 @@ if __name__ == '__main__':
 
     # options
     n = 10
-    #centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)] # (-116,40)
     extents = [10] + [40, 20] + [5, 1, 0.5, 0.1]
     quantities = [80, 40, 20, 10]
     distributions = ['random']
