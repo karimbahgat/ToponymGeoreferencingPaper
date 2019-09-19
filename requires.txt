@@ -4,6 +4,7 @@ opencv-python
 colormath
 scikit-image
 scikit-learn
+colormath
 pytesseract
 
 pythongis

@@ -2,13 +2,11 @@
 import pythongis as pg
 
 import os
-import sys
 import datetime
 from random import uniform
 import math
 import json
 import codecs
-import itertools
 import multiprocessing as mp
 
 
@@ -200,79 +198,81 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchorop
     with open('maps/{}_opts.json'.format(name), 'w') as fobj:
         fobj.write(json.dumps(opts))
 
-def iteroptions(center, extent):
-    regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
-    bbox = mapregion(**regionopts)
+def iteroptions():
+    # zoom region
+    i = 1
+    centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)]
+    for center,extent in itertools.product(centers,extents):
+        print('-------')
+        print('REGION:',center,extent)
 
-    # loop placename options
-    for quantity,distribution in itertools.product(quantities,distributions):
-
-        # check enough placenames
-        placeopts = {'quantity':quantity, 'distribution':distribution}
-        mapplaces = get_mapplaces(bbox, **placeopts)
-        if len(mapplaces) < quantity:
-            print('!!! Not enough places, skipping')
+        # check enough land
+        regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
+        bbox = mapregion(**regionopts)
+        if not valid_mapregion(bbox):
+            print('!!! Not enough land area, skipping')
             continue
 
-        # loop rendering options
-        for datas,projection,meta in itertools.product(alldatas,projections,metas):
-            
-            metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
-            textopts = {'textsize':8, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
-            anchoropts = {'fillcolor':'black', 'fillsize':0.1}
-            resolution = resolutions[0] # render at full resolution (downsample later)
+        # loop placename options
+        for quantity,distribution in itertools.product(quantities,distributions):
 
-            yield regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution
+            # check enough placenames
+            placeopts = {'quantity':quantity, 'distribution':distribution}
+            mapplaces = get_mapplaces(bbox, **placeopts)
+            if len(mapplaces) < quantity:
+                print('!!! Not enough places, skipping')
+                continue
 
-def run(i, center, extent):
-    subi = 1
-    for opts in iteroptions(center, extent):
-        regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution = opts
+            # loop rendering options
+            for datas,projection,meta in itertools.product(alldatas,projections,metas):
+                
+                metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+                textopts = {'textsize':8, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+                anchoropts = {'fillcolor':'black', 'fillsize':0.1}
+                resolution = resolutions[0] # render at full resolution (downsample later)
 
-        # render the map
-        mapp = render_map(bbox,
-                         mapplaces,
-                         datas,
-                         resolution,
-                         regionopts=regionopts,
-                         projection=projection,
-                         anchoropts=anchoropts,
-                         textopts=textopts,
-                         metaopts=metaopts,
-                         )
+                yield i,regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution
 
-        # loop image save options
-        subsubi = 1
-        for resolution,imformat in itertools.product(resolutions,imformats):
+                i += 1
 
-            name = 'sim_{}_{}_{}'.format(i, subi, subsubi)
-            
-            noiseopts = {'resolution':resolution, 'format':imformat}
-            
-            save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
-            
-            subsubi += 1
+def process(i,regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution):
 
-        subi += 1
-
-def process(i, center, extent):
-    logger = codecs.open('maps/sim_{}_log.txt'.format(i), 'w', encoding='utf8', buffering=0)
+    logger = codecs.open('sim_{}_log.txt'.format(i), 'w', encoding='utf8', buffering=0)
     sys.stdout = logger
     sys.stderr = logger
     print('PID:',os.getpid())
     print('time',datetime.datetime.now().isoformat())
     print('working path',os.path.abspath(''))
 
-    run(i, center, extent)
+    # render the map
+    mapp = render_map(bbox,
+                     mapplaces,
+                     datas,
+                     resolution,
+                     regionopts=regionopts,
+                     projection=projection,
+                     anchoropts=anchoropts,
+                     textopts=textopts,
+                     metaopts=metaopts,
+                     )
 
-    print('process finished, should exit')
+    # loop image save options
+    subi = 1
+    for resolution,imformat in itertools.product(resolutions,imformats):
+
+        name = 'sim_{}_{}'.format(i, subi)
+        
+        noiseopts = {'resolution':resolution, 'format':imformat}
+        
+        save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
+        
+        subi += 1
         
 
 ####################
 # RUN
 
 # load data (all processes)
-print('loading data')
 countries = pg.VectorData("data/ne_10m_admin_0_countries.shp")
 #places = pg.VectorData("data/ne_10m_populated_places.shp")
 places = pg.VectorData(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_settlement_points_v1.01.shp", encoding='latin')
@@ -285,9 +285,7 @@ roads = pg.VectorData("data/ne_10m_roads.shp")
 roads.create_spatial_index()
 
 # options
-print('defining options')
-n = 1000
-centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)]
+n = 10
 extents = [40, 10, 1, 0.1]
 quantities = [80, 40, 20, 10]
 distributions = ['random']
@@ -300,8 +298,8 @@ alldatas = [
                  ],
             ]
 projections = [None, # lat/lon
-               #'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
-               #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
+               '+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
+               '+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
                '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
                ]
 resolutions = [2000, 1000, 500] #, 4000]
@@ -313,44 +311,32 @@ metas = [{'title':'','legend':False,'arealabels':False}, # nothing
 
 # main process handler
 if __name__ == '__main__':
+    import itertools
 
-    maxprocs = 7
+    maxprocs = 8
     procs = []
 
     print('combinations per center', len(list(itertools.product(extents,quantities,distributions,alldatas,projections,metas,resolutions,imformats))))
 
     # begin
-    
-    # zoom regions
-    i = 1
-    for center,extent in itertools.product(centers,extents):
-        print('-------')
-        print('REGION:',i,center,extent)
-
-        # check enough land before sending to process
-        regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
-        bbox = mapregion(**regionopts)
-        if not valid_mapregion(bbox):
-            print('!!! Not enough land area, skipping')
-            continue
+    for opts in iteroptions():
+        i,regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution = opts
+        print(i)
         
-        #run(i,center,extent)
+        #process(i,regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution)
 
         # Begin process
         p = mp.Process(target=process,
-                       args=(i, center, extent),
+                       args=(i,regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution),
                        )
         p.start()
         procs.append(p)
 
-        # Wait for next available process
+        # Wait in line
         while len(procs) >= maxprocs:
             for p in procs:
                 if not p.is_alive():
                     procs.remove(p)
-
-        i += 1
-                    
 
         
 
