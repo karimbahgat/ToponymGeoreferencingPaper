@@ -12,6 +12,12 @@ import itertools
 import multiprocessing as mp
 
 
+print(os.getcwd())
+try:
+    os.chdir('simulations')
+except:
+    pass
+
 
 ####################
 # FUNCTIONS
@@ -100,6 +106,9 @@ def get_mapplaces(bbox, quantity, distribution):
         name = f['Name1'].title() #r['names'].split('|')[0]
         row = [name]
         mapplaces.add_feature(row, f.geometry) #r['geom'].__geo_interface__)
+
+    if len(mapplaces):
+        mapplaces.create_spatial_index()
             
     return mapplaces
 
@@ -118,6 +127,7 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
     if metaopts['arealabels']:
         arealabels = {'text':lambda f: f['NAME'].upper(), 'textoptions': {'textsize':textopts['textsize']*1.5, 'textcolor':(88,88,88)}}
         rencountries = countries.manage.crop(bbox)
+        rencountries.create_spatial_index()
     else:
         arealabels = {}
         rencountries = countries
@@ -270,12 +280,14 @@ def process(i, center, extent):
 
 ####################
 # RUN
+pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 
 # load data (all processes)
 print('loading data')
 countries = pg.VectorData("data/ne_10m_admin_0_countries.shp")
+countries.create_spatial_index()
 #places = pg.VectorData("data/ne_10m_populated_places.shp")
-places = pg.VectorData(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\global_settlement_points_v1.01.shp", encoding='latin')
+places = pg.VectorData("data/global_settlement_points_v1.01.shp", encoding='latin')
 places.create_spatial_index()
 rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
 rivers.create_spatial_index()
