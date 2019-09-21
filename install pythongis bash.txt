@@ -1,0 +1,14 @@
+pip install shapely
+pip install pyproj
+pip install pycrs
+pip install pyshp
+pip install pygeoj
+pip install pyqtree
+pip install Pillow
+pip install aggdraw
+pip install colour
+
+pip install git+https://github.com/karimbahgat/PyAgg
+pip install git+https://github.com/karimbahgat/ClassyPie
+
+pip install git+https://github.com/karimbahgat/PythonGis

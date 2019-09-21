@@ -1,0 +1,10 @@
+pip install Pillow
+pip install opencv-python
+
+pip install colormath
+pip install scikit-image
+pip install scikit-learn
+
+conda install -y -c conda-forge tesseract
+conda install -y -c conda-forge pytesseract
+

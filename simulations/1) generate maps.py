@@ -103,7 +103,7 @@ def get_mapplaces(bbox, quantity, distribution):
     mapplaces.fields = ['name']
     for f in _sampleplaces(bbox, quantity, distribution):
         #print f
-        name = f['Name1'].title() #r['names'].split('|')[0]
+        name = f['name'].title() #r['names'].split('|')[0]
         row = [name]
         mapplaces.add_feature(row, f.geometry) #r['geom'].__geo_interface__)
 
@@ -122,6 +122,7 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
     m = pg.renderer.Map(width, height,
                         title=metaopts['title'],
                         titleoptions=metaopts['titleoptions'],
+                        #textoptions={'font':'eb garamond 12'},
                         background=(91,181,200),
                         crs=projection)
     if metaopts['arealabels']:
@@ -172,15 +173,14 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchorop
     saveargs = {}
     if imformat == 'jpg':
         saveargs['quality'] = 10
-    m.img.convert('RGB').save('maps/{}_image.{}'.format(name, imformat), **saveargs)
 
-    m.img.resize((newwidth, newheight), 1).convert('RGB').save('maps/{}_image.{}'.format(name, imformat), **saveargs)
+    # downsample to resolution
+    img = m.img.resize((newwidth, newheight), 1)
 
     # store rendering with original geo coordinates
-    affine = m.drawer.coordspace_transform
-    r = pg.RasterData('maps/{}_image.{}'.format(name, imformat)) 
-    r.set_geotransform(affine=m.drawer.coordspace_invtransform)
-    r.save('maps/{}_truth.tif'.format(name))
+    r = pg.RasterData(image=img) 
+    r.set_geotransform(affine=m.drawer.coordspace_invtransform) # USES WRONG RESOLUTION THAT DOESNT ACCOUNT FOR DOWNSAMPLING? 
+    r.save('maps/{}_image.{}'.format(name, imformat), **saveargs)
 
     # store the original place coordinates
     # WARNING: NOT CORRECT FOR THE LOWER RESOLUTIONS...
@@ -286,8 +286,10 @@ pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 print('loading data')
 countries = pg.VectorData("data/ne_10m_admin_0_countries.shp")
 countries.create_spatial_index()
-#places = pg.VectorData("data/ne_10m_populated_places.shp")
-places = pg.VectorData("data/global_settlement_points_v1.01.shp", encoding='latin')
+places = pg.VectorData("data/ne_10m_populated_places.shp")
+places.rename_field('NAME', 'name')
+#places = pg.VectorData("data/global_settlement_points_v1.01.shp", encoding='latin')
+#places.rename_field('Name1', 'name')
 places.create_spatial_index()
 rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
 rivers.create_spatial_index()
@@ -300,7 +302,7 @@ roads.create_spatial_index()
 print('defining options')
 n = 1000
 centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)]
-extents = [40, 10, 1, 0.1]
+extents = [20, 1, 0.1]
 quantities = [80, 40, 20, 10]
 distributions = ['random']
 alldatas = [
@@ -326,7 +328,7 @@ metas = [{'title':'','legend':False,'arealabels':False}, # nothing
 # main process handler
 if __name__ == '__main__':
 
-    maxprocs = 7
+    maxprocs = 4
     procs = []
 
     print('combinations per center', len(list(itertools.product(extents,quantities,distributions,alldatas,projections,metas,resolutions,imformats))))
