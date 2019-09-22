@@ -53,41 +53,80 @@ def _sampleplaces(bbox, n, distribution):
     '''
     Samples...
     '''
-    print('target box',bbox)
+    print('sampling places within',bbox)
     hits = list(places.quick_overlap(bbox))
+
+    if distribution == 'random':
+        def samplefunc():
+            while True:
+                x = uniform(bbox[0], bbox[2])
+                y = uniform(bbox[1], bbox[3])
+                yield x,y
+
+    elif distribution == 'dispersed':
+        def samplefunc():
+            while True:
+                w = bbox[2]-bbox[0]
+                h = bbox[3]-bbox[1]
+                
+                aspect_ratio = h/float(w)
+                columns = math.sqrt(n/float(aspect_ratio))
+                if not columns.is_integer():
+                    columns += 1
+                columns = int(round(columns))
+                rows = n/float(columns)
+                if not rows.is_integer():
+                    rows += 1
+                rows = int(round(rows))
+                    
+                dx = w / float(columns)
+                dy = h / float(rows)
+
+                for row in range(rows):
+                    y = bbox[1] + row*dy
+                    for col in range(columns):
+                        x = bbox[0] + col*dx
+                        yield x,y
+
+    else:
+        raise Exception('Distribution type {} is not a valid option'.format(distribution))
+
+    itersamples = samplefunc()
+    results = []
 
     if len(hits) > n:
         radius = 0.5
         i = 0
         while True:
-            if distribution == 'random':
-                x = uniform(bbox[0], bbox[2])
-                y = uniform(bbox[1], bbox[3])
-            else:
-                raise Exception('Distribution type {} is not a valid option'.format(distribution))
+            x,y = next(itersamples) 
             bufbox = [x-radius, y-radius, x+radius, y+radius]
             def dist(f):
                 fx,fy = f.geometry['coordinates']
                 return math.hypot(x-fx, y-fy)
-            sortplaces = sorted(places.quick_overlap(bufbox), key=dist)
-            for r in sortplaces: #intersection('geom', bufbox):
+            sortplaces = sorted(hits, key=dist)
+            for f in sortplaces: #intersection('geom', bufbox):
                 #print '---'
                 #print x,y
                 #print bufbox
                 #print r.bbox
+                print('checking place', (x,y), f.row )
+                if f in results:
+                    # dont yield same place multiple times
+                    continue
                 i += 1
-                yield r
+                results.append(f)
+                yield f
                 # yield only first match inside bbox, then break
                 break
             if i >= n:
                 break
 
     else:
-        for r in hits:
-            yield r
+        for f in hits:
+            yield f
 
 # get map places
-def get_mapplaces(bbox, quantity, distribution):
+def get_mapplaces(bbox, quantity, distribution, uncertainty):
     '''
     - quantity: aka number of placenames
     - distribution: how placenames are distributed across map
@@ -105,7 +144,12 @@ def get_mapplaces(bbox, quantity, distribution):
         #print f
         name = f['name'].title() #r['names'].split('|')[0]
         row = [name]
-        mapplaces.add_feature(row, f.geometry) #r['geom'].__geo_interface__)
+        x,y = f.geometry['coordinates']
+        if uncertainty:
+            x += uniform(-uncertainty, uncertainty)
+            y += uniform(-uncertainty, uncertainty)
+        geoj = {'type':'Point', 'coordinates':(x,y)}
+        mapplaces.add_feature(row, geoj) #r['geom'].__geo_interface__)
 
     if len(mapplaces):
         mapplaces.create_spatial_index()
@@ -158,7 +202,7 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
     return m
 
 # save map
-def save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts):
+def save_map(name, mapp, mapplaces, resolution, regionopts, placeopts, projection, anchoropts, textopts, metaopts, noiseopts):
     print('SAVING:',name)
     
     # downscale to resolution
@@ -176,14 +220,18 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchorop
 
     # downsample to resolution
     img = m.img.resize((newwidth, newheight), 1)
+    m = m.copy()
+    m.resize(newwidth, newheight)
 
     # store rendering with original geo coordinates
     r = pg.RasterData(image=img) 
-    r.set_geotransform(affine=m.drawer.coordspace_invtransform) # USES WRONG RESOLUTION THAT DOESNT ACCOUNT FOR DOWNSAMPLING? 
+    r.set_geotransform(affine=m.drawer.coordspace_invtransform) 
     r.save('maps/{}_image.{}'.format(name, imformat), **saveargs)
 
     # store the original place coordinates
-    # WARNING: NOT CORRECT FOR THE LOWER RESOLUTIONS...
+    mapplaces = mapplaces.copy()
+    if projection:
+        mapplaces.manage.reproject(projection)
     mapplaces.add_field('col')
     mapplaces.add_field('row')
     mapplaces.add_field('x')
@@ -201,6 +249,7 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchorop
     opts = dict(name=name,
               resolution=resolution,
               regionopts=regionopts,
+              placeopts=placeopts,
               projection=projection,
               anchoropts=anchoropts,
               textopts=textopts,
@@ -215,10 +264,10 @@ def iteroptions(center, extent):
     bbox = mapregion(**regionopts)
 
     # loop placename options
-    for quantity,distribution in itertools.product(quantities,distributions):
+    for quantity,distribution,uncertainty in itertools.product(quantities,distributions,uncertainties):
 
         # check enough placenames
-        placeopts = {'quantity':quantity, 'distribution':distribution}
+        placeopts = {'quantity':quantity, 'distribution':distribution, 'uncertainty':uncertainty}
         mapplaces = get_mapplaces(bbox, **placeopts)
         if len(mapplaces) < quantity:
             print('!!! Not enough places, skipping')
@@ -259,7 +308,7 @@ def run(i, center, extent):
             
             noiseopts = {'resolution':resolution, 'format':imformat}
             
-            save_map(name, mapp, mapplaces, resolution, regionopts, projection, anchoropts, textopts, metaopts, noiseopts)
+            save_map(name, mapp, mapplaces, resolution, regionopts, placeopts, projection, anchoropts, textopts, metaopts, noiseopts)
             
             subsubi += 1
 
@@ -291,20 +340,37 @@ places.rename_field('NAME', 'name')
 #places = pg.VectorData("data/global_settlement_points_v1.01.shp", encoding='latin')
 #places.rename_field('Name1', 'name')
 places.create_spatial_index()
-rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
-rivers.create_spatial_index()
-urban = pg.VectorData("data/ne_10m_urban_areas.shp") 
-urban.create_spatial_index()
-roads = pg.VectorData("data/ne_10m_roads.shp") 
-roads.create_spatial_index()
+##rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
+##rivers.create_spatial_index()
+##urban = pg.VectorData("data/ne_10m_urban_areas.shp") 
+##urban.create_spatial_index()
+##roads = pg.VectorData("data/ne_10m_roads.shp") 
+##roads.create_spatial_index()
+
+# options, NEW
+
+### text error
+##noise = imformat
+##mapnoise = datas
+##
+### error magnitude
+##scale = extent
+##resolution
+##
+### warp error
+##information = quantity
+##distribution
+##uncertainty = placeerror
+##textnoise = meta
+##distortion = projection
 
 # options
 print('defining options')
-n = 1000
-centers = [(uniform(-160,160),uniform(-60,60)) for _ in range(n)]
-extents = [20, 1, 0.1]
+n = 250 # 250 per extent, 1000 total
+extents = [10] + [20, 1, 0.1] # ca 2000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
-distributions = ['random']
+distributions = ['dispersed', 'random']
+uncertainties = [0, 0.01, 0.1, 0.5] # ca 1km, 10km, and 50km
 alldatas = [
                 [], # no data layers
                 [
@@ -316,7 +382,7 @@ alldatas = [
 projections = [None, # lat/lon
                #'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
                #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
-               '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
+               #'+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
                ]
 resolutions = [2000, 1000, 500] #, 4000]
 imformats = ['png','jpg']
@@ -331,40 +397,42 @@ if __name__ == '__main__':
     maxprocs = 4
     procs = []
 
-    print('combinations per center', len(list(itertools.product(extents,quantities,distributions,alldatas,projections,metas,resolutions,imformats))))
+    print('combinations per region', len(list(itertools.product(quantities,distributions,uncertainties,alldatas,projections,metas,resolutions,imformats))))
 
     # begin
     
     # zoom regions
     i = 1
-    for center,extent in itertools.product(centers,extents):
-        print('-------')
-        print('REGION:',i,center,extent)
+    while i < n:
+        center = (uniform(-160,160),uniform(-60,60))
+        for extent in extents:
+            print('-------')
+            print('REGION:',i,center,extent)
 
-        # check enough land before sending to process
-        regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
-        bbox = mapregion(**regionopts)
-        if not valid_mapregion(bbox):
-            print('!!! Not enough land area, skipping')
-            continue
-        
-        #run(i,center,extent)
+            # check enough land before sending to process
+            regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
+            bbox = mapregion(**regionopts)
+            if not valid_mapregion(bbox):
+                print('!!! Not enough land area, skipping')
+                continue
+            
+            #run(i,center,extent)
 
-        # Begin process
-        p = mp.Process(target=process,
-                       args=(i, center, extent),
-                       )
-        p.start()
-        procs.append(p)
+            # Begin process
+            p = mp.Process(target=process,
+                           args=(i, center, extent),
+                           )
+            p.start()
+            procs.append(p)
 
-        # Wait for next available process
-        while len(procs) >= maxprocs:
-            for p in procs:
-                if not p.is_alive():
-                    procs.remove(p)
+            # Wait for next available process
+            while len(procs) >= maxprocs:
+                for p in procs:
+                    if not p.is_alive():
+                        procs.remove(p)
 
-        i += 1
-                    
+            i += 1
+                        
 
         
 
