@@ -1,5 +1,6 @@
 
 import sqlite3
+import shapely, shapely.wkb
 
 
 ##class Matches(object):
@@ -47,10 +48,14 @@ class Online(object):
                    }
 
 
+def wkb_to_shapely(wkbbuf):
+    shp = shapely.wkb.loads(bytes(wkbbuf))
+    return shp
+
 
 class OptimizedCoder(object):
     def __init__(self, path=None):
-        self.path = path or r'C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db'
+        self.path = path or 'resources/gazetteers.db'
         self.db = sqlite3.connect(self.path)
 
     def geocode(self, name, limit=10):
@@ -62,7 +67,7 @@ class OptimizedCoder(object):
                                   'name':names,
                                   'search':name,
                                   },
-                   'geometry': geom.__geo_interface__,
+                   'geometry': wkb_to_shapely(geom).__geo_interface__,
                    } for data,ID,names,geom in results)
         return results #Matches(results)
 

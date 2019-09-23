@@ -1075,7 +1075,7 @@ def detect_text_points(im, data, debug=False):
     
     return data
 
-def triang(test, matchcandidates=None):
+def triang(coder, test, matchcandidates=None):
     # TODO: maybe superfluous, maybe just integrate right into "triangulate"?? 
     names,positions = zip(*test)
     # reverse ys due to flipped image coordsys
@@ -1083,7 +1083,7 @@ def triang(test, matchcandidates=None):
     positions = [(x,maxy-y) for x,y in positions]
     # triangulate
     #print 99,names,positions
-    matches = triangulate(names, positions, matchcandidates)
+    matches = triangulate(coder, names, positions, matchcandidates)
     #for f,diff,diffs in matches[:1]:
         #print 'error:', round(diff,6)
         #for c in f['properties']['combination']:
@@ -1091,10 +1091,10 @@ def triang(test, matchcandidates=None):
         #viewmatch(positions, f)
     return matches
 
-def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, source='gns', debug=False):
+def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, db=None, source='gns', debug=False):
     # filter to those that can be geocoded
     print 'geocode and filter'
-    coder = geocode.OptimizedCoder()
+    coder = geocode.OptimizedCoder(db)
 
     if source == 'best' or source == 'avg':
         mintrials = 30
@@ -1173,7 +1173,8 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
             print '\n'.join([repr((tr[0],len(tr[2]))) for tr in tri])
         # try triang
         best = None
-        try: best = triang([tr[:2] for tr in tri],
+        try: best = triang(coder,
+                           [tr[:2] for tr in tri],
                            matchcandidates=[tr[2] for tr in tri])
         except Exception as err: print 'EXCEPTION RAISED:',err
         if best:
@@ -1200,7 +1201,8 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
                     maxy = max(maxy,nxtpos[1])
                     nxtposflip = (nxtpos[0],maxy-nxtpos[1])
                     origcoordsflip = [(x,maxy-y) for x,y in origcoords + [nxtpos]]
-                    best = triangulate_add(zip(orignames,origcoordsflip),
+                    best = triangulate_add(coder,
+                                           zip(orignames,origcoordsflip),
                                            zip(matchnames,matchcoords),
                                            (nxtname,nxtposflip),
                                            res)
@@ -1408,7 +1410,7 @@ def debug_warped(pth, outpath, controlpoints):
     m.save(outpath)
     
 
-def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, source='gns', warp_order=None, max_residual=0.05, debug=False, **kwargs):
+def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, bbox=None, db=None, source='gns', warp_order=None, max_residual=0.05, debug=False, **kwargs):
     start = time.time()
     
     print 'loading image', inpath
@@ -1422,6 +1424,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     if not outpath:
         outpath = os.path.join(infold, infil + '_georeferenced.tif')
     outfold,outfil = os.path.split(outpath)
+    outfil,ext = os.path.splitext(outfil)
 
     # partition image
     print 'image segmentation'
@@ -1485,8 +1488,8 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 ##            im_prep_thresh = im_prep_thresh.resize((im_prep.size[0]*4, im_prep.size[1]*4), PIL.Image.LANCZOS)
 
         # debug prepped
-        if debug:
-            debugpath = os.path.join(outfold, infil+'_debug_prep.png')
+        if debug is True:
+            debugpath = os.path.join(outfold, outfil+'_debug_prep.png')
             debug_prep(im_prep_thresh, debugpath)
 
         # ocr
@@ -1573,7 +1576,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 ##            print err
 ##    fdsfds
         
-    origs,matches = find_matches(points, matchthresh, **kwargs)
+    origs,matches = find_matches(points, matchthresh, db=db, source=source, **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
@@ -1605,19 +1608,19 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     warp(mapp_im, outpath, tiepoints, warp_order or warp_order_auto)
 
     # final control points
-    cppath = os.path.join(outfold, infil+'_controlpoints.geojson')
+    cppath = os.path.join(outfold, outfil+'_controlpoints.geojson')
     controlpoints = final_controlpoints(tiepoints, best_residuals, origs, matches, outpath=cppath)
 
     # draw data onto image
-    if debug:
-        debugpath = os.path.join(outfold, infil+'_debug_ocr.png')
+    if debug is True or debug == 'ocr':
+        debugpath = os.path.join(outfold, outfil+'_debug_ocr.png')
         debug_ocr(im, debugpath, data, controlpoints, origs)
 
     # view warpedp
     print '\n'+'finished!'
     print 'total runtime: {:.1f} seconds \n'.format(time.time() - start)
-    if debug:
-        debugpath = os.path.join(outfold, infil+'_debug_warp.png')
+    if debug is True:
+        debugpath = os.path.join(outfold, outfil+'_debug_warp.png')
         debug_warped(outpath, debugpath, controlpoints)
 
 def drawpoints(img):

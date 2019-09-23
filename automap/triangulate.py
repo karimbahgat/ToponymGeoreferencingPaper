@@ -5,11 +5,8 @@ import itertools
 
 from . import shapematch
 
-from . import geocode
-coder = geocode.OptimizedCoder()
 
-
-def triangulate(names, positions, matchcandidates=None):
+def triangulate(coder, names, positions, matchcandidates=None):
     assert len(names) == len(positions)
     assert len(names) >= 3
 
@@ -114,7 +111,7 @@ def triangulate(names, positions, matchcandidates=None):
 ##    matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
 ##    return matches[0]
 
-def triangulate_add(origs, matches, add, addcandidates=None):
+def triangulate_add(coder, origs, matches, add, addcandidates=None):
     orignames, origpositions = zip(*origs)
     matchnames, matchpositions = zip(*matches)
 
