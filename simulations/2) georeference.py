@@ -22,6 +22,14 @@ import multiprocessing as mp
 
 
 
+print(os.getcwd())
+try:
+    os.chdir('simulations')
+except:
+    pass
+
+
+
 ###################
 # PARAMS
 ORDER = 1
@@ -30,7 +38,7 @@ ORDER = 1
 ###################
 # FUNCTIONS
 def mapfiles():
-    for fil in os.listdir('maps'):
+    for fil in sorted(os.listdir('maps')):
         if fil.endswith(('_image.png','_image.jpg')):
             yield fil
 
@@ -90,7 +98,7 @@ if __name__ == '__main__':
 ##        ## auto
 ##        georeference_auto(fil='maps/{}'.format(fil),
 ##                       db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db",
-##                       source='natearth',
+##                       source='best',
 ##                       textcolor=(0,0,0),
 ##                       warp_order=ORDER,)
 ##
@@ -106,7 +114,7 @@ if __name__ == '__main__':
         p = mp.Process(target=georeference_auto,
                        kwargs=dict(fil='maps/{}'.format(fil),
                                    db="data/gazetteers.db",
-                                   source='ciesin',
+                                   source='best',
                                    textcolor=(0,0,0),
                                    warp_order=ORDER,),
                        )

@@ -167,6 +167,9 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
                         title=metaopts['title'],
                         titleoptions=metaopts['titleoptions'],
                         #textoptions={'font':'eb garamond 12'},
+                        #textoptions={'font':'lato'},
+                        #textoptions={'font':'dejavu sans'},
+                        #textoptions={'font':'freesans'},
                         background=(91,181,200),
                         crs=projection)
     if metaopts['arealabels']:
@@ -366,7 +369,7 @@ places.create_spatial_index()
 
 # options
 print('defining options')
-n = 250 # 250 per extent, 1000 total
+n = 10 # with 4 extents for each = 40
 extents = [10] + [20, 1, 0.1] # ca 2000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
 distributions = ['dispersed', 'random']
