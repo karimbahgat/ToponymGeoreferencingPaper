@@ -196,7 +196,9 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
     m.zoom_bbox(*bbox)
 
     if metaopts['legend']:
-        m.add_legend(legendoptions={'padding':0, 'direction':'s'})
+        legendoptions = {'padding':0, 'direction':'s'}
+        legendoptions.update(metaopts['legendoptions'])
+        m.add_legend(legendoptions=legendoptions)
 
     # note...
 
@@ -370,12 +372,12 @@ places.create_spatial_index()
 # options
 print('defining options')
 n = 10 # with 4 extents for each = 40
-extents = [10] + [20, 1, 0.1] # ca 2000km, 1000km, 100km, and 10km
+extents = [10] + [50, 1, 0.1] # ca 5000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
-distributions = ['dispersed', 'random']
-uncertainties = [0, 0.01, 0.1, 0.5] # ca 1km, 10km, and 50km
+distributions = ['dispersed', 'random'] # IMPROVE W NUMERIC
+uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
 alldatas = [
-                [], # no data layers
+                [(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
                 [
                 (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08, 'legendoptions':{'title':'Rivers'}}), # three layers
                 (urban, {'fillcolor':(209,194,151), 'legendoptions':{'title':'Urban area'}}),
@@ -387,11 +389,12 @@ projections = [None, # lat/lon
                #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
                #'+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
                ]
-resolutions = [2000, 1000, 500] #, 4000]
+resolutions = [3000, 2000, 1000, 750] #, 4000]
 imformats = ['png','jpg']
 metas = [{'title':'','legend':False,'arealabels':False}, # nothing
          {'title':'','legend':False,'arealabels':True}, # area labels
-         {'title':'This is the Map Title','legend':True,'arealabels':False}, # meta boxes
+         {'title':'This is the Map Title','legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes
+         {'title':'This is the Map Title','legend':True,'legendoptions':{'fillcolor':None},'arealabels':False}, # meta boxes, no box
          ]
 
 # main process handler

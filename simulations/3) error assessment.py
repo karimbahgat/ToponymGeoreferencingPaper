@@ -47,7 +47,7 @@ subsamp = 10
 # ...should be same as dataset centric, but also allows for spatial error variation.
 # ...during simulation, truth pixel can be calculated by storing drawing affine along with rendered image, and querying each pixel coordinate.
 # ...or without the simulation, truth pixel can be proxied by...
-def error_surface(i, truth, georef):    
+def error_surface(gcps_fil, truth, georef):    
     print('Creating error surface')
     # create coordinate distortion grid as a smaller sampling of original grid, since dist calculations are slow
     # NOTE: shouldnt subsample the error raster, only temporary for visualization
@@ -60,7 +60,7 @@ def error_surface(i, truth, georef):
     errband.compute('-99')
 
     # get tiepoints from automated tool
-    gcps = pg.VectorData('maps/sim_{}_image_controlpoints.geojson'.format(i))
+    gcps = pg.VectorData('maps/{}'.format(gcps_fil))
     frompoints = [(f['origx'],f['origy']) for f in gcps]
     topoints = [(f['matchx'],f['matchy']) for f in gcps]
     tiepoints = zip(frompoints, topoints)
@@ -115,20 +115,28 @@ def error_surface(i, truth, georef):
     return error, arrows
 
 # Error output metrics
-def error_output(i, error):
+def error_output(fil_root, error):
     print('Outputting error metrics')
     band = error.bands[0]
+
+    # final surface avg + stdev
     avg = band.summarystats('mean')['mean']
     devs = (abs(avg - cell.value) for cell in band)
     cnt = band.width * band.height
     stdev = sum(devs) / float(cnt)
 
+    # controlpoint rmse
+
+    # diff from orig controlpoints
+
+    # percent of labels correct
+
     dct = {'avg':avg, 'stdev':stdev}
-    with open('maps/sim_{}_error.json'.format(i), 'w') as fobj:
+    with open('maps/{}_error.json'.format(fil_root), 'w') as fobj:
         fobj.write(json.dumps(dct))
 
 # Visualize differences
-def error_vis(i, error, arrows, georef):
+def error_vis(fil_root, error, arrows, georef):
     print('Visualizing original vs georeferenced errors')
 
     # render georef georefs over each other, with distortion arrows
@@ -149,10 +157,11 @@ def error_vis(i, error, arrows, georef):
     #m.add_layer(arrows, fillcolor='black', fillsize='1px', legend=False) #, text=lambda f: f['dist'], textoptions={'textsize':5})
     m.zoom_bbox(*georef.bbox)
     m.add_legend({'padding':0})
-    m.save('maps/sim_{}_error_vis.png'.format(i))
+    m.save('maps/{}_error_vis.png'.format(fil_root))
 
-def error_assess(i):
-    logger = codecs.open('maps/sim_{}_error_log.txt'.format(i), 'w', encoding='utf8', buffering=0)
+def error_assess(georef_fil, truth_fil, gcps_fil):
+    georef_root,ext = os.path.splitext(georef_fil)
+    logger = codecs.open('maps/{}_error_log.txt'.format(georef_root), 'w', encoding='utf8', buffering=0)
     sys.stdout = logger
     sys.stderr = logger
     print('PID:',os.getpid())
@@ -160,24 +169,28 @@ def error_assess(i):
     print('working path',os.path.abspath(''))
 
     # original/simulated map
-    truth = pg.RasterData('maps/sim_{}_truth.tif'.format(i))
+    truth = pg.RasterData('maps/{}'.format(truth_fil))
     
     # georeferenced/transformed map
-    georef = pg.RasterData('maps/sim_{}_image_georeferenced.tif'.format(i))
+    georef = pg.RasterData('maps/{}'.format(georef_fil))
 
     print truth.affine
     print georef.affine
 
     # surface
-    error,arrows = error_surface(i, truth, georef)
+    error,arrows = error_surface(gcps_fil, truth, georef)
     #error.save('maps/sim_{}_error.tif'.format(i))
 
     # output metrics
-    error_output(i, error)
+    error_output(georef_root, error)
 
     # visualize
-    error_vis(i, error, arrows, georef)
+    error_vis(georef_root, error, arrows, georef)
 
+def itermaps():
+    for fil in os.listdir('maps'):
+        if '_image.' in fil and fil.endswith(('.png','jpg')):
+            yield fil
 
 
 
@@ -186,21 +199,37 @@ def error_assess(i):
 
 if __name__ == '__main__':
 
-    maxprocs = 8
+    maxprocs = 4
     procs = []
 
-    for i in range(1, 250):
-        print(i)
+    for imfil in itermaps():
+        fil_root = imfil.split('_image.')[0]
 
-        #error_assess(i)
+        #error_assess(fil)
         #continue
 
         # Begin process
-        p = mp.Process(target=error_assess,
-                       args=(i,),
-                       )
-        p.start()
-        procs.append(p)
+
+        ## auto
+        autofil = '{}_georeferenced_auto.tif'.format(fil_root)
+        print(imfil,autofil)
+        if os.path.lexists('maps/{}'.format(autofil)):
+            gcps = '{}_georeferenced_auto_controlpoints.geojson'.format(fil_root)
+            p = mp.Process(target=error_assess,
+                           args=(autofil,imfil,gcps),
+                           )
+            p.start()
+            procs.append(p)
+
+        ## exact
+##        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
+##        if os.path.lexists('maps/{}'.format(exactfil)):
+##            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
+##            p = mp.Process(target=error_assess,
+##                           args=(exactfil,imfil,gcps),
+##                           )
+##            p.start()
+##            procs.append(p)
 
         # Wait in line
         while len(procs) >= maxprocs:

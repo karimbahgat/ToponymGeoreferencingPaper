@@ -1,3 +1,23 @@
 
+ROUND 1
+- error, allow handling of orig placenames as gcps
+- error, output rmse
+- error, output dev from orig placenames
+- error, output percent of placenames detected
+- RUN ON CURRENT RESULTS!
+
+ROUND 2
+- error, loop and create table of opts + error outputs
+- MAKE SOME GRAPHS!
+
+ROUND 3
+- fix projections
+- fix arealabel cropping
+- rerun everything, n=2 (render, georef, error)
+- COLLATE TABLE AND EXPLORE!
+
+ROUND 4
 - warp() doesnt work correctly for >1 order. probably due to incorrect matrix inversion during backwards sampling in rmse.predict() for >1 order. 
-- ...
+- georef, save transform matrix
+- error, reuse transform matrix
+
