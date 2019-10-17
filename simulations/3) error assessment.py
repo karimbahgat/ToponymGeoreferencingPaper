@@ -115,7 +115,7 @@ def error_surface(gcps_fil, truth, georef):
     return error, arrows
 
 # Error output metrics
-def error_output(fil_root, error):
+def error_output(fil_root, gcps_fil, error):
     print('Outputting error metrics')
     band = error.bands[0]
 
@@ -126,12 +126,21 @@ def error_output(fil_root, error):
     stdev = sum(devs) / float(cnt)
 
     # controlpoint rmse
+    gcps = pg.VectorData('maps/{}'.format(gcps_fil))
+    frompoints = [(f['origx'],f['origy']) for f in gcps]
+    topoints = [(f['matchx'],f['matchy']) for f in gcps]
+    tiepoints = zip(frompoints, topoints)
+    res_x, res_y, res_xy, rmse, rmse_x, rmse_y, pred_x, pred_y, coeff_x, coeff_y = mapfit.rmse.polynomial(ORDER, *zip(*tiepoints))
 
     # diff from orig controlpoints
 
     # percent of labels correct
+    root = '_'.join(fil_root.split('_')[:4])
+    allnames = pg.VectorData('maps/{}_placenames.geojson'.format(root))
+    labperc = len(gcps) / float(len(allnames))
 
-    dct = {'avg':avg, 'stdev':stdev}
+    # output
+    dct = {'avg':avg, 'stdev':stdev, 'rmse':rmse, 'labels_used':labperc}
     with open('maps/{}_error.json'.format(fil_root), 'w') as fobj:
         fobj.write(json.dumps(dct))
 
@@ -182,7 +191,7 @@ def error_assess(georef_fil, truth_fil, gcps_fil):
     #error.save('maps/sim_{}_error.tif'.format(i))
 
     # output metrics
-    error_output(georef_root, error)
+    error_output(georef_root, gcps_fil, error)
 
     # visualize
     error_vis(georef_root, error, arrows, georef)
