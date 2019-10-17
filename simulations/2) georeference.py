@@ -79,6 +79,14 @@ def georeference_exact(fil, warp_order):
     warped = mapfit.main.warp(im, '{}_georeferenced_exact.tif'.format(fil_root), tiepoints, order=warp_order)
     #gcps = [('',oc,'',mc,[]) for oc,mc in tiepoints]
     #mapfit.main.debug_warped('maps/test_georeferenced.tif', 'maps/test_debug_warp.png', gcps)
+
+    places.rename_field('name', 'origname')
+    places.rename_field('col', 'origx')
+    places.rename_field('row', 'origy')
+    places.rename_field('x', 'matchx')
+    places.rename_field('y', 'matchy')
+    places.save('{}_georeferenced_exact_controlpoints.geojson'.format(fil_root))
+
     print('finished exact georeferencing', time()-t)
 
 

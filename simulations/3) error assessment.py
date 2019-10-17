@@ -222,14 +222,14 @@ if __name__ == '__main__':
             procs.append(p)
 
         ## exact
-##        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
-##        if os.path.lexists('maps/{}'.format(exactfil)):
-##            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
-##            p = mp.Process(target=error_assess,
-##                           args=(exactfil,imfil,gcps),
-##                           )
-##            p.start()
-##            procs.append(p)
+        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
+        if os.path.lexists('maps/{}'.format(exactfil)):
+            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
+            p = mp.Process(target=error_assess,
+                           args=(exactfil,imfil,gcps),
+                           )
+            p.start()
+            procs.append(p)
 
         # Wait in line
         while len(procs) >= maxprocs:

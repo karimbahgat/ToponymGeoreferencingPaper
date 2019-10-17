@@ -1,6 +1,6 @@
 
 ROUND 1
-- error, allow handling of orig placenames as gcps
+X error, allow handling of orig placenames as gcps
 - error, output rmse
 - error, output dev from orig placenames
 - error, output percent of placenames detected
