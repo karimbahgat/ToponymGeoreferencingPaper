@@ -27,6 +27,13 @@ import json
 
 
 
+print(os.getcwd())
+try:
+    os.chdir('simulations')
+except:
+    pass
+
+
 ###################
 # PARAMS
 ORDER = 1
@@ -160,7 +167,9 @@ def error_vis(fil_root, error, arrows, georef):
 
     # render error surface map, with distortion arrows?
     print('error color surface and values')
-    m = pg.renderer.Map(background='white')
+    m = pg.renderer.Map(background='white',
+                        #textoptions={'font':'freesans'},
+                        )
     m.add_layer(georef)
     m.add_layer(error, transparency=0.2, legendoptions={'title':'Error (Meters)', 'valueformat':'.0f'})
     #m.add_layer(arrows, fillcolor='black', fillsize='1px', legend=False) #, text=lambda f: f['dist'], textoptions={'textsize':5})
