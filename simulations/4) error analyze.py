@@ -83,21 +83,54 @@ stats = pg.VectorData('analyze/stats.xls')
 for fl in stats.fields:
     stats.compute(fl, lambda f: json.loads(f[fl]))
 
+# EXACT
+
+# avg surface
 vals = [f['error_exact']['avg'] for f in stats if f['error_exact']]
 plt.hist(vals, bins=100) #, range=(0,10000))
 plt.title('Average errors')
 plt.show()
 
+# avg vs extent
+xys = [(f['opts']['regionopts']['extent'],f['error_exact']['avg']) for f in stats if f['error_exact'] and 'avg' in f['error_exact']]
+xs,ys = zip(*xys)
+plt.scatter(xs, ys)
+plt.xlabel('Extent')
+plt.ylabel('Average errors')
+plt.show()
+
+# rmse gcps
 vals = [f['error_exact']['rmse'] for f in stats if f['error_exact'] and 'rmse' in f['error_exact']] 
 plt.hist(vals, bins=100) #, range=(0,10000))
 plt.title('RMSE')
 plt.show()
 
+# rmse vs extent
 xys = [(f['opts']['regionopts']['extent'],f['error_exact']['rmse']) for f in stats if f['error_exact'] and 'rmse' in f['error_exact']]
 xs,ys = zip(*xys)
 plt.scatter(xs, ys)
 plt.xlabel('Extent')
 plt.ylabel('RMSE')
+plt.show()
+
+
+
+# AUTO
+
+# avg surface
+vals = [f['error_auto']['avg'] for f in stats if f['error_auto']]
+vals = [v for v in vals if not math.isnan(v)]
+plt.hist(vals, bins=100, range=(0,150000))
+plt.title('Average errors')
+plt.show()
+
+# avg vs extent
+xys = [(f['opts']['regionopts']['extent'],f['error_auto']['avg']) for f in stats if f['error_auto'] and 'avg' in f['error_auto']]
+xys = [(x,y) for x,y in xys if not math.isnan(y)]
+xs,ys = zip(*xys)
+plt.scatter(xs, ys)
+plt.xlabel('Extent')
+plt.ylabel('Average errors')
 plt.show()
 
 

@@ -8,6 +8,9 @@ pip install Pillow
 pip install aggdraw
 pip install colour
 
+pip install xlrd
+pip install xlwt
+
 pip install git+https://github.com/karimbahgat/PyAgg
 pip install git+https://github.com/karimbahgat/ClassyPie
 
