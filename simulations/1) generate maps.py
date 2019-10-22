@@ -141,6 +141,49 @@ def _sampleplaces(bbox, n, distribution):
         for f in hits:
             yield f
 
+def project_bbox(bbox, fromcrs, tocrs):
+    '''Take a bbox from one crs, convert to bbox in another crs, then convert back to the original crs'''
+    def get_crs_transformer(fromcrs, tocrs):
+        import pycrs
+        
+        if not (fromcrs and tocrs):
+            return None
+        
+        if isinstance(fromcrs, basestring):
+            fromcrs = pycrs.parse.from_unknown_text(fromcrs)
+
+        if isinstance(tocrs, basestring):
+            tocrs = pycrs.parse.from_unknown_text(tocrs)
+
+        fromcrs = fromcrs.to_proj4()
+        tocrs = tocrs.to_proj4()
+        
+        if fromcrs != tocrs:
+            import pyproj
+            fromcrs = pyproj.Proj(fromcrs)
+            tocrs = pyproj.Proj(tocrs)
+            def _project(points):
+                xs,ys = itertools.izip(*points)
+                xs,ys = pyproj.transform(fromcrs,
+                                         tocrs,
+                                         xs, ys)
+                newpoints = list(itertools.izip(xs, ys))
+                return newpoints
+        else:
+            _project = None
+
+        return _project
+
+    _transform = get_crs_transformer(fromcrs, tocrs)
+    x1,y1,x2,y2 = bbox
+    corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
+    corners = _transform(corners)
+    xs,ys = zip(*corners)
+    xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+    projbox = [xmin,ymin,xmax,ymax] 
+    return projbox
+
+
 # get map places
 def get_mapplaces(bbox, quantity, distribution, uncertainty):
     '''
@@ -251,8 +294,8 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, placeopts, projectio
 
     # store the original place coordinates
     mapplaces = mapplaces.copy()
-    if projection:
-        mapplaces.manage.reproject(projection)
+    #if projection:
+    #    mapplaces.manage.reproject(projection)
     mapplaces.add_field('col')
     mapplaces.add_field('row')
     mapplaces.add_field('x')
@@ -287,22 +330,35 @@ def iteroptions(center, extent):
     # loop placename options
     for quantity,distribution,uncertainty in itertools.product(quantities,distributions,uncertainties):
 
-        # check enough placenames
-        placeopts = {'quantity':quantity, 'distribution':distribution, 'uncertainty':uncertainty}
-        mapplaces = get_mapplaces(bbox, **placeopts)
-        if len(mapplaces) < quantity:
-            print('!!! Not enough places, skipping')
-            continue
+        # FIX PROJECTION...
+        for projection in projections:
 
-        # loop rendering options
-        for datas,projection,meta in itertools.product(alldatas,projections,metas):
-            
-            metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'legendoptions':meta.get('legendoptions'), 'arealabels':meta['arealabels']}
-            textopts = {'textsize':8, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
-            anchoropts = {'fillcolor':'black', 'fillsize':0.1}
-            resolution = resolutions[0] # render at full resolution (downsample later)
+            if projection:
+                lonlat = '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
+                projbox = project_bbox(bbox, lonlat, projection)
+                placebox = project_bbox(projbox, projection, lonlat)
+                print('bbox to projbox and back',bbox,placebox)
+            else:
+                placebox = bbox
 
-            yield regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution
+            # check enough placenames
+            placeopts = {'quantity':quantity, 'distribution':distribution, 'uncertainty':uncertainty}
+            mapplaces = get_mapplaces(placebox, **placeopts)
+            if len(mapplaces) < 10: #quantity:
+                print('!!! Not enough places, skipping')
+                continue
+
+            # loop rendering options
+            for datas,meta in itertools.product(alldatas,metas):
+
+                #projbox = project_bbox(bbox)
+                
+                metaopts = {'title':meta['title'], 'titleoptions':meta.get('titleoptions', {}), 'legend':meta['legend'], 'legendoptions':meta.get('legendoptions', {}), 'arealabels':meta['arealabels']}
+                textopts = {'textsize':8, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+                anchoropts = {'fillcolor':'black', 'fillsize':0.1}
+                resolution = resolutions[0] # render at full resolution (downsample later)
+
+                yield regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution
 
 def run(i, center, extent):
     subi = 1
@@ -461,9 +517,9 @@ projections = [None, # lat/lon
                ]
 resolutions = [3000, 2000, 1000, 750] #, 4000]
 imformats = ['png','jpg']
-metas = [{'title':'','legend':False,'arealabels':False}, # nothing
+metas = [#'title':'','legend':False,'arealabels':False}, # nothing
          {'title':'This is the Map Title','titleoptions':{'fillcolor':None},'legend':True,'legendoptions':{'fillcolor':None},'arealabels':True}, # text noise (arealabels + title + legend)
-         {'title':'This is the Map Title','legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes (title + legend)
+         {'title':'This is the Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes (title + legend)
          ]
 
 # main process handler
