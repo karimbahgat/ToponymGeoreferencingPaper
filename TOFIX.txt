@@ -13,6 +13,7 @@ X MAKE SOME GRAPHS!
 ROUND 3
 - fix projections
 - fix arealabel cropping
+X fix distributed sampling
 - rerun everything, n=2 (render, georef, error)
 - COLLATE TABLE AND EXPLORE!
 

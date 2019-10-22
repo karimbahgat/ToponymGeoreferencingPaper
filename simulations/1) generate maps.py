@@ -69,23 +69,29 @@ def _sampleplaces(bbox, n, distribution):
                 w = bbox[2]-bbox[0]
                 h = bbox[3]-bbox[1]
                 
-                aspect_ratio = h/float(w)
-                columns = math.sqrt(n/float(aspect_ratio))
-                if not columns.is_integer():
-                    columns += 1
-                columns = int(round(columns))
-                rows = n/float(columns)
-                if not rows.is_integer():
-                    rows += 1
-                rows = int(round(rows))
-                    
+        ##        aspect_ratio = h/float(w)
+        ##        columns = math.sqrt(n/float(aspect_ratio))
+        ##        if not columns.is_integer():
+        ##            columns += 1
+        ##        columns = int(round(columns))
+        ##        rows = n/float(columns)
+        ##        if not rows.is_integer():
+        ##            rows += 1
+        ##        rows = int(round(rows))
+
+                rows = columns = int(round(math.sqrt(n)))
+                
+                print rows,columns
+
                 dx = w / float(columns)
                 dy = h / float(rows)
-
+                    
                 for row in range(rows):
                     y = bbox[1] + row*dy
+                    y += dy/2.0
                     for col in range(columns):
                         x = bbox[0] + col*dx
+                        x += dx/2.0
                         yield x,y
 
     else:
@@ -331,6 +337,56 @@ def process(i, center, extent):
 
     print('process finished, should exit')
         
+
+#######################
+# MISC TESTING
+def samplefunc(bbox, n):
+    if True:
+        w = bbox[2]-bbox[0]
+        h = bbox[3]-bbox[1]
+        
+##        aspect_ratio = h/float(w)
+##        columns = math.sqrt(n/float(aspect_ratio))
+##        if not columns.is_integer():
+##            columns += 1
+##        columns = int(round(columns))
+##        rows = n/float(columns)
+##        if not rows.is_integer():
+##            rows += 1
+##        rows = int(round(rows))
+
+        rows = columns = int(round(math.sqrt(n)))
+        
+        print rows,columns
+
+        dx = w / float(columns)
+        dy = h / float(rows)
+
+##        r = pg.RasterData(mode='1bit', width=columns, height=rows,
+##                          xscale=dx, yscale=dy, xoffset=bbox[0], yoffset=bbox[2])
+##        r.add_band()
+##        for cell in r.bands[0]:
+##            yield cell.point['coordinates']
+            
+        for row in range(rows):
+            y = bbox[1] + row*dy
+            y += dy/2.0
+            for col in range(columns):
+                x = bbox[0] + col*dx
+                x += dx/2.0
+                yield x,y
+
+import pyagg
+c=pyagg.Canvas(1000,500)
+bbox=0,0,100,100
+c.custom_space(*bbox)
+for x,y in samplefunc(bbox, 40):
+    print x,y
+    c.draw_circle((x,y))
+c.view()
+
+sdfsdf
+
 
 ####################
 # RUN
