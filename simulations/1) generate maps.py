@@ -10,6 +10,7 @@ import json
 import codecs
 import itertools
 import multiprocessing as mp
+import sqlite3
 
 
 print(os.getcwd())
@@ -21,7 +22,6 @@ except:
 
 ####################
 # FUNCTIONS
-
 
 # select map region
 def mapregion(center, extent, aspect):
@@ -54,7 +54,17 @@ def _sampleplaces(bbox, n, distribution):
     Samples...
     '''
     print('sampling places within',bbox)
-    hits = list(places.quick_overlap(bbox))
+    #hits = list(places.quick_overlap(bbox))
+    hits = pg.VectorData(fields=['name'])
+    db = sqlite3.connect('data/gns.db')
+    x1,y1,x2,y2 = bbox
+    for names,x,y in db.execute('select names,x,y from data where (x between ? and ?) and (y between ? and ?)', (x1,x2,y1,y2)):
+        name = names.split('|')[1] if '|' in names else names
+        try: name.encode('latin')
+        except: continue
+        geoj = {'type':'Point', 'coordinates':(x,y)}
+        hits.add_feature([name], geoj)
+    print('possible places in map window',hits)
 
     if distribution == 'random':
         def samplefunc():
@@ -81,7 +91,7 @@ def _sampleplaces(bbox, n, distribution):
 
                 rows = columns = int(round(math.sqrt(n)))
                 
-                print rows,columns
+                #print rows,columns
 
                 dx = w / float(columns)
                 dy = h / float(rows)
@@ -101,11 +111,11 @@ def _sampleplaces(bbox, n, distribution):
     results = []
 
     if len(hits) > n:
-        radius = 0.5
+        #radius = 2.0
         i = 0
         while True:
             x,y = next(itersamples) 
-            bufbox = [x-radius, y-radius, x+radius, y+radius]
+            #bufbox = [x-radius, y-radius, x+radius, y+radius]
             def dist(f):
                 fx,fy = f.geometry['coordinates']
                 return math.hypot(x-fx, y-fy)
@@ -180,8 +190,8 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
                         crs=projection)
     if metaopts['arealabels']:
         arealabels = {'text':lambda f: f['NAME'].upper(), 'textoptions': {'textsize':textopts['textsize']*1.5, 'textcolor':(88,88,88)}}
-        rencountries = countries.manage.crop(bbox)
-        rencountries.create_spatial_index()
+        rencountries = countries #.manage.crop(bbox)
+        #rencountries.create_spatial_index()
     else:
         arealabels = {}
         rencountries = countries
@@ -287,7 +297,7 @@ def iteroptions(center, extent):
         # loop rendering options
         for datas,projection,meta in itertools.product(alldatas,projections,metas):
             
-            metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'arealabels':meta['arealabels']}
+            metaopts = {'title':meta['title'], 'titleoptions':{'fillcolor':'white'}, 'legend':meta['legend'], 'legendoptions':meta.get('legendoptions'), 'arealabels':meta['arealabels']}
             textopts = {'textsize':8, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
             anchoropts = {'fillcolor':'black', 'fillsize':0.1}
             resolution = resolutions[0] # render at full resolution (downsample later)
@@ -340,52 +350,56 @@ def process(i, center, extent):
 
 #######################
 # MISC TESTING
-def samplefunc(bbox, n):
-    if True:
-        w = bbox[2]-bbox[0]
-        h = bbox[3]-bbox[1]
-        
-##        aspect_ratio = h/float(w)
-##        columns = math.sqrt(n/float(aspect_ratio))
-##        if not columns.is_integer():
-##            columns += 1
-##        columns = int(round(columns))
-##        rows = n/float(columns)
-##        if not rows.is_integer():
-##            rows += 1
-##        rows = int(round(rows))
 
-        rows = columns = int(round(math.sqrt(n)))
-        
-        print rows,columns
+# Test sampling distribution
+##def samplefunc(bbox, n):
+##    if True:
+##        w = bbox[2]-bbox[0]
+##        h = bbox[3]-bbox[1]
+##        
+####        aspect_ratio = h/float(w)
+####        columns = math.sqrt(n/float(aspect_ratio))
+####        if not columns.is_integer():
+####            columns += 1
+####        columns = int(round(columns))
+####        rows = n/float(columns)
+####        if not rows.is_integer():
+####            rows += 1
+####        rows = int(round(rows))
+##
+##        rows = columns = int(round(math.sqrt(n)))
+##        
+##        print rows,columns
+##
+##        dx = w / float(columns)
+##        dy = h / float(rows)
+##
+####        r = pg.RasterData(mode='1bit', width=columns, height=rows,
+####                          xscale=dx, yscale=dy, xoffset=bbox[0], yoffset=bbox[2])
+####        r.add_band()
+####        for cell in r.bands[0]:
+####            yield cell.point['coordinates']
+##            
+##        for row in range(rows):
+##            y = bbox[1] + row*dy
+##            y += dy/2.0
+##            for col in range(columns):
+##                x = bbox[0] + col*dx
+##                x += dx/2.0
+##                yield x,y
+##
+##import pyagg
+##c=pyagg.Canvas(1000,500)
+##bbox=0,0,100,100
+##c.custom_space(*bbox)
+##for x,y in samplefunc(bbox, 40):
+##    print x,y
+##    c.draw_circle((x,y))
+##c.view()
+##
+##sdfsdf
 
-        dx = w / float(columns)
-        dy = h / float(rows)
 
-##        r = pg.RasterData(mode='1bit', width=columns, height=rows,
-##                          xscale=dx, yscale=dy, xoffset=bbox[0], yoffset=bbox[2])
-##        r.add_band()
-##        for cell in r.bands[0]:
-##            yield cell.point['coordinates']
-            
-        for row in range(rows):
-            y = bbox[1] + row*dy
-            y += dy/2.0
-            for col in range(columns):
-                x = bbox[0] + col*dx
-                x += dx/2.0
-                yield x,y
-
-import pyagg
-c=pyagg.Canvas(1000,500)
-bbox=0,0,100,100
-c.custom_space(*bbox)
-for x,y in samplefunc(bbox, 40):
-    print x,y
-    c.draw_circle((x,y))
-c.view()
-
-sdfsdf
 
 
 ####################
@@ -396,17 +410,17 @@ pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 print('loading data')
 countries = pg.VectorData("data/ne_10m_admin_0_countries.shp")
 countries.create_spatial_index()
-places = pg.VectorData("data/ne_10m_populated_places.shp")
-places.rename_field('NAME', 'name')
+#places = pg.VectorData("data/ne_10m_populated_places.shp")
+#places.rename_field('NAME', 'name')
 #places = pg.VectorData("data/global_settlement_points_v1.01.shp", encoding='latin')
 #places.rename_field('Name1', 'name')
-places.create_spatial_index()
-##rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
-##rivers.create_spatial_index()
-##urban = pg.VectorData("data/ne_10m_urban_areas.shp") 
-##urban.create_spatial_index()
-##roads = pg.VectorData("data/ne_10m_roads.shp") 
-##roads.create_spatial_index()
+#places.create_spatial_index()
+rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
+rivers.create_spatial_index()
+urban = pg.VectorData("data/ne_10m_urban_areas.shp") 
+urban.create_spatial_index()
+roads = pg.VectorData("data/ne_10m_roads.shp") 
+roads.create_spatial_index()
 
 # options, NEW
 
@@ -443,14 +457,13 @@ alldatas = [
 projections = [None, # lat/lon
                #'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
                #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
-               #'+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
+               '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
                ]
 resolutions = [3000, 2000, 1000, 750] #, 4000]
 imformats = ['png','jpg']
 metas = [{'title':'','legend':False,'arealabels':False}, # nothing
-         {'title':'','legend':False,'arealabels':True}, # area labels
-         {'title':'This is the Map Title','legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes
-         {'title':'This is the Map Title','legend':True,'legendoptions':{'fillcolor':None},'arealabels':False}, # meta boxes, no box
+         {'title':'This is the Map Title','titleoptions':{'fillcolor':None},'legend':True,'legendoptions':{'fillcolor':None},'arealabels':True}, # text noise (arealabels + title + legend)
+         {'title':'This is the Map Title','legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes (title + legend)
          ]
 
 # main process handler
