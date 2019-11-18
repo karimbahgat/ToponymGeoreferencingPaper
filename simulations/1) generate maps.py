@@ -517,7 +517,7 @@ projections = [None, # lat/lon
                ]
 resolutions = [3000, 2000, 1000, 750] #, 4000]
 imformats = ['png','jpg']
-metas = [#'title':'','legend':False,'arealabels':False}, # nothing
+metas = [{'title':'','legend':False,'arealabels':False}, # nothing
          {'title':'This is the Map Title','titleoptions':{'fillcolor':None},'legend':True,'legendoptions':{'fillcolor':None},'arealabels':True}, # text noise (arealabels + title + legend)
          {'title':'This is the Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes (title + legend)
          ]

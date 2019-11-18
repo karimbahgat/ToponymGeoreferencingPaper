@@ -586,8 +586,7 @@ def color_edges(im, colorthresh=10):
     #PIL.Image.fromarray(diff_im).show()
     return diff_im
 
-def image_segments(im):
-    colorthresh = 5
+def image_segments(im, colorthresh=5):
 
     # BOX APPROACH
 
@@ -1344,7 +1343,8 @@ def warp(im, outpath, tiepoints, order):
     for i in range(len(im.mode)):
         bandim = PIL.Image.fromarray(outarr[:,:,i]).convert('L')
         out.add_band(img=bandim)
-    out.save(outpath)
+    if outpath:
+        out.save(outpath)
     return out
 
 def final_controlpoints(tiepoints, residuals, origs, matches, outpath=False):

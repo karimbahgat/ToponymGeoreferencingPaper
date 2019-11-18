@@ -127,7 +127,7 @@ if __name__ == '__main__':
                                    warp_order=ORDER,),
                        )
         p.start()
-        procs.append(p)
+        procs.append((p,time()))
 
         ## exact
         p = mp.Process(target=georeference_exact,
@@ -135,13 +135,16 @@ if __name__ == '__main__':
                                    warp_order=ORDER,),
                        )
         p.start()
-        procs.append(p)
+        procs.append((p,time()))
 
         # Wait in line
         while len(procs) >= maxprocs:
-            for p in procs:
+            for p,t in procs:
                 if not p.is_alive():
-                    procs.remove(p)
+                    procs.remove((p,t))
+                elif time()-t > 300:
+                    p.terminate()
+                    procs.remove((p,t))
 
 
 
