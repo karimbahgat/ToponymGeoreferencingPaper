@@ -4,6 +4,9 @@ import PIL, PIL.Image
 
 
 def warp(im, transform, invtransform, resample='nearest'):
+    if not im.mode == 'RGBA':
+        im = im.convert('RGBA')
+    
     pixels = []
     for row in range(im.size[1]):
         for col in range(im.size[0]):
@@ -40,7 +43,9 @@ def warp(im, transform, invtransform, resample='nearest'):
         
         print 'writing to output'
         # slow, can prob optimize even more by using direct numpy indexing
-        outarr = np.zeros((h, w, len(im.mode)), dtype=np.uint8)
+        # 4 bands, fourth is the alpha, invisible for pixels that were not sampled
+        # currently assumes input image is RGBA only... 
+        outarr = np.zeros((h, w, 4), dtype=np.uint8)
         imw,imh = im.size
         imload = im.load()
         for row in range(h):
@@ -48,7 +53,9 @@ def warp(im, transform, invtransform, resample='nearest'):
                 origcol,origrow = backpred[row,col]
                 origcol,origrow = map(int, (origcol,origrow))
                 if 0 <= origcol < imw and 0 <= origrow < imh:
-                    outarr[row,col,:] = imload[origcol,origrow]
+                    rgba = list(imload[origcol,origrow])
+                    rgba[-1] = 255
+                    outarr[row,col,:] = rgba
 
     else:
         raise ValueError('Unknown resample arg: {}'.format(resample))
