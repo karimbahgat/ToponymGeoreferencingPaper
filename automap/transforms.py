@@ -4,12 +4,14 @@ import numpy as np
 class Polynomial(object):
     
     def __init__(self, order=None, A=None):
-        if A:
+        if A is not None:
             A = np.array(A)
-            if A.shape == [3,3]:
+            if A.shape == (3,3):
                 order = 1
-            elif A.shape == [6,6]:
+            elif A.shape == (6,6):
                 order = 2
+            else:
+                raise ValueError('Matrix A must be shape (3,3), or (6,6); not {}'.format(A.shape))
 
         self.A = A
         self.order = order
