@@ -1352,10 +1352,13 @@ def warp(im, outpath, tiepoints, order):
     pixels,coords = zip(*tiepoints)
     (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
 
-    transform = transforms.Polynomial(order=order)
-    transform.fit(cols,rows,xs,ys)
+    forward = transforms.Polynomial(order=order)
+    forward.fit(cols,rows,xs,ys)
 
-    wim,aff = imwarp.warp(im, transform)
+    backward = transforms.Polynomial(order=order)
+    backward.fit(xs,ys,cols,rows)
+
+    wim,aff = imwarp.warp(im, forward, backward)
     out = pg.RasterData(image=wim, affine=aff)
     
     if outpath:

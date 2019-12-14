@@ -16,7 +16,7 @@ class Polynomial(object):
         self.A = A
         self.order = order
 
-    def fit(self, inx, iny, outx, outy, invert=True):
+    def fit(self, inx, iny, outx, outy):
         # to arrays
         inx = np.array(inx)
         iny = np.array(iny)
@@ -55,21 +55,11 @@ class Polynomial(object):
         # Two first rows of the A matrix are equations for the x and y coordinates, respectively
         A[0,:] = xcoeffs
         A[1,:] = ycoeffs
+
         self.A = A
-
-        # Also invert
-        if invert:
-            if self.order == 1:
-                inv = np.linalg.inv(self.A)
-
-            elif self.order == 2:
-                inv = Polynomial(self.order).fit(outx,outy, inx,iny, invert=False).A
-
-            self.inv = inv
-        
         return self
 
-    def predict(self, x, y, invert=False):
+    def predict(self, x, y):
         # to arrays
         x = np.array(x)
         y = np.array(y)
@@ -97,10 +87,7 @@ class Polynomial(object):
             u = np.array([xx,xy,yy,x,y,ones])
 
         # apply the transform matrix to predict output
-        if invert:
-            predx,predy = self.inv.dot(u)[:2]
-        else:
-            predx,predy = self.A.dot(u)[:2]
+        predx,predy = self.A.dot(u)[:2]
         return predx,predy
 
 

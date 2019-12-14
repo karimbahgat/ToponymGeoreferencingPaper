@@ -4,7 +4,7 @@ import PIL, PIL.Image
 import math
 
 
-def warp(im, transform, resample='nearest'):
+def warp(im, transform, invtransform, resample='nearest'):
     if not im.mode == 'RGBA':
         im = im.convert('RGBA')
 
@@ -66,7 +66,7 @@ def warp(im, transform, resample='nearest'):
                 x = xoff + col*xscale
                 coords.append((x,y))
         xs,ys = zip(*coords)
-        backpredx,backpredy = transform.predict(xs, ys, invert=True)
+        backpredx,backpredy = invtransform.predict(xs, ys)
         backpred = np.column_stack((backpredx, backpredy))
         backpred = backpred.reshape((h,w,2))
         
