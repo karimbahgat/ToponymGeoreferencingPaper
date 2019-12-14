@@ -16,7 +16,7 @@ class Polynomial(object):
         self.A = A
         self.order = order
 
-    def fit(self, inx, iny, outx, outy):
+    def fit(self, inx, iny, outx, outy, invert=False):
         # to arrays
         inx = np.array(inx)
         iny = np.array(iny)
@@ -35,8 +35,17 @@ class Polynomial(object):
             ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
             # A matrix
             A = np.eye(3)
+            # two first rows of the A matrix are equations for the x and y coordinates, respectively
+            A[0,:] = xcoeffs
+            A[1,:] = ycoeffs
+            # get inverse transform by inverting the Matrix
+            if invert:
+                A = np.linalg.inv(A)
             
         elif self.order == 2:
+            # get inverse transform by switching the from and to coords (warning, not an exact inverse bc different lstsq estimation)
+            if invert:
+                inx,iny,outx,outy = outx,outy,inx,iny
             # terms
             x = inx
             y = iny
@@ -51,10 +60,9 @@ class Polynomial(object):
             ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
             # A matrix
             A = np.eye(6)
-
-        # Two first rows of the A matrix are equations for the x and y coordinates, respectively
-        A[0,:] = xcoeffs
-        A[1,:] = ycoeffs
+            # two first rows of the A matrix are equations for the x and y coordinates, respectively
+            A[0,:] = xcoeffs
+            A[1,:] = ycoeffs
 
         self.A = A
         return self
