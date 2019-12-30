@@ -3,7 +3,7 @@ from . import geocode
 from .triangulate import triangulate, triangulate_add
 from .shapematch import normalize
 from .rmse import optimal_rmse, polynomial, predict
-from . import transforms, imwarp
+from . import transforms, accuracy, imwarp
 
 import os
 import itertools
@@ -1252,9 +1252,9 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
 def optimal_warp_order(tiepoints):
     # due to automation and high likelihood of errors, we set higher point threshold for polynomial order
     # compare to gdal: https://github.com/naturalatlas/node-gdal/blob/master/deps/libgdal/gdal/alg/gdal_crs.c#L186
-    if len(tiepoints) >= 20:
-        warp_order = 3
-    elif len(tiepoints) >= 10:
+    #if len(tiepoints) >= 20:
+    #    warp_order = 3
+    if len(tiepoints) >= 10:
         warp_order = 2
     else:
         warp_order = 1
@@ -1348,16 +1348,7 @@ def optimal_warp_order(tiepoints):
 ##        out.save(outpath)
 ##    return out
 
-def warp(im, outpath, tiepoints, order):
-    pixels,coords = zip(*tiepoints)
-    (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
-
-    forward = transforms.Polynomial(order=order)
-    forward.fit(cols,rows,xs,ys)
-
-    backward = transforms.Polynomial(order=order)
-    backward.fit(cols,rows,xs,ys, invert=True)
-
+def warp(im, outpath, forward, backward):
     wim,aff = imwarp.warp(im, forward, backward)
     out = pg.RasterData(image=wim, affine=aff)
     
@@ -1606,30 +1597,56 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     if not warp_order:
         warp_order_auto = optimal_warp_order(tiepoints)
 
-    # exclude outliers
-    if warp_order == 'tps':
-        best_residuals = [None for _ in tiepoints]
-    else:
-        print '\n'+'excluding outliers'
-        frompoints,topoints = zip(*tiepoints)
-        best, best_frompoints, best_topoints, best_residuals = optimal_rmse(warp_order or warp_order_auto, frompoints, topoints, max_residual=max_residual)
-        tiepoints = zip(best_frompoints, best_topoints)
-        print 'RMSE:', best
+    # estimate transforms
+    def estimate_polynomial(tiepoints, order):
+        pixels,coords = zip(*tiepoints)
+        (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
+        forward = transforms.Polynomial(order=order)
+        forward.fit(cols,rows,xs,ys)
+        backward = transforms.Polynomial(order=order)
+        backward.fit(cols,rows,xs,ys, invert=True)
+        return forward,backward
+    forward,backward = estimate_polynomial(tiepoints, warp_order or warp_order_auto)
+
+    # initial rmse
+    def get_rmse(transform, inpoints, outpoints):
+        inx,iny = zip(*inpoints)
+        outx,outy = zip(*outpoints)
+        predx,predy = backward.predict(inx, iny)
+        resids = accuracy.residuals(outx,outy,predx,predy)
+        rmse = accuracy.RMSE(resids)
+        return rmse, resids
+    frompoints,topoints = zip(*tiepoints)
+    rmse,resids = get_rmse(backward, topoints, frompoints)
+    print '{} points, RMSE: {}'.format(len(frompoints), rmse)
+
+    # exclude outliers (in terms of pixels, flipping from/topoints)
+    print '\n'+'excluding outliers'
+    #maxres = max(im.size[0], im.size[1]) / 100.0 * 10 # not more than 10 percent of image
+    topoints,frompoints = accuracy.drop_outliers(backward, topoints, frompoints) #, max_residual=maxres)
+    tiepoints = zip(frompoints, topoints)
+
+    # calculate new rmse
+    rmse,resids = get_rmse(backward, topoints, frompoints)
+    print '{} points, RMSE: {}'.format(len(frompoints), rmse)
 
     # once again, determine transform method after excluding outliers
     if not warp_order:
         warp_order_auto = optimal_warp_order(tiepoints)
 
+    # reestimate transforms
+    order = warp_order or warp_order_auto
+    forward,backward = estimate_polynomial(tiepoints, order)
+
     # warp
     print '\n'+'warping'
-    order = warp_order or warp_order_auto
     print '{} points, warp_method={}'.format(len(tiepoints), order)
     mapp_im = mask_image(im, mapp_poly)
-    warp(mapp_im, outpath, tiepoints, order)
+    warp(mapp_im, outpath, forward, backward)
 
     # final control points
     cppath = os.path.join(outfold, outfil+'_controlpoints.geojson')
-    controlpoints = final_controlpoints(tiepoints, best_residuals, origs, matches, outpath=cppath)
+    controlpoints = final_controlpoints(tiepoints, resids, origs, matches, outpath=cppath)
 
     # draw data onto image
     if debug is True or debug == 'ocr':

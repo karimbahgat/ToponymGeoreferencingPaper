@@ -497,7 +497,7 @@ roads.create_spatial_index()
 
 # options
 print('defining options')
-n = 10 # with 4 extents for each = 40
+n = 25 # with 4 extents for each = 40
 extents = [10] + [50, 1, 0.1] # ca 5000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
 distributions = ['dispersed', 'random'] # IMPROVE W NUMERIC
@@ -515,7 +515,7 @@ projections = [None, # lat/lon
                #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
                '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
                ]
-resolutions = [3000, 2000, 1000, 750] #, 4000]
+resolutions = [3000, 2000, 1000] #, 750] #, 4000]
 imformats = ['png','jpg']
 metas = [{'title':'','legend':False,'arealabels':False}, # nothing
          {'title':'This is the Map Title','titleoptions':{'fillcolor':None},'legend':True,'legendoptions':{'fillcolor':None},'arealabels':True}, # text noise (arealabels + title + legend)
@@ -525,7 +525,7 @@ metas = [{'title':'','legend':False,'arealabels':False}, # nothing
 # main process handler
 if __name__ == '__main__':
 
-    maxprocs = 4
+    maxprocs = 6
     procs = []
 
     print('combinations per region', len(list(itertools.product(quantities,distributions,uncertainties,alldatas,projections,metas,resolutions,imformats))))
@@ -535,7 +535,7 @@ if __name__ == '__main__':
     # zoom regions
     i = 1
     while i < n:
-        center = (uniform(-160,160),uniform(-60,60))
+        center = (uniform(-170,170),uniform(-70,70))
         for extent in extents:
             print('-------')
             print('REGION:',i,center,extent)
