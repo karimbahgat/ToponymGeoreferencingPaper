@@ -1626,10 +1626,6 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     topoints,frompoints = accuracy.drop_outliers(backward, topoints, frompoints) #, max_residual=maxres)
     tiepoints = zip(frompoints, topoints)
 
-    # calculate new rmse
-    rmse,resids = get_rmse(backward, topoints, frompoints)
-    print '{} points, RMSE: {}'.format(len(frompoints), rmse)
-
     # once again, determine transform method after excluding outliers
     if not warp_order:
         warp_order_auto = optimal_warp_order(tiepoints)
@@ -1637,6 +1633,10 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     # reestimate transforms
     order = warp_order or warp_order_auto
     forward,backward = estimate_polynomial(tiepoints, order)
+
+    # calculate new rmse
+    rmse,resids = get_rmse(backward, topoints, frompoints)
+    print '{} points, RMSE: {}'.format(len(frompoints), rmse)
 
     # warp
     print '\n'+'warping'

@@ -22,6 +22,17 @@ class Polynomial(object):
         iny = np.array(iny)
         outx = np.array(outx)
         outy = np.array(outy)
+
+        # auto determine order from number of points
+        if not self.order:
+            # due to automation and high likelihood of errors, we set higher point threshold for polynomial order
+            # compare to gdal: https://github.com/naturalatlas/node-gdal/blob/master/deps/libgdal/gdal/alg/gdal_crs.c#L186
+            #if len(inx) >= 20:
+            #    self.order = 3
+            if len(inx) >= 10:
+                self.order = 2
+            else:
+                self.order = 1
         
         if self.order == 1:
             # terms
