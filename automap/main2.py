@@ -20,7 +20,7 @@ import os
 
 
 
-def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, db=None, source='gns', warp_order=None, max_residual=None, debug=False, **kwargs):
+def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp_order=None, max_residual=None, debug=False, **kwargs):
     start = time.time()
     
     print 'loading image', inpath
@@ -57,7 +57,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     print 'detecting text'
     if textcolor and not isinstance(textcolor, list):
         textcolor = [textcolor]
-    texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh)
+    texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh, textconf=textconf, sample=sample)
     toponym_colors = set((r['color'] for r in texts))
 
     # connect text

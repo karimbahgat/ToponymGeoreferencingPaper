@@ -12,9 +12,9 @@ print 'beginning'
 #automap('testmaps/tunisia_pol_1990.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-automap('testmaps/cameroon_pol98.jpg', textcolor=None, colorthresh=25, textconf=60, db=db)
+#automap('testmaps/cameroon_pol98.jpg', textcolor=None, colorthresh=25, sample=True, textconf=60, db=db)
 #automap('testmaps/cameroon.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.2, db=db, debug=True)
-#automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=None, colorthresh=25, sample=False, textconf=60, db=db)
 
 #automap('testmaps/repcongo.png', textcolor=(120,120,120), colorthresh=25, textconf=60)
 #automap('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[2000,2500,4000,4500])

@@ -273,7 +273,7 @@ def sample_quads(im, tilesize):
     maxtimes = max(twtimes,thtimes)
     maxtimes = max(0, maxtimes-0.5) # round to nearest half
     levels = int(math.sqrt(maxtimes))
-    print 'quad specs',w,h,tw,th,maxtimes,levels
+    #print 'quad specs',w,h,tw,th,maxtimes,levels
 
     # divide image into quad tiles            
     quads = Quad(w/2.0, h/2.0, w, h)

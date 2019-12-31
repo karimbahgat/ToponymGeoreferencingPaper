@@ -214,7 +214,8 @@ def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcan
                     pass # just keep all the results and choose best matching ones
                 else:
                     res = [r for r in res if r['properties']['data']==source]
-                testres.append((nxtname,nxtpos,res))
+                if res:
+                    testres.append((nxtname,nxtpos,res))
                 #time.sleep(0.1)
         except Exception as err:
             print 'EXCEPTION:', err

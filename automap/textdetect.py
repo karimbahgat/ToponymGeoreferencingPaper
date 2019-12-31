@@ -28,13 +28,13 @@ def run_ocr(im, bbox=None):
         
     return drows
 
-def sniff_text_colors(im, samples=15):
+def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
     w,h = im.size
-    sw,sh = 400,400
+    sw,sh = 300,300
     texts = []
     for i,q in enumerate(segmentation.sample_quads(im, (sw,sh))):
-        print '---'
-        print 'sample',i,q
+        #print '---'
+        print '# sample',i,q
         x1,y1,x2,y2 = q.bbox()
         sample = im.crop((x1,y1,x2,y2))
         lab = segmentation.rgb_to_lab(sample)
@@ -45,7 +45,7 @@ def sniff_text_colors(im, samples=15):
         data = run_ocr(lup)
         for text in data:
             #print '---',text
-            if float(text['conf']) > 50 and len(text['text']) >= 5:
+            if float(text['conf']) > 60 and len(text['text']) >= 5:
                 # ignore nontoponyms
                 if not text['text'].replace(' ',''):
                     # empty text
@@ -57,7 +57,7 @@ def sniff_text_colors(im, samples=15):
                     # more than half of characters is uppercase
                     continue
                 # found text
-                print 'FOUND',text
+                #print 'FOUND',text
                 top,left = map(int, (text['top'],text['left']))
                 width,height = map(int, (text['width'],text['height']))
                 textbox = left/2.0,top/2.0,left/2.0+width/2.0,top/2.0+height/2.0
@@ -109,16 +109,17 @@ def sniff_text_colors(im, samples=15):
                 #hist = sorted(hist, key=lambda(c,rgb): -c)
                 #textcol = hist[0][1]
                 
-                print textcol
+                #print textcol
                 texts.append((text['text'],textcol))
-        if i >= 3 and len(texts) > samples:
-            break
+        if i >= 3:
+            if len(texts) >= max_texts or i >= max_samples:
+                break
     textcolors = [t[1] for t in texts]
     textcolors = segmentation.group_colors(textcolors, 20)
-    print 'textcolors detected',textcolors
+    print 'textcolors detected',[(col,len(cols)) for col,cols in textcolors.items()]
     return textcolors
 
-def sample_texts(im, textcolors, samplesize=(400,400), threshold=25):
+def sample_texts(im, textcolors, threshold=25, textconf=60, samplesize=(300,300), max_samples=8, max_texts=10):
     w,h = im.size
     sw,sh = samplesize
     texts = []
@@ -127,8 +128,8 @@ def sample_texts(im, textcolors, samplesize=(400,400), threshold=25):
 ##            print _
 ##            x,y = uniform(0,w-sw),uniform(0,h-sh)
     for i,q in enumerate(segmentation.sample_quads(im, (sw,sh))):
-        print '---'
-        print 'sample',i,q
+        #print '---'
+        print '# sample',i,q
         x1,y1,x2,y2 = q.bbox()
         sample = im.crop((x1,y1,x2,y2))
         # upscale
@@ -175,7 +176,7 @@ def sample_texts(im, textcolors, samplesize=(400,400), threshold=25):
             for text in data:
                 
                 # process text
-                if float(text['conf']) > 50 and len(text['text']) >= 2:
+                if float(text['conf']) > textconf and len(text['text']) >= 2:
                     
                     # clean text
                     text['text_clean'] = re.sub('^\\W+|\\W+$', '', text['text'], flags=re.UNICODE) # strips nonalpha chars from start/end
@@ -216,13 +217,14 @@ def sample_texts(im, textcolors, samplesize=(400,400), threshold=25):
                     texts.append(text)
 
         print 'texts',len(texts)
-        if i >= 3 and len(texts) > 30:
-            break
+        if i >= 3:
+            if len(texts) >= max_texts or i >= max_samples:
+                break
                 
     return texts
 
 
-def extract_texts(im, textcolors, threshold=25):
+def extract_texts(im, textcolors, threshold=25, textconf=60):
     # extract from entire image
     w,h = im.size
     texts = []
@@ -272,7 +274,7 @@ def extract_texts(im, textcolors, threshold=25):
         for text in data:
             
             # process text
-            if float(text['conf']) > 50 and len(text['text']) >= 2:
+            if float(text['conf']) > textconf and len(text['text']) >= 2:
                 
                 # clean text
                 text['text_clean'] = re.sub('^\\W+|\\W+$', '', text['text'], flags=re.UNICODE) # strips nonalpha chars from start/end
@@ -303,9 +305,10 @@ def extract_texts(im, textcolors, threshold=25):
 
     return texts
 
-def auto_detect_text(im, textcolors=None, sample=False, colorthresh=25):
+def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=False, max_samples=8, max_texts=10, max_sniff_samples=8, max_sniff_texts=5):
     if not textcolors:
-        textcolors = sniff_text_colors(im)
+        print 'sniffing text colors'
+        textcolors = sniff_text_colors(im, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
         #segmentation.view_colors(textcolors)
     
     # compare with just luminance
@@ -335,9 +338,9 @@ def auto_detect_text(im, textcolors=None, sample=False, colorthresh=25):
 
     # sample text detection
     if sample:
-        texts = sample_texts(im, textcolors, threshold=colorthresh)
+        texts = sample_texts(im, textcolors, threshold=colorthresh, textconf=textconf, max_samples=max_samples, max_texts=max_texts)
     else:
-        texts = extract_texts(im, textcolors, threshold=colorthresh)
+        texts = extract_texts(im, textcolors, threshold=colorthresh, textconf=textconf)
     
 ##    for t in texts:
 ##        print t
