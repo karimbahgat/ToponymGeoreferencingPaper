@@ -136,11 +136,13 @@ def edge_filter(im):
     return edges
 
 def close_edge_gaps(im):
-    grow = ImageMorph.MorphOp(op_name='dilation8')
+    grow = ImageMorph.MorphOp(op_name='dilation4')
     changes,im = grow.apply(im)
+    #changes,im = grow.apply(im)
     
-    shrink = ImageMorph.MorphOp(op_name='erosion8')
+    shrink = ImageMorph.MorphOp(op_name='erosion4')
     changes,im = shrink.apply(im)
+    #changes,im = shrink.apply(im)
 
     return im
 

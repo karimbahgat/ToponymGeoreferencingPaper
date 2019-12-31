@@ -1,22 +1,21 @@
 
 print 'importing libs'
 
-from automap.main2 import automap
-from automap.main import automap as automap_old
+from automap.main import automap
 
 db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
 
 print 'beginning'
 
-#automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, db=db, debug=True)
+automap('testmaps/burkina.jpg', textcolor=None, sample=True, db=db)
 #automap('testmaps/tunisia_pol_1990.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-#automap('testmaps/cameroon_pol98.jpg', textcolor=None, colorthresh=25, sample=True, textconf=60, db=db)
+#automap('testmaps/cameroon_pol98.jpg', textcolor=None, sample=True, db=db)
 #automap('testmaps/cameroon.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.2, db=db, debug=True)
-automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=None, colorthresh=25, sample=False, textconf=60, db=db)
+#automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=None, colorthresh=25, sample=False, textconf=60, db=db)
 
-#automap('testmaps/repcongo.png', textcolor=(120,120,120), colorthresh=25, textconf=60)
+#automap('testmaps/repcongo.png', textcolor=None, db=db) #(120,120,120))
 #automap('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[2000,2500,4000,4500])
 #automap('testmaps/gmaps.png', textcolor=(80,80,80), colorthresh=25, textconf=60)
 #automap('testmaps/brazil_pol_1981.gif', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.4)
