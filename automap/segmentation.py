@@ -36,9 +36,17 @@ def color_difference(im, color):
     
     difftable = dict(list(zip(colors,diffs)))
     diff_im = np.zeros((im.height,im.width))
+    im_arr_idx = im_arr.dot(np.array([1, 256, 65536])) #im_arr[:,:,0] + (im_arr[:,:,1]*256) + (im_arr[:,:,2]*256*256)
     for col,diff in difftable.items():
         #print col
-        diff_im[(im_arr[:,:,0]==col[0])&(im_arr[:,:,1]==col[1])&(im_arr[:,:,2]==col[2])] = diff # 3 lookup is slow
+        
+        #diff_im[(im_arr[:,:,0]==col[0])&(im_arr[:,:,1]==col[1])&(im_arr[:,:,2]==col[2])] = diff # 3 lookup is slow
+
+        #wherecolor = (im_arr==col).all(axis=2) 
+        #diff_im[wherecolor] = diff
+
+        wherecolor = im_arr_idx == (col[0] + (col[1]*256) + (col[2]*256*256))
+        diff_im[wherecolor] = diff
 
     return diff_im
 
