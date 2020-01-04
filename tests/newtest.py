@@ -7,10 +7,10 @@ db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
 
 print 'beginning'
 
-automap('testmaps/burkina.jpg', textcolor=None, sample=False, db=db)
-#automap('testmaps/tunisia_pol_1990.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/burkina.jpg', textcolor=None, sample=False, db=db)
+#automap('testmaps/tunisia_pol_1990.jpg', textcolor=None, db=db)
 #automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-#automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/nepal_pol90.jpg', textcolor=None, db=db)
 #automap('testmaps/cameroon_pol98.jpg', textcolor=(0,0,0), sample=False, db=db)
 #automap('testmaps/cameroon.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.2, db=db, debug=True)
 #automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=None, colorthresh=25, sample=False, textconf=60, db=db)
@@ -24,7 +24,7 @@ automap('testmaps/burkina.jpg', textcolor=None, sample=False, db=db)
 #automap('testmaps/vietnam_pol92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
 #automap('testmaps/vietnam_admin92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
 #automap('testmaps/nigeria_econ_1979.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60, max_residual=0.5)
-#automap('testmaps/nigeria_crops.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60, max_residual=0.5)
+automap('testmaps/nigeria_crops.jpg', textcolor=None, db=db)
 #automap('testmaps/nigeria_linguistic_1979.jpg', textcolor=(50,50,50), colorthresh=35, textconf=60, max_residual=0.5)
 
 #automap('testmaps/namibia_homelands_78.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)

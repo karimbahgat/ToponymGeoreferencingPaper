@@ -37,6 +37,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
 
     ################
+    # Image partitioning
     
     # partition image
     print 'image segmentation'
@@ -45,6 +46,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
 
     ###############
+    # Text detection
 
     # remove unwanted parts of image
     text_im = im
@@ -61,6 +63,9 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh, textconf=textconf, sample=sample)
     toponym_colors = set((r['color'] for r in texts))
 
+    # deduplicate overlapping texts from different colors
+    # ...
+
     # connect text
     print '(connecting texts)'
     grouped = []
@@ -68,6 +73,9 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
         coltexts = [r for r in texts if r['color'] == col]
         grouped.extend( textgroup.connect_text(coltexts) )
     texts = grouped
+
+    # ignore small texts?
+    texts = [text for text in texts if len(text['text_clean']) >= 3]
 
     # text anchor points
     print 'determening text anchors'
@@ -88,6 +96,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     
 
     ###############
+    # Control point matching
 
     # find matches
     print 'finding matches'
@@ -101,6 +110,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
 
     #################
+    # Transformation
 
     def estimate_polynomial(tiepoints, order):
         pixels,coords = zip(*tiepoints)
@@ -146,6 +156,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
 
     #################
+    # Warping
 
     def final_controlpoints(tiepoints, residuals, origs, matches, outpath=False):
         controlpoints = []

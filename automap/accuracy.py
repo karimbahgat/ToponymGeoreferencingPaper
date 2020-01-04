@@ -3,6 +3,33 @@ import numpy as np
 import math
 
 
+def predict_gcps(transform, inpoints, outpoints):
+    inx,iny = zip(*inpoints)
+    outx,outy = zip(*outpoints)
+    predx,predy = transform.predict(inx,iny)
+    return outpoints, zip(predx, predy)
+
+def predict_loo(transform, inpoints, outpoints):
+    # leave-one-out and reestimate bootstrap method
+    predpoints = []
+    for inpoint,outpoint in zip(inpoints, outpoints):
+        # remove gcp and reestimate transform
+        _inpoints = list(inpoints)
+        _inpoints.remove(inpoint)
+        _outpoints = list(outpoints)
+        _outpoints.remove(outpoint)
+
+        inx,iny = zip(*_inpoints)
+        outx,outy = zip(*_outpoints)
+        transform.fit(inx, iny, outx, outy)
+
+        # calc err bw observed outpoint and predicted outpoint
+        inx,iny = inpoint
+        outx,outy = outpoint
+        predx,predy = transform.predict([inx], [iny])
+        predpoints.append((predx[0], predx[1]))
+    return outpoints, predpoints
+
 def residuals(inx, iny, outx, outy, distance='eucledian'):
     # to arrays
     inx = np.array(inx)
@@ -34,90 +61,63 @@ def residuals(inx, iny, outx, outy, distance='eucledian'):
 
     return resids
 
-##def refine_leave_one_out(inx, iny, outx, outy, metric):
-##    # leave one residual out at a time, drop the one that improves accuracy the most
-##    acc = metric(residuals)
-##    for res in residuals:
-##        resids = list(residuals)
-##        resids.pop(res)
-##        acc = metric(residuals)
-##        ...
-
-##def refine_residuals(residuals):
-##    # or maybe based on transformer, plus all gcps...
-##    # eg: forward, backward, frompoints, topoints, max_residual=0.1, min_points=3
-##    x = residuals
-##    def diststats(x):
-##        mean = sum(x) / float(len(x))
-##        sqdev = [(v-mean)**2 for v in x]
-##        stdev = math.sqrt(sum(sqdev)/float(len(x)))
-##        return mean,stdev
-##    def dropoutliers(x, mean, stdev):
-##        return [v for v in x if mean-stdev*2 < v < mean+stdev*2]
-##    mean,stdev = diststats(x)
-##    x = dropoutliers(x)
-##    return x
-
-def drop_outliers(transform, inpoints, outpoints, max_residual=None, geodesic=False):
-    inx,iny = zip(*inpoints)
-    outx,outy = zip(*outpoints)
-    predx,predy = transform.predict(inx,iny)
-    if geodesic:
-        resids = residuals(outx,outy,predx,predy,'geodesic')
-    else:
-        resids = residuals(outx,outy,predx,predy)
-
-    # calculate residual stats
-    def diststats(vals):
-        mean = sum(vals) / float(len(vals))
-        sqdev = [(v-mean)**2 for v in vals]
-        stdev = math.sqrt(sum(sqdev)/float(len(vals)))
-        return mean,stdev
-    mean,stdev = diststats(resids)
-    
-    # drop bad points with bad residuals
-    inpoints_new = []
-    outpoints_new = []
-    for i in range(len(inpoints)):
-        resid = resids[i]
-        if mean-stdev*2 < resid < mean+stdev*2:
-            if max_residual and resid > max_residual:
-                continue
-            inpoints_new.append(inpoints[i])
-            outpoints_new.append(outpoints[i])
-            
-    return inpoints_new, outpoints_new
-
-##def drop_gcps_stdev(resids):
-##    # returns indexes of the resids to drop
-##    
+##def drop_outliers(transform, inpoints, outpoints, max_residual=None, geodesic=False):
+##    inx,iny = zip(*inpoints)
+##    outx,outy = zip(*outpoints)
+##    predx,predy = transform.predict(inx,iny)
+##    if geodesic:
+##        resids = residuals(outx,outy,predx,predy,'geodesic')
+##    else:
+##        resids = residuals(outx,outy,predx,predy)
+##
 ##    # calculate residual stats
-##    def diststats(x):
-##        mean = sum(x) / float(len(x))
-##        sqdev = [(v-mean)**2 for v in x]
-##        stdev = math.sqrt(sum(sqdev)/float(len(x)))
+##    def diststats(vals):
+##        mean = sum(vals) / float(len(vals))
+##        sqdev = [(v-mean)**2 for v in vals]
+##        stdev = math.sqrt(sum(sqdev)/float(len(vals)))
 ##        return mean,stdev
 ##    mean,stdev = diststats(resids)
 ##    
 ##    # drop bad points with bad residuals
-##    drop = []
-##    for i,resid in enumerate(resids):
-##        if not mean-stdev*2 < resid < mean+stdev*2:
-##            drop.append(i)
+##    inpoints_new = []
+##    outpoints_new = []
+##    for i in range(len(inpoints)):
+##        resid = resids[i]
+##        if mean-stdev*2 < resid < mean+stdev*2:
+##            if max_residual and resid > max_residual:
+##                continue
+##            inpoints_new.append(inpoints[i])
+##            outpoints_new.append(outpoints[i])
 ##            
-##    return drop
+##    return inpoints_new, outpoints_new
+
+
+# metrics
 
 def RMSE(residuals):
-    # root mean square error
-    return math.sqrt( (residuals**2).sum() / residuals.shape[0] )
+    return math.sqrt( (residuals**2).sum() / float(residuals.shape[0]) )
 
 def MAE(residuals):
-    # mean absolute error
-    return abs(residuals).sum() / residuals.shape[0]
+    return abs(residuals).sum() / float(residuals.shape[0])
 
-##def LOO(residuals):
-##    # leave-one-out bootstrap method to calculate error
-##    pass
+##def RMSE(transform, inpoints, outpoints):
+##    # root mean square error
+##    inx,iny = zip(*inpoints)
+##    outx,outy = zip(*outpoints)
+##    predx,predy = transform.predict(inx,iny)
+##    resids = residuals(outx, outy, predx, predy)
+##    err = math.sqrt( (residuals**2).sum() / residuals.shape[0] )
+##    return err, resids
+
+##def MAE(transform, inpoints, outpoints):
+##    # mean absolute error
+##    inx,iny = zip(*inpoints)
+##    outx,outy = zip(*outpoints)
+##    predx,predy = transform.predict(inx,iny)
+##    resids = residuals(outx, outy, predx, predy)
+##    err = abs(residuals).sum() / residuals.shape[0]
+##    return err, resids
+
 
 
 

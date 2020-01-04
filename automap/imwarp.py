@@ -20,20 +20,28 @@ def warp(im, transform, invtransform, resample='nearest'):
     print 'calculating coordinate bounds'
     pixels = []
     imw,imh = im.size
-    
-    # get top and bottom edges
-    for row in [0, imh+1]: # +1 to incl bottom of last row
-        for col in range(0, imw+1, imw//20): # +1 to incl right of last column, ca 20 points along
-            pixels.append((col,row))
 
-    # get left and right edges
-    for col in [0, imw+1]: # +1 to incl right of last column
-        for row in range(0, imh+1, imh//20): # +1 to incl bottom of last row, ca 20 points along
+    # get all pixels
+    for row in range(0, imh+1):
+        for col in range(0, imw+1):
             pixels.append((col,row))
+    
+##    # get top and bottom edges
+##    for row in [0, imh+1]: # +1 to incl bottom of last row
+##        for col in range(0, imw+1, imw//20): # +1 to incl right of last column, ca 20 points along
+##            pixels.append((col,row))
+##
+##    # get left and right edges
+##    for col in [0, imw+1]: # +1 to incl right of last column
+##        for row in range(0, imh+1, imh//20): # +1 to incl bottom of last row, ca 20 points along
+##            pixels.append((col,row))
+
     cols,rows = zip(*pixels)
 
     # transform and get bounds
     predx,predy = transform.predict(cols, rows)
+    predx = predx[~np.isnan(predx)]
+    predy = predy[~np.isnan(predy)]
     xmin,ymin,xmax,ymax = predx.min(), predy.min(), predx.max(), predy.max()
 
     # TODO: maybe walk along output edges and backwards transform
@@ -79,6 +87,8 @@ def warp(im, transform, invtransform, resample='nearest'):
         for row in range(h):
             for col in range(w):
                 origcol,origrow = backpred[row,col]
+                if math.isnan(origcol) or math.isnan(origrow):
+                    continue
                 origcol,origrow = int(math.floor(origcol)), int(math.floor(origrow))
                 if 0 <= origcol < imw and 0 <= origrow < imh:
                     rgba = list(imload[origcol,origrow])
