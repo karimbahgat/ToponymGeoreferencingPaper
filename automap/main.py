@@ -20,7 +20,7 @@ import os
 
 
 
-def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp_order=None, max_residual=None, debug=False, **kwargs):
+def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
     start = time.time()
     
     print 'loading image', inpath
@@ -112,46 +112,44 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     #################
     # Transformation
 
-    def estimate_polynomial(tiepoints, order):
-        pixels,coords = zip(*tiepoints)
-        (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
-        forward = transforms.Polynomial(order=order)
-        forward.fit(cols,rows,xs,ys)
-        backward = transforms.Polynomial(order=order)
-        backward.fit(cols,rows,xs,ys, invert=True)
-        return forward,backward
-
-    def get_rmse(transform, inpoints, outpoints):
-        inx,iny = zip(*inpoints)
-        outx,outy = zip(*outpoints)
-        predx,predy = backward.predict(inx, iny)
-        resids = accuracy.residuals(outx,outy,predx,predy)
-        rmse = accuracy.RMSE(resids)
-        return rmse, resids
-
-    # estimate transforms
-    forward,backward = estimate_polynomial(tiepoints, warp_order)
+    # setup
+    trans = transforms.Polynomial(order=warp_order)
+    if residual_type == 'geographic':
+        invert = False
+        distance = 'geodesic'
+    elif residual_type == 'pixels':
+        invert = True
+        distance = 'eucledian'
+    else:
+        raise ValueError
+    pixels,coords = zip(*tiepoints)
 
     # initial rmse
-    frompoints,topoints = zip(*tiepoints)
-    rmse,resids = get_rmse(backward, topoints, frompoints)
-    print '{} points, RMSE: {}'.format(len(frompoints), rmse)
+    err,resids = accuracy.model_accuracy(trans, pixels, coords,
+                                         leave_one_out=True,
+                                         invert=invert, distance=distance,
+                                         accuracy='rmse')
+    print '{} points, RMSE: {}'.format(len(pixels), err)
 
-    # drop outliers (in terms of pixels, flipping from/topoints)
-    print '\n'+'excluding outliers'
-    if max_residual == 'auto':
-        maxres = max(im.size[0], im.size[1]) / 100.0 * 10 # not more than 10 percent of image
-    else:
-        maxres = None
-    topoints,frompoints = accuracy.drop_outliers(backward, topoints, frompoints, max_residual=maxres)
-    tiepoints = zip(frompoints, topoints)
+    # enforce some minimum residual? 
+    # ... 
 
-    # reestimate transforms
-    forward,backward = estimate_polynomial(tiepoints, warp_order)
+    # auto drop points that best improve model
+    trans, pixels, coords, err, resids = accuracy.auto_drop_models(trans, pixels, coords,
+                                                                 improvement_ratio=0.10,
+                                                                 minpoints=None,
+                                                                 leave_one_out=True,
+                                                                 invert=invert, distance=distance,
+                                                                 accuracy='rmse')
+    tiepoints = zip(pixels, coords)
+    print '{} points, RMSE: {}'.format(len(pixels), err)
 
-    # calculate new rmse
-    rmse,resids = get_rmse(backward, topoints, frompoints)
-    print '{} points, RMSE: {}'.format(len(frompoints), rmse)
+    # estimate final forward and backward transforms for image warping
+    (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
+    forward = trans.copy()
+    forward.fit(cols,rows,xs,ys)
+    backward = trans.copy()
+    backward.fit(cols,rows,xs,ys, invert=True)
 
 
 
@@ -177,7 +175,7 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
 
     # warp
     print '\n'+'warping'
-    print '{} points, warp_method={}'.format(len(tiepoints), forward.order)
+    print '{} points, warp_method={}'.format(len(tiepoints), forward)
     if mapp_poly is not None:
         mapp_im = segmentation.mask_image(im.convert('RGBA'), mapp_poly) # map region
     else:

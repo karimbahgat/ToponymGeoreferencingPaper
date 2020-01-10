@@ -16,6 +16,12 @@ class Polynomial(object):
 
         self.A = A
         self.order = order
+        self.minpoints = {1:3, 2:6, 3:9}.get(order, 3) # minimum 3 if order not set
+
+    def copy(self):
+        new = Polynomial(order=self.order, A=self.A)
+        new.minpoints = self.minpoints
+        return new
 
     def fit(self, inx, iny, outx, outy, invert=False):
         # to arrays
@@ -34,6 +40,8 @@ class Polynomial(object):
                 self.order = 2
             else:
                 self.order = 1
+            # update minpoints
+            self.minpoints = {1:3, 2:6, 3:9}[self.order] 
         
         if self.order == 1:
             # terms
@@ -116,7 +124,14 @@ class TIN:
     def __init__(self):
         '''Creates a triangulated irregular network (TIN) between control points
         and does a global affine transform within each triangle'''
-        pass
+        self.tris = []
+        self.minpoints = 3 # at least one triangle/affine
+
+    def copy(self):
+        new = TIN()
+        new.tris = list(self.tris)
+        new.minpoints = self.minpoints
+        return new
 
     def fit(self, inx, iny, outx, outy, invert=False):
         # to arrays

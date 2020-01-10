@@ -2,45 +2,20 @@
 import numpy as np
 import math
 
+# residuals
 
-def predict_gcps(transform, inpoints, outpoints):
-    inx,iny = zip(*inpoints)
-    outx,outy = zip(*outpoints)
-    predx,predy = transform.predict(inx,iny)
-    return outpoints, zip(predx, predy)
-
-def predict_loo(transform, inpoints, outpoints):
-    # leave-one-out and reestimate bootstrap method
-    predpoints = []
-    for inpoint,outpoint in zip(inpoints, outpoints):
-        # remove gcp and reestimate transform
-        _inpoints = list(inpoints)
-        _inpoints.remove(inpoint)
-        _outpoints = list(outpoints)
-        _outpoints.remove(outpoint)
-
-        inx,iny = zip(*_inpoints)
-        outx,outy = zip(*_outpoints)
-        transform.fit(inx, iny, outx, outy)
-
-        # calc err bw observed outpoint and predicted outpoint
-        inx,iny = inpoint
-        outx,outy = outpoint
-        predx,predy = transform.predict([inx], [iny])
-        predpoints.append((predx[0], predx[1]))
-    return outpoints, predpoints
-
-def residuals(inx, iny, outx, outy, distance='eucledian'):
+def distances(obsx, obsy, predx, predy, metric='eucledian'):
     # to arrays
-    inx = np.array(inx)
-    iny = np.array(iny)
-    outx = np.array(outx)
-    outy = np.array(outy)
-    
-    if distance == 'eucledian':
+    obsx = np.array(obsx)
+    obsy = np.array(obsy)
+    predx = np.array(predx)
+    predy = np.array(predy)
+
+    # calc distances
+    if metric == 'eucledian':
         # eucledian distances
-        resids = np.sqrt((inx - outx)**2 + (iny - outy)**2)
-    elif distance == 'geodesic':
+        resids = np.sqrt((predx - obsx)**2 + (predy - obsy)**2)
+    elif metric == 'geodesic':
         # geodesic is geodesic distance between lat-lon coordinates
         def haversine(lon1, lat1, lon2, lat2):
             """
@@ -57,9 +32,163 @@ def residuals(inx, iny, outx, outy, distance='eucledian'):
             c = 2 * np.arcsin(np.sqrt(a)) 
             km = 6367 * c
             return km
-        resids = haversine(inx, iny, outx, outy)
+        resids = haversine(predx, predy, obsx, obsy)
 
     return resids
+
+def residuals(transform, inpoints, outpoints, invert=False, distance='eucledian'):
+    # fit
+    inx,iny = zip(*inpoints)
+    outx,outy = zip(*outpoints)
+    transform.fit(inx, iny, outx, outy, invert=invert)
+    
+    # residual is difference bw model prediction and observed output
+    if invert:
+        outx,outy = zip(*outpoints)
+        predx,predy = transform.predict(outx,outy)
+    else:
+        inx,iny = zip(*inpoints)
+        predx,predy = transform.predict(inx,iny)
+
+    # determine observed reference points
+    if invert:
+        obsx,obsy = zip(*inpoints) # inpoints are the ones being compared
+    else:
+        obsx,obsy = zip(*outpoints) # outpoints are the ones being compared
+
+    # calc distances
+    resids = distances(obsx, obsy, predx, predy, distance)
+
+    return resids
+
+def loo_residuals(transform, inpoints, outpoints, invert=False, distance='eucledian'):
+    # leave-one-out bootstrap method (out of sample)
+    # residual is difference bw predicted point when refitting the model without each point
+    predpoints = []
+    for inpoint,outpoint in zip(inpoints, outpoints):
+        # remove gcp and reestimate transform
+        _inpoints = list(inpoints)
+        _inpoints.remove(inpoint)
+        _outpoints = list(outpoints)
+        _outpoints.remove(outpoint)
+
+        inx,iny = zip(*_inpoints)
+        outx,outy = zip(*_outpoints)
+        transform.fit(inx, iny, outx, outy, invert=invert)
+
+        # calc err bw observed outpoint and predicted outpoint (in sample)
+        if invert:
+            outx,outy = outpoint
+            predx,predy = transform.predict([outx], [outy])
+        else:
+            inx,iny = inpoint
+            predx,predy = transform.predict([inx], [iny])
+        predpoints.append((predx[0], predy[0]))
+
+    # predicted points
+    predx,predy = zip(*predpoints)
+
+    # determine observed reference points
+    if invert:
+        obsx,obsy = zip(*inpoints) # inpoints are the ones being compared
+    else:
+        obsx,obsy = zip(*outpoints) # outpoints are the ones being compared
+
+    # calc distances
+    resids = distances(obsx, obsy, predx, predy, distance)
+
+    return resids
+
+
+# accuracy
+def model_accuracy(trans, inpoints, outpoints, leave_one_out=False, invert=False, distance=None, accuracy='rmse'):
+    # convenience function
+    resfunc = loo_residuals if leave_one_out else residuals
+    resids = resfunc(trans, inpoints, outpoints, invert, distance) 
+
+    accfunc = {'rmse':RMSE, 'mae':MAE}[accuracy.lower()]
+    err = accfunc(resids)
+
+    return err, resids
+
+
+# auto refinement
+
+def drop_worst_model(trans, inpoints, outpoints, leave_one_out=False, invert=False, distance=None, accuracy='rmse'):
+    inpoints = list(inpoints)
+    outpoints = list(outpoints)
+    trans = trans.copy()
+    
+    # remove one at a time
+    errs = []
+    for inp,outp in zip(inpoints,outpoints):
+        _inpoints = list(inpoints)
+        _inpoints.remove(inp)
+        _outpoints = list(outpoints)
+        _outpoints.remove(outp)
+
+        err,resids = model_accuracy(trans, _inpoints, _outpoints, leave_one_out=leave_one_out, invert=invert, distance=distance, accuracy=accuracy)
+        
+        errs.append((inp,outp,err,resids))
+
+    # drop the gcp leading to lowest error if dropped
+    inp,outp,err,resids = sorted(errs, key=lambda(i,o,e,r): e)[0] 
+    inpoints.remove(inp)
+    outpoints.remove(outp)
+
+    # refit model with remaining points before returning
+    inx,iny = zip(*inpoints)
+    outx,outy = zip(*outpoints)
+    trans.fit(inx, iny, outx, outy, invert=invert)
+    
+    return trans, inpoints, outpoints, err, resids
+
+def auto_drop_models(trans, inpoints, outpoints, improvement_ratio=0.10, minpoints=None, leave_one_out=False, invert=False, distance=None, accuracy='rmse'):
+    _inpoints = list(inpoints)
+    _outpoints = list(outpoints)
+    trans = trans.copy()
+    seq = []
+
+    # determine minimum points
+    minpoints = minpoints or trans.minpoints
+    minpoints = max(minpoints, trans.minpoints)
+
+    # initial error
+    err,resids = model_accuracy(trans, _inpoints, _outpoints,
+                                leave_one_out, invert, distance, accuracy)
+    seq.append((trans, _inpoints, _outpoints, err, resids))
+    print 'init error',err
+
+    # auto refine improvement threshold or minpoints
+    while len(_inpoints) > minpoints: #for _ in range(len(inpoints)-trans.minpoints):
+        print len(_inpoints)
+        _trans,_inpoints,_outpoints,_err,_resids = drop_worst_model(trans, _inpoints, _outpoints,
+                                                                    leave_one_out, invert, distance, accuracy)
+        print 'new error',_err
+        
+        _preverr = seq[-1][-2]
+        impr = (_err-_preverr)/float(_preverr)
+        if impr > -improvement_ratio:
+            # no longer improving, exit
+            break
+
+        seq.append((_trans,_inpoints,_outpoints,_err,_resids))
+
+    # refit model
+    _trans,_inpoints,_outpoints,_err,_resids = seq[-1]
+    inx,iny = zip(*_inpoints)
+    outx,outy = zip(*_outpoints)
+    _trans.fit(inx, iny, outx, outy, invert=invert)
+
+    # should we return list of errors and points?
+    # ...
+
+    return _trans, _inpoints, _outpoints, _err, _resids
+
+
+##def drop_worst_residual():
+##    raise NotImplemented()
+
 
 ##def drop_outliers(transform, inpoints, outpoints, max_residual=None, geodesic=False):
 ##    inx,iny = zip(*inpoints)
@@ -100,23 +229,8 @@ def RMSE(residuals):
 def MAE(residuals):
     return abs(residuals).sum() / float(residuals.shape[0])
 
-##def RMSE(transform, inpoints, outpoints):
-##    # root mean square error
-##    inx,iny = zip(*inpoints)
-##    outx,outy = zip(*outpoints)
-##    predx,predy = transform.predict(inx,iny)
-##    resids = residuals(outx, outy, predx, predy)
-##    err = math.sqrt( (residuals**2).sum() / residuals.shape[0] )
-##    return err, resids
 
-##def MAE(transform, inpoints, outpoints):
-##    # mean absolute error
-##    inx,iny = zip(*inpoints)
-##    outx,outy = zip(*outpoints)
-##    predx,predy = transform.predict(inx,iny)
-##    resids = residuals(outx, outy, predx, predy)
-##    err = abs(residuals).sum() / residuals.shape[0]
-##    return err, resids
+
 
 
 

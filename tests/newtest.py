@@ -24,7 +24,7 @@ print 'beginning'
 #automap('testmaps/vietnam_pol92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
 #automap('testmaps/vietnam_admin92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
 #automap('testmaps/nigeria_econ_1979.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60, max_residual=0.5)
-automap('testmaps/nigeria_crops.jpg', textcolor=None, db=db)
+#automap('testmaps/nigeria_crops.jpg', textcolor=None, db=db)
 #automap('testmaps/nigeria_linguistic_1979.jpg', textcolor=(50,50,50), colorthresh=35, textconf=60, max_residual=0.5)
 
 #automap('testmaps/namibia_homelands_78.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
@@ -37,7 +37,7 @@ automap('testmaps/nigeria_crops.jpg', textcolor=None, db=db)
 # difficult
 #automap('testmaps/2113087.jpg', textcolor=(120,120,120), colorthresh=25, textconf=60, bbox=[1000,1000,2000,2000])
 #automap('testmaps/txu-oclc-6654394-nb-30-4th-ed.jpg', textcolor=(50,50,50), colorthresh=25, textconf=90, bbox=[3000,1500,4000,2500])
-#automap('testmaps/ierland-toeristische-attracties-kaart.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
+automap('testmaps/ierland-toeristische-attracties-kaart.jpg', textcolor=None, db=db)
 #automap('testmaps/brazil_pop_1977.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60, max_residual=0.6)
 #automap('testmaps/brazil_land_1977.jpg', textcolor=None, db=db) #(50,50,50))
 #automap('testmaps/egypt_admn97.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
