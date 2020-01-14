@@ -74,9 +74,22 @@ def georeference_exact(fil, warp_order):
     print('exact georeferencing based on original placename coordinates')
     t=time()
     im = PIL.Image.open(fil)
+    
     places = pg.VectorData('{}_placenames.geojson'.format(fil_root))
     tiepoints = [((f['col'],f['row']),(f['x'],f['y'])) for f in places]
-    warped = mapfit.main.warp(im, '{}_georeferenced_exact.tif'.format(fil_root), tiepoints, order=warp_order)
+    pixels,coords = zip(*tiepoints)
+    (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
+    trans = mapfit.transforms.Polynomial(order=warp_order)
+    forward = trans.copy()
+    forward.fit(cols,rows,xs,ys)
+    backward = trans.copy()
+    backward.fit(cols,rows,xs,ys, invert=True)
+
+    wim,aff = mapfit.imwarp.warp(im, forward, backward) # warp
+    warped = pg.RasterData(image=wim, affine=aff) # to geodata
+    warped.save('{}_georeferenced_exact.tif'.format(fil_root))
+    
+    #warped = mapfit.main.warp(im, '{}_georeferenced_exact.tif'.format(fil_root), tiepoints, order=warp_order)
     #gcps = [('',oc,'',mc,[]) for oc,mc in tiepoints]
     #mapfit.main.debug_warped('maps/test_georeferenced.tif', 'maps/test_debug_warp.png', gcps)
 
@@ -121,9 +134,9 @@ if __name__ == '__main__':
         ## auto
         p = mp.Process(target=georeference_auto,
                        kwargs=dict(fil='maps/{}'.format(fil),
-                                   db="data/gazetteers.db",
+                                   db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db", #"data/gazetteers.db",
                                    source='best',
-                                   textcolor=(0,0,0),
+                                   textcolor=None,
                                    warp_order=ORDER,),
                        )
         p.start()

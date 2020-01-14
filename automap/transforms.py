@@ -18,6 +18,9 @@ class Polynomial(object):
         self.order = order
         self.minpoints = {1:3, 2:6, 3:9}.get(order, 3) # minimum 3 if order not set
 
+    def __repr__(self):
+        return u'Polynomial Transform(order={}, estimated={})'.format(self.order, self.A is not None)
+
     def copy(self):
         new = Polynomial(order=self.order, A=self.A)
         new.minpoints = self.minpoints
@@ -126,6 +129,9 @@ class TIN:
         and does a global affine transform within each triangle'''
         self.tris = []
         self.minpoints = 3 # at least one triangle/affine
+
+    def __repr__(self):
+        return u'TIN Transform(estimated={})'.format(bool(self.tris))
 
     def copy(self):
         new = TIN()
