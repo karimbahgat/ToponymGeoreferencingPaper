@@ -264,17 +264,20 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     # then transforms
     # NOTE: metadata reports only RMSE error type with leave_one_out=True, maybe allow user customizing this? 
     if invert:
-        ferr,fresids = err,resids # already calculated
-        berr,bresids = accuracy.model_accuracy(trans, pixels, coords,
-                                             leave_one_out=True,
-                                             invert=True, distance='geodesic',
-                                             accuracy='rmse')
-    else:
-        berr,bresids = err,resids # already calculated
+        # get forward error, backward is already calculated
+        berr,bresids = err,resids 
         ferr,fresids = accuracy.model_accuracy(trans, pixels, coords,
                                              leave_one_out=True,
-                                             invert=False, distance='eucledian',
+                                             invert=False, distance='geodesic',
                                              accuracy='rmse')
+    else:
+        # get backward error, forward is already calculated
+        ferr,fresids = err,resids 
+        berr,bresids = accuracy.model_accuracy(trans, pixels, coords,
+                                             leave_one_out=True,
+                                             invert=True, distance='eucledian',
+                                             accuracy='rmse')
+    
     forward_info = {'model': forward.info(),
                     'error': ferr,
                     'residuals': list(fresids),
