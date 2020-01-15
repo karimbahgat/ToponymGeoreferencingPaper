@@ -7,7 +7,7 @@ db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
 
 print 'beginning'
 
-automap('testmaps/burkina.jpg', textcolor=None, sample=False, db=db)
+automap('testmaps/burkina.jpg', textcolor=(40,30,20), sample=False, db=db, debug=True)
 #automap('testmaps/tunisia_pol_1990.jpg', textcolor=None, db=db)
 #automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/nepal_pol90.jpg', textcolor=None, db=db)

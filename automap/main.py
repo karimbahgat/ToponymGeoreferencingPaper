@@ -17,22 +17,54 @@ import PIL, PIL.Image
 
 import time
 import os
+import json
 
 
 
-def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
+def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
     start = time.time()
+    info = dict()
+    params = dict(inpath=inpath,
+                  outpath=outpath,
+                  matchthresh=matchthresh,
+                  textcolor=textcolor,
+                  colorthresh=colorthresh,
+                  textconf=textconf,
+                  sample=sample,
+                  source=source,
+                  warp_order=warp_order,
+                  residual_type=residual_type,
+                  )
+    info['params'] = params
+
+
+
+    
     
     print 'loading image', inpath
     im = PIL.Image.open(inpath).convert('RGB')
 
     # determine various paths
+    # outpath can be string, True, or False/None
     infold,infil = os.path.split(inpath)
     infil,ext = os.path.splitext(infil)
-    if not outpath:
-        outpath = os.path.join(infold, infil + '_georeferenced.tif')
-    outfold,outfil = os.path.split(outpath)
-    outfil,ext = os.path.splitext(outfil)
+    if outpath:
+        # output
+        if outpath is True:
+            # auto, relative to inpath
+            outfold = infold
+            outfil = infil
+        else:
+            # relative to manual outpath
+            outfold,outfil = os.path.split(outpath)
+            outfil,ext = os.path.splitext(outfil)
+    else:
+        # dont output, but still need for debug
+        # relative to inpath
+        outfold = infold
+        outfil = infil
+    
+
 
 
 
@@ -42,6 +74,30 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     # partition image
     print 'image segmentation'
     mapp_poly,box_polys = segmentation.image_segments(im)
+
+    # create as feature collection (move to image_segments()?)
+    seginfo = {'type': 'FeatureCollection',
+               'features': []}
+    
+    # (map)
+    mapp_geoj = {'type': 'Polygon',
+                 'coordinates': [ [tuple(p[0].tolist()) for p in mapp_poly] ]}
+    props = {'type':'Map'}
+    feat = {'type': 'Feature', 'properties': props, 'geometry': mapp_geoj}
+    seginfo['features'].append(feat)
+    
+    # (boxes)
+    boxes_geoj = [{'type': 'Polygon',
+                 'coordinates': [ [tuple(p[0].tolist()) for p in box] ]}
+                  for box in box_polys]
+    for box_geoj in boxes_geoj:
+        props = {'type':'Box'}
+        feat = {'type': 'Feature', 'properties': props, 'geometry': box_geoj}
+        seginfo['features'].append(feat)
+
+    # store metadata
+    info['segmentation'] = seginfo
+    
 
 
 
@@ -77,6 +133,23 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     # ignore small texts?
     texts = [text for text in texts if len(text['text_clean']) >= 3]
 
+    # store metadata
+    textinfo = {'type': 'FeatureCollection', 'features': []}
+    for r in texts:
+        x1,y1,x2,y2 = r['left'], r['top'], r['left']+r['width'], r['top']+r['height']
+        box = [(x1,y1),(x2,y1),(x2,y2),(x1,y2),(x1,y1)]
+        geoj = {'type':'Polygon', 'coordinates':[box]}
+        props = dict(r)
+        feat = {'geometry':geoj, 'properties':props}
+        textinfo['features'].append(feat)
+    info['text_recognition'] = textinfo
+
+
+
+
+    ################
+    # Toponym selection
+
     # text anchor points
     print 'determening text anchors'
     anchored = []
@@ -91,9 +164,19 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     # create control points from toponyms
     points = [(r['text_clean'], r['anchor']) for r in texts if 'anchor' in r] # if r['function']=='placename']
 
+    # store metadata
+    toponyminfo = {'type': 'FeatureCollection', 'features': []}
+    for name,p in points:
+        geoj = {'type':'Point', 'coordinates':p}
+        props = {'name':name}
+        feat = {'geometry':geoj, 'properties':props}
+        toponyminfo['features'].append(feat)
+    info['toponym_candidates'] = toponyminfo
+
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
 
     
+
 
     ###############
     # Control point matching
@@ -105,7 +188,18 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
 
+    # store metadata
+    gcps_matched_info = {'type': 'FeatureCollection', 'features': []}
+    for (oname,ocoord),(mname,mcoord) in zip(origs,matches):
+        geoj = {'type':'Point', 'coordinates':mcoord}
+        props = {'origname':oname, 'origx':ocoord[0], 'origy':ocoord[1],
+                 'matchname':mname, 'matchx':mcoord[0], 'matchy':mcoord[1]}
+        feat = {'geometry':geoj, 'properties':props}
+        gcps_matched_info['features'].append(feat)
+    info['gcps_matched'] = gcps_matched_info
+
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+
 
 
 
@@ -151,29 +245,57 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     backward = trans.copy()
     backward.fit(cols,rows,xs,ys, invert=True)
 
+    # store metadata
+
+    # first gcps
+    gcps_final_info = {'type': 'FeatureCollection', 'features': []}
+    for ocoord,mcoord,res in zip(pixels,coords,resids):
+        i = list(zip(origcoords, matchcoords)).index((ocoord,mcoord))
+        oname = orignames[i]
+        mname = matchnames[i]
+        geoj = {'type':'Point', 'coordinates':mcoord}
+        props = {'origname':oname, 'origx':ocoord[0], 'origy':ocoord[1],
+                 'matchname':mname, 'matchx':mcoord[0], 'matchy':mcoord[1],
+                 'residual':res, 'residual_type':residual_type}
+        feat = {'geometry':geoj, 'properties':props}
+        gcps_final_info['features'].append(feat)
+    info['gcps_final'] = gcps_final_info
+
+    # then transforms
+    # NOTE: metadata reports only RMSE error type with leave_one_out=True, maybe allow user customizing this? 
+    if invert:
+        ferr,fresids = err,resids # already calculated
+        berr,bresids = accuracy.model_accuracy(trans, pixels, coords,
+                                             leave_one_out=True,
+                                             invert=True, distance='geodesic',
+                                             accuracy='rmse')
+    else:
+        berr,bresids = err,resids # already calculated
+        ferr,fresids = accuracy.model_accuracy(trans, pixels, coords,
+                                             leave_one_out=True,
+                                             invert=False, distance='eucledian',
+                                             accuracy='rmse')
+    forward_info = {'model': forward.info(),
+                    'error': ferr,
+                    'residuals': list(fresids),
+                    # hardcoded
+                    'error_type': 'rmse',
+                    'leave_one_out': True}
+    backward_info = {'model': backward.info(),
+                     'error': berr,
+                     'residuals': list(bresids),
+                     # hardcoded
+                     'error_type': 'rmse', 
+                     'leave_one_out': True}
+    info['transformation'] = {'forward': forward_info,
+                              'backward': backward_info}
+
 
 
     #################
     # Warping
 
-    def final_controlpoints(tiepoints, residuals, origs, matches, outpath=False):
-        controlpoints = []
-        orignames,origcoords = zip(*origs)
-        matchnames,matchcoords = zip(*matches)
-        for (oc,mc),res in zip(tiepoints, residuals):
-            i = origcoords.index(oc)
-            oc,on,mc,mn = [lst[i] for lst in (origcoords,orignames,matchcoords,matchnames)]
-            controlpoints.append([on,oc,mn,mc,res])
-
-        if outpath:
-            vec = pg.VectorData(fields='origname origx origy matchname matchx matchy residual'.split())
-            for on,(ox,oy),mn,(mx,my),res in controlpoints:
-                vec.add_feature([on,ox,oy,mn,mx,my,res], geometry={'type': 'Point', 'coordinates': (mx,my)})
-            vec.save(outpath)
-
-        return controlpoints
-
-    # warp
+    # warp the image
     print '\n'+'warping'
     print '{} points, warp_method={}'.format(len(tiepoints), forward)
     if mapp_poly is not None:
@@ -181,16 +303,66 @@ def automap(inpath, outpath=None, matchthresh=0.1, textcolor=None, colorthresh=2
     else:
         mapp_im = im
     wim,aff = imwarp.warp(mapp_im, forward, backward) # warp
-    rast = pg.RasterData(image=wim, affine=aff) # to geodata
-    if outpath:
-        rast.save(outpath)
 
-    # final control points
-    cppath = os.path.join(outfold, outfil+'_controlpoints.geojson')
-    controlpoints = final_controlpoints(tiepoints, resids, origs, matches, outpath=cppath)
+    # store metadata
+    warp_info = {'image':wim,
+                 'affine':aff}
+    info['warped'] = warp_info
+
+
+
+
+    ##############
+    # Save output? 
+
+    if outpath:
+        
+        # warped image
+        pth = os.path.join(outfold, outfil + '_georeferenced.tif')
+        rast = pg.RasterData(image=wim, affine=aff) # to geodata
+        rast.save(pth)
+
+        # final control points
+        pth = os.path.join(outfold, outfil+'_controlpoints.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['gcps_final'], writer)
+
+        # transformation
+        pth = os.path.join(outfold, outfil+'_transform.json')
+        with open(pth, 'w') as writer:
+            json.dump(info['transformation'], writer)
+
+    if debug:
+
+        # segmentation
+        pth = os.path.join(outfold, outfil+'_debug_segmentation.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['segmentation'], writer)
+
+        # text recognition
+        pth = os.path.join(outfold, outfil+'_debug_text.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['text_recognition'], writer)
+
+        # toponym candidates
+        pth = os.path.join(outfold, outfil+'_debug_text_toponyms.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['toponym_candidates'], writer)
+
+        # gcps matched
+        pth = os.path.join(outfold, outfil+'_debug_gcps_matched.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['gcps_matched'], writer)
+
+
+
+    #############
+    # Finished
 
     print '\n'+'finished!'
     print 'total runtime: {:.1f} seconds \n'.format(time.time() - start)
+
+    return info
 
 
 

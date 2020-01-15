@@ -26,6 +26,15 @@ class Polynomial(object):
         new.minpoints = self.minpoints
         return new
 
+    def info(self):
+        params = {'order': self.order}
+        data = {'A': self.A.tolist() }
+        info = {'type': 'Polynomial',
+                'params': params,
+                'data': data,
+                }
+        return info
+
     def fit(self, inx, iny, outx, outy, invert=False):
         # to arrays
         inx = np.array(inx)
@@ -138,6 +147,16 @@ class TIN:
         new.tris = list(self.tris)
         new.minpoints = self.minpoints
         return new
+
+    def info(self):
+        params = {}
+        tri_models = [(tri,trans.info()) for tri,trans in self.tris]
+        data = {'tris': tri_models}
+        info = {'type': 'TIN',
+                'params': params,
+                'data': data,
+                }
+        return info
 
     def fit(self, inx, iny, outx, outy, invert=False):
         # to arrays
