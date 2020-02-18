@@ -185,6 +185,21 @@ def auto_drop_models(trans, inpoints, outpoints, improvement_ratio=0.10, minpoin
 
     return _trans, _inpoints, _outpoints, _err, _resids
 
+def auto_choose_model(inpoints, outpoints, transforms, improvement_ratio=0.10, minpoints=None, invert=False, distance=None, accuracy='rmse'):
+    # compare and choose optimal among a set of transforms
+    inpoints = list(inpoints)
+    outpoints = list(outpoints)
+
+    results = []
+    for trans in transforms:
+        print trans
+        res = auto_drop_models(trans, inpoints, outpoints, improvement_ratio=improvement_ratio, minpoints=minpoints, leave_one_out=True, invert=invert, distance=distance, accuracy=accuracy)
+        results.append(res)
+
+    best = sorted(results, key=lambda res: res[-2])
+    trans, inpoints, outpoints, err, resids = best[0]
+    return trans, inpoints, outpoints, err, resids
+
 
 ##def drop_worst_residual():
 ##    raise NotImplemented()

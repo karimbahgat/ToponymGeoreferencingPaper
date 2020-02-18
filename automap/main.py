@@ -80,20 +80,22 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
                'features': []}
     
     # (map)
-    mapp_geoj = {'type': 'Polygon',
-                 'coordinates': [ [tuple(p[0].tolist()) for p in mapp_poly] ]}
-    props = {'type':'Map'}
-    feat = {'type': 'Feature', 'properties': props, 'geometry': mapp_geoj}
-    seginfo['features'].append(feat)
+    if mapp_poly is not None:
+        mapp_geoj = {'type': 'Polygon',
+                     'coordinates': [ [tuple(p[0].tolist()) for p in mapp_poly] ]}
+        props = {'type':'Map'}
+        feat = {'type': 'Feature', 'properties': props, 'geometry': mapp_geoj}
+        seginfo['features'].append(feat)
     
     # (boxes)
-    boxes_geoj = [{'type': 'Polygon',
-                 'coordinates': [ [tuple(p[0].tolist()) for p in box] ]}
-                  for box in box_polys]
-    for box_geoj in boxes_geoj:
-        props = {'type':'Box'}
-        feat = {'type': 'Feature', 'properties': props, 'geometry': box_geoj}
-        seginfo['features'].append(feat)
+    if box_polys:
+        boxes_geoj = [{'type': 'Polygon',
+                     'coordinates': [ [tuple(p[0].tolist()) for p in box] ]}
+                      for box in box_polys]
+        for box_geoj in boxes_geoj:
+            props = {'type':'Box'}
+            feat = {'type': 'Feature', 'properties': props, 'geometry': box_geoj}
+            seginfo['features'].append(feat)
 
     # store metadata
     info['segmentation'] = seginfo
@@ -206,37 +208,62 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     #################
     # Transformation
 
-    # setup
-    trans = transforms.Polynomial(order=warp_order)
-    if residual_type == 'geographic':
-        invert = False
-        distance = 'geodesic'
-    elif residual_type == 'pixels':
-        invert = True
-        distance = 'eucledian'
+    if warp_order:
+        # setup
+        trans = transforms.Polynomial(order=warp_order)
+        if residual_type == 'geographic':
+            invert = False
+            distance = 'geodesic'
+        elif residual_type == 'pixels':
+            invert = True
+            distance = 'eucledian'
+        else:
+            raise ValueError
+        pixels,coords = zip(*tiepoints)
+
+        # initial rmse
+        err,resids = accuracy.model_accuracy(trans, pixels, coords,
+                                             leave_one_out=True,
+                                             invert=invert, distance=distance,
+                                             accuracy='rmse')
+        print '{} points, RMSE: {}'.format(len(pixels), err)
+
+        # enforce some minimum residual? 
+        # ... 
+
+        # auto drop points that best improve model
+        print 'dropping points to improve model'
+        trans, pixels, coords, err, resids = accuracy.auto_drop_models(trans, pixels, coords,
+                                                                     improvement_ratio=0.10,
+                                                                     minpoints=None,
+                                                                     leave_one_out=True,
+                                                                     invert=invert, distance=distance,
+                                                                     accuracy='rmse')
+        tiepoints = zip(pixels, coords)
+        print '{} points, RMSE: {}'.format(len(pixels), err)
+
     else:
-        raise ValueError
-    pixels,coords = zip(*tiepoints)
+        # setup
+        trytrans = [transforms.Polynomial(order=1), transforms.Polynomial(order=2)]
+        if residual_type == 'geographic':
+            invert = False
+            distance = 'geodesic'
+        elif residual_type == 'pixels':
+            invert = True
+            distance = 'eucledian'
+        else:
+            raise ValueError
+        pixels,coords = zip(*tiepoints)
 
-    # initial rmse
-    err,resids = accuracy.model_accuracy(trans, pixels, coords,
-                                         leave_one_out=True,
-                                         invert=invert, distance=distance,
-                                         accuracy='rmse')
-    print '{} points, RMSE: {}'.format(len(pixels), err)
+        # initial points
+        print '{} points'.format(len(pixels))
 
-    # enforce some minimum residual? 
-    # ... 
-
-    # auto drop points that best improve model
-    trans, pixels, coords, err, resids = accuracy.auto_drop_models(trans, pixels, coords,
-                                                                 improvement_ratio=0.10,
-                                                                 minpoints=None,
-                                                                 leave_one_out=True,
-                                                                 invert=invert, distance=distance,
-                                                                 accuracy='rmse')
-    tiepoints = zip(pixels, coords)
-    print '{} points, RMSE: {}'.format(len(pixels), err)
+        # auto get optimal transform
+        print 'autodetecting optimal transform'
+        # TODO: maybe allow improvement_ratio and minpoints params
+        trans, pixels, coords, err, resids = accuracy.auto_choose_model(pixels, coords, trytrans, invert=invert, distance=distance, accuracy='rmse')
+        tiepoints = zip(pixels, coords)
+        print '{} points, RMSE: {}'.format(len(pixels), err)
 
     # estimate final forward and backward transforms for image warping
     (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
