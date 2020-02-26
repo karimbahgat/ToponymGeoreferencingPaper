@@ -34,11 +34,6 @@ except:
     pass
 
 
-###################
-# PARAMS
-ORDER = 1
-subsamp = 10
-
 
 
 
@@ -103,44 +98,57 @@ def sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_b
 
 
 def georef_error_surface(sampling_trans, georef, truth, error_type='geographic'):
+    print('Calculating {} error surface for georef'.format(error_type))
     ### georef grid
     # ST_out sampled from georef grid
-    # (requirement: ET2 input coordsys == TT input coordsys)
     out = georef.copy(shallow=True)
+    out.mode = 'float32'
 
     # prep args
     samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
     sample_xs,sample_ys = zip(*samples)
-    truth_forward = mapfit.transforms.Polynomial(order=1, A=list(truth.affine))
-    truth_backward = mapfit.transforms.Polynomial(order=1, A=list(~truth.affine))
+    
+    A = np.eye(6).flatten()
+    A[:6] = list(truth.affine)
+    truth_forward = mapfit.transforms.Polynomial(order=1, A=A.reshape((6,6)))
+    A = np.eye(6).flatten()
+    A[:6] = list(truth.inv_affine)
+    truth_backward = mapfit.transforms.Polynomial(order=1, A=A.reshape((6,6)))
 
     # calc errors
     sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
 
     # return as raster
     errors = errors.reshape((out.height,out.width))
-    out.add_band(image=Image.fromarray(errors))
+    out.add_band(img=Image.fromarray(errors))
     return out
 
 
 def image_error_surface(sampling_trans, georef, truth, error_type='pixel'):
+    print('Calculating {} error surface for image'.format(error_type))
     ### image grid
     # ST_out sampled from image grid
     # otherwise, same exact steps
     out = truth.copy(shallow=True)
+    out.mode = 'float32'
 
     # prep args
     samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
     sample_xs,sample_ys = zip(*samples)
-    truth_forward = mapfit.transforms.Polynomial(order=1, A=list(truth.affine))
-    truth_backward = mapfit.transforms.Polynomial(order=1, A=list(~truth.affine))
+    
+    A = np.eye(6).flatten()
+    A[:6] = list(truth.affine)
+    truth_forward = mapfit.transforms.Polynomial(order=1, A=A.reshape((6,6)))
+    A = np.eye(6).flatten()
+    A[:6] = list(truth.inv_affine)
+    truth_backward = mapfit.transforms.Polynomial(order=1, A=A.reshape((6,6)))
 
     # calc errors
     sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
 
     # return as raster
     errors = errors.reshape((out.height,out.width))
-    out.add_band(image=Image.fromarray(errors))
+    out.add_band(img=Image.fromarray(errors))
     return out
 
 
@@ -156,8 +164,7 @@ def error_vis(rast, error_surface):
     m.zoom_bbox(*rast.bbox)
     m.add_legend({'padding':0})
     m.render_all()
-    im = m.get_image()
-    return im
+    return m
 
 
 
@@ -177,8 +184,8 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
     resids = np.array(pixel_error_surface.bands[0].img).flatten()
     dct['image']['pixels'] = mapfit.accuracy.RMSE(resids)
     # then percent (of image pixel dims)
-    im = Image.open(truth_fil)
-    diag = math.hypot(*im.size)
+    im = Image.open('maps/{}'.format(truth_fil))
+    diag = hypot(*im.size)
     pixperc = dct['image']['pixels'] / float(diag)
     dct['image']['percent'] = pixperc
     # ...
@@ -191,8 +198,8 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
     dct['controlpoints'] = {'geographic': transdict['forward']['error'],
                             'pixels': transdict['backward']['error'],}
     # then percent (of image pixel dims)
-    im = Image.open(truth_fil)
-    diag = math.hypot(*im.size)
+    im = Image.open('maps/{}'.format(truth_fil))
+    diag = hypot(*im.size)
     pixperc = dct['controlpoints']['pixels'] / float(diag)
     dct['controlpoints']['percent'] = pixperc
 
@@ -204,14 +211,14 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
     ### percent of labels detected
     root = '_'.join(georef_root.split('_')[:4])
     allnames = pg.VectorData('maps/{}_placenames.geojson'.format(root))
-    detected = pg.VectorData('maps/{}_debug_text_toponyms.geojson'.format(root))
+    detected = pg.VectorData('maps/{}_debug_text_toponyms.geojson'.format(georef_root))
     perc = len(detected) / float(len(allnames))
     dct['labels_detected'] = perc
 
 
     ### percent of labels used
     allnames = pg.VectorData('maps/{}_placenames.geojson'.format(root))
-    gcps = pg.VectorData('maps/{}_controlpoints.geojson'.format(root))
+    gcps = pg.VectorData('maps/{}_controlpoints.geojson'.format(georef_root))
     perc = len(gcps) / float(len(allnames))
     dct['labels_used'] = perc
     
@@ -224,12 +231,6 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
 
 def run_error_assessment(georef_fil, truth_fil, gcps_fil):
     georef_root,ext = os.path.splitext(georef_fil)
-    logger = codecs.open('maps/{}_error_log.txt'.format(georef_root), 'w', encoding='utf8', buffering=0)
-    sys.stdout = logger
-    sys.stderr = logger
-    print('PID:',os.getpid())
-    print('time',datetime.datetime.now().isoformat())
-    print('working path',os.path.abspath(''))
 
     # original/simulated map
     truth = pg.RasterData('maps/{}'.format(truth_fil))
@@ -242,7 +243,7 @@ def run_error_assessment(georef_fil, truth_fil, gcps_fil):
     # calc error surface
     with open('maps/{}_transform.json'.format(georef_root), 'r') as fobj:
         transdict = json.load(fobj)
-        sampling_trans = mapfit.transforms.from_json(transdict['backward'])
+        sampling_trans = mapfit.transforms.from_json(transdict['backward']['model'])
     georef_errorsurf_geo = georef_error_surface(sampling_trans, georef, truth, 'geographic')
     georef_errorsurf_pix = georef_error_surface(sampling_trans, georef, truth, 'pixel')
 
@@ -252,13 +253,24 @@ def run_error_assessment(georef_fil, truth_fil, gcps_fil):
         fobj.write(json.dumps(errdct))
 
     # visualize geographic error
-    im = error_vis(georef, georef_errorsurf_geo)
-    im.save('maps/{}_error_vis_geo.png'.format(georef_root))
+    mapp = error_vis(georef, georef_errorsurf_geo)
+    mapp.save('maps/{}_error_vis_geo.png'.format(georef_root))
 
     # visualize pixel error
-    im = error_vis(georef, georef_errorsurf_pix)
-    im.save('maps/{}_error_vis_pix.png'.format(georef_root))
+    mapp = error_vis(georef, georef_errorsurf_pix)
+    mapp.save('maps/{}_error_vis_pix.png'.format(georef_root))
 
+
+def run_in_process(georef_fil, truth_fil, gcps_fil):
+    georef_root,ext = os.path.splitext(georef_fil)
+    logger = codecs.open('maps/{}_error_log.txt'.format(georef_root), 'w', encoding='utf8', buffering=0)
+    sys.stdout = logger
+    sys.stderr = logger
+    print('PID:',os.getpid())
+    print('time',datetime.datetime.now().isoformat())
+    print('working path',os.path.abspath(''))
+    
+    run_error_assessment(georef_fil, truth_fil, gcps_fil)
 
 
 def itermaps():
@@ -279,17 +291,33 @@ if __name__ == '__main__':
     for imfil in itermaps():
         fil_root = imfil.split('_image.')[0]
 
-        #error_assess(fil)
-        #continue
 
-        # Begin process
+        # LOCAL 
 
         ## auto
         autofil = '{}_georeferenced_auto.tif'.format(fil_root)
         print(imfil,autofil)
         if os.path.lexists('maps/{}'.format(autofil)):
             gcps = '{}_georeferenced_auto_controlpoints.geojson'.format(fil_root)
-            p = mp.Process(target=run_error_assessment,
+            run_error_assessment(autofil,imfil,gcps)
+
+        ## exact
+        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
+        if os.path.lexists('maps/{}'.format(exactfil)):
+            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
+            run_error_assessment(autofil,imfil,gcps)
+
+        continue
+            
+
+        # MULTIPROCESS
+
+        ## auto
+        autofil = '{}_georeferenced_auto.tif'.format(fil_root)
+        print(imfil,autofil)
+        if os.path.lexists('maps/{}'.format(autofil)):
+            gcps = '{}_georeferenced_auto_controlpoints.geojson'.format(fil_root)
+            p = mp.Process(target=run_in_process,
                            args=(autofil,imfil,gcps),
                            )
             p.start()
@@ -299,7 +327,7 @@ if __name__ == '__main__':
         exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
         if os.path.lexists('maps/{}'.format(exactfil)):
             gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
-            p = mp.Process(target=run_error_assessment,
+            p = mp.Process(target=run_in_process,
                            args=(exactfil,imfil,gcps),
                            )
             p.start()

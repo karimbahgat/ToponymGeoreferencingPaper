@@ -43,12 +43,10 @@ class Polynomial(object):
         return info
 
     @staticmethod
-    def from_json(self, js):
+    def from_json(js):
         init = {}
-        A = js['A']
-        A_size = len(A)
-        rank = {3**2:3, 6**2:6, 9**2:9}[A_size] # size of square matrix
-        init['A'] = A.reshape((rank,rank))
+        A = np.array(js['data']['A'])
+        init['A'] = A
         init.update(js['params'])
         trans = Polynomial(**init)
         return trans

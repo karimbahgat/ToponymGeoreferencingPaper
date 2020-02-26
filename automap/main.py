@@ -53,16 +53,17 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
         if outpath is True:
             # auto, relative to inpath
             outfold = infold
-            outfil = infil
+            outfil = infil + '_georeferenced'
         else:
             # relative to manual outpath
             outfold,outfil = os.path.split(outpath)
-            outfil,ext = os.path.splitext(outfil)
     else:
         # dont output, but still need for debug
         # relative to inpath
         outfold = infold
-        outfil = infil
+        outfil = infil + '_georeferenced'
+
+    outfil,ext = os.path.splitext(outfil)
     
 
 
@@ -348,7 +349,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     if outpath:
         
         # warped image
-        pth = os.path.join(outfold, outfil + '_georeferenced.tif')
+        pth = os.path.join(outfold, outfil + '.tif') # suffix already added (manual or auto, see top)
         rast = pg.RasterData(image=wim, affine=aff) # to geodata
         rast.save(pth)
 

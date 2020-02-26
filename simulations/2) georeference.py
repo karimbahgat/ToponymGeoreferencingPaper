@@ -108,7 +108,7 @@ def georeference_exact(fil, warp_order):
 
 if __name__ == '__main__':
 
-    maxprocs = 4
+    maxprocs = 2
     procs = []
 
     for fil in mapfiles():
