@@ -33,6 +33,8 @@ def distances(obsx, obsy, predx, predy, metric='eucledian'):
             km = 6367 * c
             return km
         resids = haversine(predx, predy, obsx, obsy)
+    else:
+        raise ValueError(metric)
 
     return resids
 

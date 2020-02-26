@@ -108,12 +108,12 @@ def georef_error_surface(sampling_trans, georef, truth, error_type='geographic')
     samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
     sample_xs,sample_ys = zip(*samples)
     
-    A = np.eye(6).flatten()
+    A = np.eye(3).flatten()
     A[:6] = list(truth.affine)
-    truth_forward = mapfit.transforms.Polynomial(order=1, A=A.reshape((6,6)))
-    A = np.eye(6).flatten()
+    truth_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+    A = np.eye(3).flatten()
     A[:6] = list(truth.inv_affine)
-    truth_backward = mapfit.transforms.Polynomial(order=1, A=A.reshape((6,6)))
+    truth_backward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
 
     # calc errors
     sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
@@ -160,7 +160,7 @@ def error_vis(rast, error_surface):
                         #textoptions={'font':'freesans'},
                         )
     m.add_layer(rast)
-    m.add_layer(error_surface, transparency=0.2, legendoptions={'title':'Error', 'valueformat':'.0f'})
+    m.add_layer(error_surface, transparency=0.2, legendoptions={'title':'Error', 'valueformat':'.1f'})
     m.zoom_bbox(*rast.bbox)
     m.add_legend({'padding':0})
     m.render_all()
@@ -176,18 +176,18 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
 
 
     ### known error surface avg + stdev
-    dct['image'] = {}
+    dct['rmse_georeferenced'] = {}
     # first geographic
     resids = np.array(geographic_error_surface.bands[0].img).flatten()
-    dct['image']['geographic'] = mapfit.accuracy.RMSE(resids)
+    dct['rmse_georeferenced']['geographic'] = mapfit.accuracy.RMSE(resids)
     # then pixels
     resids = np.array(pixel_error_surface.bands[0].img).flatten()
-    dct['image']['pixels'] = mapfit.accuracy.RMSE(resids)
+    dct['rmse_georeferenced']['pixels'] = mapfit.accuracy.RMSE(resids)
     # then percent (of image pixel dims)
     im = Image.open('maps/{}'.format(truth_fil))
     diag = hypot(*im.size)
-    pixperc = dct['image']['pixels'] / float(diag)
-    dct['image']['percent'] = pixperc
+    pixperc = dct['rmse_georeferenced']['pixels'] / float(diag)
+    dct['rmse_georeferenced']['percent'] = pixperc
     # ...
     
 
@@ -195,29 +195,32 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
     with open('maps/{}_transform.json'.format(georef_root), 'r') as fobj:
         transdict = json.load(fobj)
     # first geog and pixels
-    dct['controlpoints'] = {'geographic': transdict['forward']['error'],
-                            'pixels': transdict['backward']['error'],}
+    dct['rmse_controlpoints'] = {'geographic': transdict['forward']['error'],
+                                 'pixels': transdict['backward']['error'],}
     # then percent (of image pixel dims)
     im = Image.open('maps/{}'.format(truth_fil))
     diag = hypot(*im.size)
-    pixperc = dct['controlpoints']['pixels'] / float(diag)
-    dct['controlpoints']['percent'] = pixperc
+    pixperc = dct['rmse_controlpoints']['pixels'] / float(diag)
+    dct['rmse_controlpoints']['percent'] = pixperc
 
     
     ### (diff from orig controlpoints?)
     # ...
 
 
-    ### percent of labels detected
+    ### all labels, for reference
     root = '_'.join(georef_root.split('_')[:4])
     allnames = pg.VectorData('maps/{}_placenames.geojson'.format(root))
+    dct['labels'] = len(allnames)
+
+
+    ### percent of labels detected
     detected = pg.VectorData('maps/{}_debug_text_toponyms.geojson'.format(georef_root))
     perc = len(detected) / float(len(allnames))
     dct['labels_detected'] = perc
 
 
     ### percent of labels used
-    allnames = pg.VectorData('maps/{}_placenames.geojson'.format(root))
     gcps = pg.VectorData('maps/{}_controlpoints.geojson'.format(georef_root))
     perc = len(gcps) / float(len(allnames))
     dct['labels_used'] = perc
@@ -302,10 +305,10 @@ if __name__ == '__main__':
             run_error_assessment(autofil,imfil,gcps)
 
         ## exact
-        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
-        if os.path.lexists('maps/{}'.format(exactfil)):
-            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
-            run_error_assessment(autofil,imfil,gcps)
+##        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
+##        if os.path.lexists('maps/{}'.format(exactfil)):
+##            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
+##            run_error_assessment(exactfil,imfil,gcps)
 
         continue
             
@@ -324,14 +327,14 @@ if __name__ == '__main__':
             procs.append(p)
 
         ## exact
-        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
-        if os.path.lexists('maps/{}'.format(exactfil)):
-            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
-            p = mp.Process(target=run_in_process,
-                           args=(exactfil,imfil,gcps),
-                           )
-            p.start()
-            procs.append(p)
+##        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
+##        if os.path.lexists('maps/{}'.format(exactfil)):
+##            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
+##            p = mp.Process(target=run_in_process,
+##                           args=(exactfil,imfil,gcps),
+##                           )
+##            p.start()
+##            procs.append(p)
 
         # Wait in line
         while len(procs) >= maxprocs:
