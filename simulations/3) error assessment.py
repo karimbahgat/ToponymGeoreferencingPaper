@@ -46,138 +46,183 @@ subsamp = 10
 ##################
 # FUNCTIONS
 
-# Error surface calculation
-# EITHER dataset centric, since the purpose of georef is data capture, to see if we can recreate the original data
-# ...measured as avg deviation bw coordinates, one metric per dataset layer
-# ...
-# OR map centric, generate an error grid that captures difference bw truth and georef transformed pixel.
-# ...should be same as dataset centric, but also allows for spatial error variation.
-# ...during simulation, truth pixel can be calculated by storing drawing affine along with rendered image, and querying each pixel coordinate.
-# ...or without the simulation, truth pixel can be proxied by...
-def error_surface(gcps_fil, truth, georef):    
-    print('Creating error surface')
-    # create coordinate distortion grid as a smaller sampling of original grid, since dist calculations are slow
-    # NOTE: shouldnt subsample the error raster, only temporary for visualization
-    xscale,xskew,xoff,yskew,yscale,yoff = georef.affine
-    xscale *= subsamp
-    yscale *= subsamp
-    error = pg.RasterData(width=georef.width/subsamp, height=georef.height/subsamp, mode='float32', 
-                          affine=[xscale,xskew,xoff,yskew,yscale,yoff])
-    errband = error.add_band(nodataval=-99)
-    errband.compute('-99')
+# Error calculation and surfaces
 
-    # get tiepoints from automated tool
-    gcps = pg.VectorData('maps/{}'.format(gcps_fil))
-    frompoints = [(f['origx'],f['origy']) for f in gcps]
-    topoints = [(f['matchx'],f['matchy']) for f in gcps]
-    tiepoints = zip(frompoints, topoints)
-    # OR use the georef coordinates for the rendered placenames (should be approx 0 error...)
-    ##places = pg.VectorData('maps/test_placenames.geojson')
-    ##tiepoints = [((f['col'],f['row']),(f['x'],f['y'])) for f in places]
+def sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type='geographic'):
+    # two different coordsys in and out,
+    # ...comparing three different transforms between in and out (two rasters and an arbitrary transform)
+    # in = pixels
+    # out = coords
+    # TT = truth image transform (affine)
+    # ET = estimated image transform (affine)
+    # ET2 = alternative estimated transform (arbitrary form)
 
-    # estimating map transform
-    print('estimating transform from tiepoints...')
-    coeff_x, coeff_y = mapfit.rmse.polynomial(ORDER, *zip(*tiepoints))[-2:]
+    # ST_out sample coords are given
+    # the *_in pixel coordsys cannot be assumed to be equivalent
+    
+    # TT_in -> TT -> TT_out      (truth_forward and truth_backward)
+    # ET_in -> ET -> ET_out      (not used I guess...)
+    # ET2_in -> ET2 -> ET2_out   (sampling_trans = ET2-1)
 
-    #
-    print('defining error sampling points...')
-    points = []
-    for row in range(error.height):
-        #print (row, georef.height)
-        for col in range(error.width):
-            x,y = error.cell_to_geo(col,row)
-            points.append((x,y))
+    # guiding rule is that input coordsys are different, so always use output coordsys as starting point
+    # ie strategy is to send sample point through arbitrary transform ET2 and then back through TT to get the error of ET2
 
-    #
-    print('inverting transform matrix for backwards resampling (georeferenced pixels to original image pixels)...')
-    points = np.array(points)
-    #print points
-    #print coeff_x, coeff_y
-    pred = mapfit.rmse.predict(ORDER, points, coeff_x, coeff_y, invert=True)
-    pred = pred.reshape((error.height, error.width,2))
-    #print pred.shape
-    #print pred
+    # args:
+    # - ST_out sample coords
+    # - truth rast providing TT and TT-1
+    # - trans providing ET2-1
 
-    #
-    print('measuring error distances between original and georeferenced')
-    geod = Geodesic.WGS84
-    arrows = pg.VectorData()
-    arrows.fields = ['dist']
-    for row in range(error.height):
-        #print (row, error.height)
-        for col in range(error.width):
-            if 1:
-                x,y = error.cell_to_geo(col, row)
-                origcol,origrow = pred[row,col]
-                ix,iy = truth.cell_to_geo(origcol, origrow)
-                #dist = hypot(ix-x, iy-y)
-                res = geod.Inverse(iy,ix,y,x)
-                dist = res['s12']
-                arrows.add_feature([dist], {'type':'LineString','coordinates':[(x,y),(ix,iy)]})
-                #print (col,row), (iy,ix,y,x), dist, hypot(ix-x, iy-y)
-                errband.set(col, row, dist)
-            #except:
-            #    pass
+    if error_type == 'geographic':
 
-    return error, arrows
+        # geographic error
+        # (goal: diff bw ET2 and TT)
+        # 1) ST_out -> ET2-1 -> ET2_in   (pixel where coord was sampled)
+        # 2) ET2_in -> TT -> TT_out      (coord that truly belongs to pixel)
+        # 3) voila, calc distances() bw ST_out and TT_out
 
-# Error output metrics
-def error_output(fil_root, gcps_fil, error):
-    print('Outputting error metrics')
-    band = error.bands[0]
+        sample_pxs,sample_pys = sampling_trans.predict(sample_xs, sample_ys)
+        truth_xs,truth_ys = truth_forward.predict(sample_pxs, sample_pys)
+        resids = mapfit.accuracy.distances(truth_xs, truth_ys, sample_xs, sample_ys, 'geodesic')
+        return sample_xs, sample_ys, truth_xs, truth_ys, resids
 
-    # final surface avg + stdev
-    avg = band.summarystats('mean')['mean']
-    devs = (abs(avg - cell.value) for cell in band)
-    cnt = band.width * band.height
-    stdev = sum(devs) / float(cnt)
+    elif error_type == 'pixel':
 
-    # controlpoint rmse
-    gcps = pg.VectorData('maps/{}'.format(gcps_fil))
-    frompoints = [(f['origx'],f['origy']) for f in gcps]
-    topoints = [(f['matchx'],f['matchy']) for f in gcps]
-    tiepoints = zip(frompoints, topoints)
-    res_x, res_y, res_xy, rmse, rmse_x, rmse_y, pred_x, pred_y, coeff_x, coeff_y = mapfit.rmse.polynomial(ORDER, *zip(*tiepoints))
+        # pixel error
+        # (goal: diff bw ET2 and TT)
+        # 1) ST_out -> ET2-1 -> ET2_in   (pixel where coord was sampled)
+        # 2) ST_out -> TT-1 -> TT_in     (pixel that truly belongs to coord)
+        # 4) voila, calc distances() bw ET2_in and TT_in
 
-    # diff from orig controlpoints
+        sample_pxs,sample_pys = sampling_trans.predict(sample_xs, sample_ys)
+        truth_pxs,truth_pys = truth_backward.predict(sample_xs, sample_ys)
+        resids = mapfit.accuracy.distances(truth_pxs, truth_pys, sample_pxs, sample_pys, 'eucledian')
+        return sample_pxs, sample_pys, truth_pxs, truth_pys, resids
 
-    # percent of labels correct
-    root = '_'.join(fil_root.split('_')[:4])
-    allnames = pg.VectorData('maps/{}_placenames.geojson'.format(root))
-    labperc = len(gcps) / float(len(allnames))
+    else:
+        raise ValueError(str(error_type))
 
-    # output
-    dct = {'avg':avg, 'stdev':stdev, 'rmse':rmse, 'labels_used':labperc}
-    with open('maps/{}_error.json'.format(fil_root), 'w') as fobj:
-        fobj.write(json.dumps(dct))
 
-# Visualize differences
-def error_vis(fil_root, error, arrows, georef):
-    print('Visualizing original vs georeferenced errors')
+def georef_error_surface(sampling_trans, georef, truth, error_type='geographic'):
+    ### georef grid
+    # ST_out sampled from georef grid
+    # (requirement: ET2 input coordsys == TT input coordsys)
+    out = georef.copy(shallow=True)
 
-    # render georef georefs over each other, with distortion arrows
-##    print('overlay images with distortion arrows')
-##    m = pg.renderer.Map(2000, 2000)
-##    m.add_layer('maps/test_georeferenced.tif')
-##    m.add_layer('maps/test.tif', transparency=0.5)
-##    m.add_layer(arrows, fillcolor='black', fillsize='1px')
-##    m.zoom_auto()
-##    m.add_layer(r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\raw\ne_10m_admin_0_countries.shp", fillcolor=None, outlinecolor='red')
-##    m.save('maps/test_debug_warp2.png')
+    # prep args
+    samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
+    sample_xs,sample_ys = zip(*samples)
+    truth_forward = mapfit.transforms.Polynomial(order=1, A=list(truth.affine))
+    truth_backward = mapfit.transforms.Polynomial(order=1, A=list(~truth.affine))
 
-    # render error surface map, with distortion arrows?
-    print('error color surface and values')
+    # calc errors
+    sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
+
+    # return as raster
+    errors = errors.reshape((out.height,out.width))
+    out.add_band(image=Image.fromarray(errors))
+    return out
+
+
+def image_error_surface(sampling_trans, georef, truth, error_type='pixel'):
+    ### image grid
+    # ST_out sampled from image grid
+    # otherwise, same exact steps
+    out = truth.copy(shallow=True)
+
+    # prep args
+    samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
+    sample_xs,sample_ys = zip(*samples)
+    truth_forward = mapfit.transforms.Polynomial(order=1, A=list(truth.affine))
+    truth_backward = mapfit.transforms.Polynomial(order=1, A=list(~truth.affine))
+
+    # calc errors
+    sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
+
+    # return as raster
+    errors = errors.reshape((out.height,out.width))
+    out.add_band(image=Image.fromarray(errors))
+    return out
+
+
+
+# Visualize error surface
+def error_vis(rast, error_surface):
+    print('Visualizing rast overlaid with errors')
     m = pg.renderer.Map(background='white',
                         #textoptions={'font':'freesans'},
                         )
-    m.add_layer(georef)
-    m.add_layer(error, transparency=0.2, legendoptions={'title':'Error (Meters)', 'valueformat':'.0f'})
-    #m.add_layer(arrows, fillcolor='black', fillsize='1px', legend=False) #, text=lambda f: f['dist'], textoptions={'textsize':5})
-    m.zoom_bbox(*georef.bbox)
+    m.add_layer(rast)
+    m.add_layer(error_surface, transparency=0.2, legendoptions={'title':'Error', 'valueformat':'.0f'})
+    m.zoom_bbox(*rast.bbox)
     m.add_legend({'padding':0})
-    m.save('maps/{}_error_vis.png'.format(fil_root))
+    m.render_all()
+    im = m.get_image()
+    return im
 
-def error_assess(georef_fil, truth_fil, gcps_fil):
+
+
+# Error output metrics
+def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_surface):
+    print('Outputting error metrics')
+    georef_root,ext = os.path.splitext(georef_fil)
+    dct = {}
+
+
+    ### known error surface avg + stdev
+    dct['image'] = {}
+    # first geographic
+    resids = np.array(geographic_error_surface.bands[0].img).flatten()
+    dct['image']['geographic'] = mapfit.accuracy.RMSE(resids)
+    # then pixels
+    resids = np.array(pixel_error_surface.bands[0].img).flatten()
+    dct['image']['pixels'] = mapfit.accuracy.RMSE(resids)
+    # then percent (of image pixel dims)
+    im = Image.open(truth_fil)
+    diag = math.hypot(*im.size)
+    pixperc = dct['image']['pixels'] / float(diag)
+    dct['image']['percent'] = pixperc
+    # ...
+    
+
+    ### controlpoint rmse
+    with open('maps/{}_transform.json'.format(georef_root), 'r') as fobj:
+        transdict = json.load(fobj)
+    # first geog and pixels
+    dct['controlpoints'] = {'geographic': transdict['forward']['error'],
+                            'pixels': transdict['backward']['error'],}
+    # then percent (of image pixel dims)
+    im = Image.open(truth_fil)
+    diag = math.hypot(*im.size)
+    pixperc = dct['controlpoints']['pixels'] / float(diag)
+    dct['controlpoints']['percent'] = pixperc
+
+    
+    ### (diff from orig controlpoints?)
+    # ...
+
+
+    ### percent of labels detected
+    root = '_'.join(georef_root.split('_')[:4])
+    allnames = pg.VectorData('maps/{}_placenames.geojson'.format(root))
+    detected = pg.VectorData('maps/{}_debug_text_toponyms.geojson'.format(root))
+    perc = len(detected) / float(len(allnames))
+    dct['labels_detected'] = perc
+
+
+    ### percent of labels used
+    allnames = pg.VectorData('maps/{}_placenames.geojson'.format(root))
+    gcps = pg.VectorData('maps/{}_controlpoints.geojson'.format(root))
+    perc = len(gcps) / float(len(allnames))
+    dct['labels_used'] = perc
+    
+
+    return dct
+
+
+
+# Main routine
+
+def run_error_assessment(georef_fil, truth_fil, gcps_fil):
     georef_root,ext = os.path.splitext(georef_fil)
     logger = codecs.open('maps/{}_error_log.txt'.format(georef_root), 'w', encoding='utf8', buffering=0)
     sys.stdout = logger
@@ -188,22 +233,33 @@ def error_assess(georef_fil, truth_fil, gcps_fil):
 
     # original/simulated map
     truth = pg.RasterData('maps/{}'.format(truth_fil))
+    print truth.affine
     
     # georeferenced/transformed map
     georef = pg.RasterData('maps/{}'.format(georef_fil))
-
-    print truth.affine
     print georef.affine
 
-    # surface
-    error,arrows = error_surface(gcps_fil, truth, georef)
-    #error.save('maps/sim_{}_error.tif'.format(i))
+    # calc error surface
+    with open('maps/{}_transform.json'.format(georef_root), 'r') as fobj:
+        transdict = json.load(fobj)
+        sampling_trans = mapfit.transforms.from_json(transdict['backward'])
+    georef_errorsurf_geo = georef_error_surface(sampling_trans, georef, truth, 'geographic')
+    georef_errorsurf_pix = georef_error_surface(sampling_trans, georef, truth, 'pixel')
 
     # output metrics
-    error_output(georef_root, gcps_fil, error)
+    errdct = error_output(georef_fil, truth_fil, georef_errorsurf_geo, georef_errorsurf_pix)
+    with open('maps/{}_error.json'.format(georef_root), 'w') as fobj:
+        fobj.write(json.dumps(errdct))
 
-    # visualize
-    error_vis(georef_root, error, arrows, georef)
+    # visualize geographic error
+    im = error_vis(georef, georef_errorsurf_geo)
+    im.save('maps/{}_error_vis_geo.png'.format(georef_root))
+
+    # visualize pixel error
+    im = error_vis(georef, georef_errorsurf_pix)
+    im.save('maps/{}_error_vis_pix.png'.format(georef_root))
+
+
 
 def itermaps():
     for fil in os.listdir('maps'):
@@ -233,7 +289,7 @@ if __name__ == '__main__':
         print(imfil,autofil)
         if os.path.lexists('maps/{}'.format(autofil)):
             gcps = '{}_georeferenced_auto_controlpoints.geojson'.format(fil_root)
-            p = mp.Process(target=error_assess,
+            p = mp.Process(target=run_error_assessment,
                            args=(autofil,imfil,gcps),
                            )
             p.start()
@@ -243,7 +299,7 @@ if __name__ == '__main__':
         exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
         if os.path.lexists('maps/{}'.format(exactfil)):
             gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
-            p = mp.Process(target=error_assess,
+            p = mp.Process(target=run_error_assessment,
                            args=(exactfil,imfil,gcps),
                            )
             p.start()

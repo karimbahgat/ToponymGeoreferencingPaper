@@ -1,6 +1,13 @@
 
 import numpy as np
 
+def from_json(js):
+    cls = {'Polynomial':Polynomial,
+           'TIN':TIN,
+           }[js['type']]
+    trans = cls.from_json(js)
+    return trans
+
 class Polynomial(object):
     
     def __init__(self, order=None, A=None):
@@ -34,6 +41,17 @@ class Polynomial(object):
                 'data': data,
                 }
         return info
+
+    @staticmethod
+    def from_json(self, js):
+        init = {}
+        A = js['A']
+        A_size = len(A)
+        rank = {3**2:3, 6**2:6, 9**2:9}[A_size] # size of square matrix
+        init['A'] = A.reshape((rank,rank))
+        init.update(js['params'])
+        trans = Polynomial(**init)
+        return trans
 
     def fit(self, inx, iny, outx, outy, invert=False):
         # to arrays
