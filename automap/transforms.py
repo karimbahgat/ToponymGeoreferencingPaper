@@ -18,12 +18,14 @@ class Polynomial(object):
                 order = 1
             elif A.shape == (6,6):
                 order = 2
+            elif A.shape == (10,10):
+                order = 3
             else:
-                raise ValueError('Matrix A must be shape (3,3), or (6,6); not {}'.format(A.shape))
+                raise ValueError('Matrix A must be shape (3,3), (6,6), or (10,10); not {}'.format(A.shape))
 
         self.A = A
         self.order = order
-        self.minpoints = {1:3, 2:6, 3:9}.get(order, 3) # minimum 3 if order not set
+        self.minpoints = {1:3, 2:10, 3:20}.get(order, 3) # minimum 3 if order not set
 
     def __repr__(self):
         return u'Polynomial Transform(order={}, estimated={})'.format(self.order, self.A is not None)
@@ -34,6 +36,7 @@ class Polynomial(object):
         return new
 
     def info(self):
+        # TODO: rename to_json()
         params = {'order': self.order}
         data = {'A': self.A.tolist() }
         info = {'type': 'Polynomial',
@@ -62,14 +65,14 @@ class Polynomial(object):
         if not self.order:
             # due to automation and high likelihood of errors, we set higher point threshold for polynomial order
             # compare to gdal: https://github.com/naturalatlas/node-gdal/blob/master/deps/libgdal/gdal/alg/gdal_crs.c#L186
-            #if len(inx) >= 20:
-            #    self.order = 3
+            if len(inx) >= 20:
+                self.order = 3
             if len(inx) >= 10:
                 self.order = 2
             else:
                 self.order = 1
             # update minpoints
-            self.minpoints = {1:3, 2:6, 3:9}[self.order] 
+            self.minpoints = {1:3, 2:10, 3:20}[self.order] 
         
         if self.order == 1:
             # terms
@@ -112,6 +115,34 @@ class Polynomial(object):
             A[0,:] = xcoeffs
             A[1,:] = ycoeffs
 
+        elif self.order == 3:
+            # get inverse transform by switching the from and to coords (warning, not an exact inverse bc different lstsq estimation)
+            if invert:
+                inx,iny,outx,outy = outx,outy,inx,iny
+            # terms
+            #X = a0 + a1x + a2y + a3xy + a4x^2 + a5y^2 + a6x^3 + a7x^2y + a8xy^2 + a9y^3
+            #Y = b0 + b1x + b2y + b3xy + b4x^2 + b5y^2 + b6x^3 + b7x^2y + b8xy^2 + b9y^3
+            x = inx
+            y = iny
+            xx = x*x
+            xy = x*y
+            yy = y*y
+            xxx = xx*x
+            xxy = xx*y
+            xyy = x*yy
+            yyy = yy*y
+            ones = np.ones(x.shape)
+            # u consists of each term in equation, with each term being array if want to transform multiple
+            u = np.array([xxx,xxy,xyy,yyy, xx,xy,yy, x,y,ones]).transpose()
+            # x and y coeffs
+            xcoeffs,xres,xrank,xsing = np.linalg.lstsq(u, outx, rcond=-1) 
+            ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
+            # A matrix
+            A = np.eye(10)
+            # two first rows of the A matrix are equations for the x and y coordinates, respectively
+            A[0,:] = xcoeffs
+            A[1,:] = ycoeffs
+
         self.A = A
         return self
 
@@ -141,6 +172,21 @@ class Polynomial(object):
             ones = np.ones(x.shape)
             # u consists of each term in equation, with each term being array if want to transform multiple
             u = np.array([xx,xy,yy,x,y,ones])
+
+        elif self.order == 3:
+            # terms
+            x = x
+            y = y
+            xx = x*x
+            xy = x*y
+            yy = y*y
+            xxx = xx*x
+            xxy = xx*y
+            xyy = x*yy
+            yyy = yy*y
+            ones = np.ones(x.shape)
+            # u consists of each term in equation, with each term being array if want to transform multiple
+            u = np.array([xxx,xxy,xyy,yyy, xx,xy,yy, x,y,ones])
 
         # apply the transform matrix to predict output
         predx,predy = self.A.dot(u)[:2]

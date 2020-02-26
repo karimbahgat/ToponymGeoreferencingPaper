@@ -32,7 +32,7 @@ except:
 
 ###################
 # PARAMS
-ORDER = 1
+ORDER = None
 
 
 ###################
@@ -124,8 +124,8 @@ if __name__ == '__main__':
 ##                       warp_order=ORDER,)
 ##
 ##        ## exact
-##        georeference_exact(fil='maps/{}'.format(fil),
-##                       warp_order=ORDER,)
+####        georeference_exact(fil='maps/{}'.format(fil),
+####                       warp_order=ORDER,)
 ##
 ##        continue
 
@@ -143,12 +143,12 @@ if __name__ == '__main__':
         procs.append((p,time()))
 
         ## exact
-        p = mp.Process(target=georeference_exact,
-                       kwargs=dict(fil='maps/{}'.format(fil),
-                                   warp_order=ORDER,),
-                       )
-        p.start()
-        procs.append((p,time()))
+##        p = mp.Process(target=georeference_exact,
+##                       kwargs=dict(fil='maps/{}'.format(fil),
+##                                   warp_order=ORDER,),
+##                       )
+##        p.start()
+##        procs.append((p,time()))
 
         # Wait in line
         while len(procs) >= maxprocs:

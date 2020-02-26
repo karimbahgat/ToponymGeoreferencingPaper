@@ -245,7 +245,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
 
     else:
         # setup
-        trytrans = [transforms.Polynomial(order=1), transforms.Polynomial(order=2)]
+        trytrans = [transforms.Polynomial(order=1), transforms.Polynomial(order=2), transforms.Polynomial(order=3)]
         if residual_type == 'geographic':
             invert = False
             distance = 'geodesic'
