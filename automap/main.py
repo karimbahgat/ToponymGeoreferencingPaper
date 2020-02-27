@@ -15,65 +15,19 @@ import pythongis as pg
 
 import PIL, PIL.Image
 
+import datetime
 import time
 import os
 import json
 
 
+### FUNCS FOR DIFFERENT STAGES
 
-def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
-    start = time.time()
-    info = dict()
-    params = dict(inpath=inpath,
-                  outpath=outpath,
-                  matchthresh=matchthresh,
-                  textcolor=textcolor,
-                  colorthresh=colorthresh,
-                  textconf=textconf,
-                  sample=sample,
-                  source=source,
-                  warp_order=warp_order,
-                  residual_type=residual_type,
-                  )
-    info['params'] = params
-
-
-
-    
-    
-    print 'loading image', inpath
-    im = PIL.Image.open(inpath).convert('RGB')
-
-    # determine various paths
-    # outpath can be string, True, or False/None
-    infold,infil = os.path.split(inpath)
-    infil,ext = os.path.splitext(infil)
-    if outpath:
-        # output
-        if outpath is True:
-            # auto, relative to inpath
-            outfold = infold
-            outfil = infil + '_georeferenced'
-        else:
-            # relative to manual outpath
-            outfold,outfil = os.path.split(outpath)
-    else:
-        # dont output, but still need for debug
-        # relative to inpath
-        outfold = infold
-        outfil = infil + '_georeferenced'
-
-    outfil,ext = os.path.splitext(outfil)
-    
-
-
-
-
+def image_partitioning(im):
     ################
     # Image partitioning
     
     # partition image
-    print 'image segmentation'
     mapp_poly,box_polys = segmentation.image_segments(im)
 
     # create as feature collection (move to image_segments()?)
@@ -98,22 +52,11 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
             feat = {'type': 'Feature', 'properties': props, 'geometry': box_geoj}
             seginfo['features'].append(feat)
 
-    # store metadata
-    info['segmentation'] = seginfo
-    
+    return seginfo
 
-
-
+def text_detection(text_im, textcolor, colorthresh, textconf, sample):
     ###############
     # Text detection
-
-    # remove unwanted parts of image
-    text_im = im
-    if mapp_poly is not None:
-        text_im = segmentation.mask_image(text_im, mapp_poly)
-    for box in box_polys:
-        text_im = segmentation.mask_image(text_im, box, invert=True)
-    #text_im.show()
     
     # detect text
     print 'detecting text'
@@ -145,16 +88,17 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
         props = dict(r)
         feat = {'geometry':geoj, 'properties':props}
         textinfo['features'].append(feat)
-    info['text_recognition'] = textinfo
 
+    return textinfo
 
-
-
+def toponym_selection(im, textinfo, colorthresh):
     ################
     # Toponym selection
 
     # text anchor points
     print 'determening text anchors'
+    texts = [f['properties'] for f in textinfo['features']]
+    toponym_colors = set((r['color'] for r in texts))
     anchored = []
     for col in toponym_colors:
         coltexts = [r for r in texts if r['color'] == col]
@@ -174,18 +118,15 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
         props = {'name':name}
         feat = {'geometry':geoj, 'properties':props}
         toponyminfo['features'].append(feat)
-    info['toponym_candidates'] = toponyminfo
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    return toponyminfo
 
-    
-
-
+def match_control_points(toponyminfo, matchthresh, db, source, **kwargs):
     ###############
     # Control point matching
+    points = [(f['properties']['name'],f['geometry']['coordinates']) for f in toponyminfo['features']]
 
     # find matches
-    print 'finding matches'
     origs,matches = triangulate.find_matches(points, matchthresh, db=db, source=source, **kwargs)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
@@ -199,15 +140,18 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
                  'matchname':mname, 'matchx':mcoord[0], 'matchy':mcoord[1]}
         feat = {'geometry':geoj, 'properties':props}
         gcps_matched_info['features'].append(feat)
-    info['gcps_matched'] = gcps_matched_info
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    return gcps_matched_info
 
-
-
-
+def estimate_transform(gcps_matched_info, warp_order, residual_type):
     #################
-    # Transformation
+    # Transform Estimation
+
+    orignames = [f['properties']['origname'] for f in gcps_matched_info['features']]
+    matchnames = [f['properties']['matchname'] for f in gcps_matched_info['features']]
+    origcoords = [(f['properties']['origx'],f['properties']['origy']) for f in gcps_matched_info['features']]
+    matchcoords = [(f['properties']['matchx'],f['properties']['matchy']) for f in gcps_matched_info['features']]
+    tiepoints = zip(origcoords, matchcoords)
 
     if warp_order:
         # setup
@@ -287,7 +231,6 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
                  'residual':res, 'residual_type':residual_type}
         feat = {'geometry':geoj, 'properties':props}
         gcps_final_info['features'].append(feat)
-    info['gcps_final'] = gcps_final_info
 
     # then transforms
     # NOTE: metadata reports only RMSE error type with leave_one_out=True, maybe allow user customizing this? 
@@ -318,39 +261,239 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
                      # hardcoded
                      'error_type': 'rmse', 
                      'leave_one_out': True}
-    info['transformation'] = {'forward': forward_info,
-                              'backward': backward_info}
+    transinfo = {'forward': forward_info,
+                 'backward': backward_info}
 
+    return transinfo,gcps_final_info
 
-
+def warp(mapp_im, transinfo):
     #################
     # Warping
 
+    # load the transforms
+    forward = transforms.from_json(transinfo['forward']['model'])
+    backward = transforms.from_json(transinfo['backward']['model'])
+    
     # warp the image
-    print '\n'+'warping'
-    print '{} points, warp_method={}'.format(len(tiepoints), forward)
-    if mapp_poly is not None:
-        mapp_im = segmentation.mask_image(im.convert('RGBA'), mapp_poly) # map region
-    else:
-        mapp_im = im
     wim,aff = imwarp.warp(mapp_im, forward, backward) # warp
 
     # store metadata
     warp_info = {'image':wim,
                  'affine':aff}
-    info['warped'] = warp_info
 
+    return warp_info
+
+
+
+### MAIN FUNC
+
+def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
+    info = dict()
+    start = time.time()
+
+    timinginfo = dict()
+    timinginfo['start'] = datetime.datetime.now().isoformat()
+    
+    params = dict(inpath=inpath,
+                  outpath=outpath,
+                  matchthresh=matchthresh,
+                  textcolor=textcolor,
+                  colorthresh=colorthresh,
+                  textconf=textconf,
+                  sample=sample,
+                  source=source,
+                  warp_order=warp_order,
+                  residual_type=residual_type,
+                  )
+    info['params'] = params
+
+
+    
+    # load image
+    print 'loading image', inpath
+    im = PIL.Image.open(inpath).convert('RGB')
+
+
+
+    # determine various paths
+    # outpath can be string, True, or False/None
+    infold,infil = os.path.split(inpath)
+    infil,ext = os.path.splitext(infil)
+    if outpath:
+        # output
+        if outpath is True:
+            # auto, relative to inpath
+            outfold = infold
+            outfil = infil + '_georeferenced'
+        else:
+            # relative to manual outpath
+            outfold,outfil = os.path.split(outpath)
+    else:
+        # dont output, but still need for debug
+        # relative to inpath
+        outfold = infold
+        outfil = infil + '_georeferenced'
+
+    outfil,ext = os.path.splitext(outfil)
+
+    
+
+
+    ################
+    # Image partitioning
+    print '\n' + 'image segmentation'
+
+    # remove unwanted parts of image? 
+    text_im = im
+##    if mapp_poly is not None:
+##        text_im = segmentation.mask_image(text_im, mapp_poly)
+##    for box in box_polys:
+##        text_im = segmentation.mask_image(text_im, box, invert=True)
+##    #text_im.show()
+    
+    # partition image
+    t = time.time()
+    seginfo = image_partitioning(text_im)
+
+    # store timing
+    elaps = time.time() - t
+    timinginfo['segmentation'] = elaps
+
+    # store metadata
+    info['segmentation'] = seginfo
+
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    
+
+
+
+    ###############
+    # Text detection
+    
+    # detect text
+    print '\n' + 'detecting text'
+    t = time.time()
+    textinfo = text_detection(text_im, textcolor, colorthresh, textconf, sample)
+
+    # store timing
+    elaps = time.time() - t
+    timinginfo['text_recognition'] = elaps
+
+    # store metadata
+    info['text_recognition'] = textinfo
+
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+
+
+
+
+    ################
+    # Toponym selection
+
+    # text anchor points
+    print '\n' + 'seleting toponyms with anchor points'
+    t = time.time()
+    toponyminfo = toponym_selection(im, textinfo, colorthresh)
+
+    # store timing
+    elaps = time.time() - t
+    timinginfo['toponym_candidates'] = elaps
+
+    # store metadata
+    info['toponym_candidates'] = toponyminfo
+
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+
+    
+
+
+    ###############
+    # Control point matching
+
+    # find matches
+    print '\n' + 'finding matches'
+    t = time.time()
+    gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
+
+    # store timing
+    elaps = time.time() - t
+    timinginfo['gcps_matched'] = elaps
+
+    # store metadata
+    info['gcps_matched'] = gcps_matched_info
+
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+
+
+
+
+    #################
+    # Transform Estimation
+
+    # estimate the transform and return final gcps
+    print '\n' + 'estimating transformation'
+    t = time.time()
+    transinfo,gcps_final_info = estimate_transform(gcps_matched_info, warp_order, residual_type)
+
+    # store timing
+    elaps = time.time() - t
+    timinginfo['transform_estimation'] = elaps
+
+    # store metadata
+    info['gcps_final'] = gcps_final_info
+    info['transform_estimation'] = transinfo
+
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+
+
+
+
+    #################
+    # Warping
+    print '\n' + 'warping'
+    print '{} points, warp_method={}'.format(len(gcps_final_info['features']), transinfo['forward']['model'])
+
+    # mask the image before warping
+    mapp_im = im
+    #if mapp_poly is not None:
+    #    mapp_im = segmentation.mask_image(im.convert('RGBA'), mapp_poly) # map region
+
+    # warp the image
+    t = time.time()
+    warp_info = warp(mapp_im, transinfo)
+
+    # store timing
+    elaps = time.time() - t
+    timinginfo['warping'] = elaps
+
+    # store metadata
+    info['warping'] = warp_info
+
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+
+
+
+    #############
+    # Finished
+
+    total_time = time.time() - start
+    timinginfo['total'] = total_time
+    info['timings'] = timinginfo
+    
+    print '\n'+'finished!'
+    print 'total runtime: {:.1f} seconds \n'.format(total_time)
 
 
 
     ##############
-    # Save output? 
+    # Save output?
 
     if outpath:
+        print '\n' + 'saving output'
         
         # warped image
         pth = os.path.join(outfold, outfil + '.tif') # suffix already added (manual or auto, see top)
-        rast = pg.RasterData(image=wim, affine=aff) # to geodata
+        rast = pg.RasterData(image=warp_info['image'], affine=warp_info['affine']) # to geodata
         rast.save(pth)
 
         # final control points
@@ -361,9 +504,10 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
         # transformation
         pth = os.path.join(outfold, outfil+'_transform.json')
         with open(pth, 'w') as writer:
-            json.dump(info['transformation'], writer)
+            json.dump(info['transform_estimation'], writer)
 
     if debug:
+        print '\n' + 'saving debug data'
 
         # segmentation
         pth = os.path.join(outfold, outfil+'_debug_segmentation.geojson')
@@ -385,13 +529,15 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
         with open(pth, 'w') as writer:
             json.dump(info['gcps_matched'], writer)
 
+        # timings
+        pth = os.path.join(outfold, outfil+'_debug_timings.json')
+        with open(pth, 'w') as writer:
+            json.dump(info['timings'], writer)
 
 
-    #############
-    # Finished
 
-    print '\n'+'finished!'
-    print 'total runtime: {:.1f} seconds \n'.format(time.time() - start)
+    ##############
+    # Return results metadata
 
     return info
 
