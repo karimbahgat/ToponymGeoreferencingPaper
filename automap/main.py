@@ -543,58 +543,5 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
 
 
 
-    #################
-
-##    def debug_ocr(im, outpath, data, controlpoints, origs):
-##        import pyagg
-##        c = pyagg.canvas.from_image(im)
-##        #print c.width,c.height,im.size
-##        for r in data:
-##            top,left,w,h = [r[k] for k in 'top left width height'.split()]
-##            box = [left, top, left+w, top+h]
-##            text = r.get('text_clean','[?]')
-##            #print box,text
-##            c.draw_box(bbox=box, fillcolor=None, outlinecolor=(0,255,0))
-##            c.draw_text(text, xy=(left,top), anchor='sw', textsize=6, textcolor=(0,255,0)) #bbox=box)
-##        for oname,ocoord in origs:
-##            c.draw_circle(xy=ocoord, fillsize=1, fillcolor=None, outlinecolor=(0,0,255))
-##        for on,oc,mn,mc,res in controlpoints:
-##            c.draw_circle(xy=oc, fillsize=1, fillcolor=(255,0,0,155), outlinecolor=None)
-##        c.save(outpath)
-##
-##    def debug_warped(pth, outpath, controlpoints):
-##        import pythongis as pg
-##        m = pg.renderer.Map(width=2000, height=2000, background='white')
-##
-##        m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_admin_0_countries\ne_10m_admin_0_countries.shp",
-##                    fillcolor=(217,156,38))
-##
-##        warped = pg.RasterData(pth)
-##        for b in warped.bands:
-##            b.nodataval = 0 # need better approach, use 4th band as mask
-##        rlyr = m.add_layer(warped, transparency=0.3)
-##
-##        m.add_layer(r"C:\Users\kimok\Downloads\ne_10m_populated_places_simple\ne_10m_populated_places_simple.shp",
-##                    fillcolor='red', fillsize=0.1) #outlinewidth=0.1)
-##
-##        anchors = pg.VectorData(fields=['origname', 'matchname', 'residual'])
-##        for on,oc,mn,mc,res in controlpoints:
-##            anchors.add_feature([on,mn,res], dict(type='Point', coordinates=mc))
-##        m.add_layer(anchors, fillcolor=(0,255,0), fillsize=0.3)
-##
-##        m.zoom_bbox(*rlyr.bbox)
-##        m.zoom_out(1.5)
-##        #m.view()
-##        m.save(outpath)
-
-    ##    # draw data onto image
-##    if debug is True or debug == 'ocr':
-##        debugpath = os.path.join(outfold, outfil+'_debug_ocr.png')
-##        debug_ocr(im, debugpath, data, controlpoints, origs)
-##
-##    # view warped
-##    if debug is True:
-##        debugpath = os.path.join(outfold, outfil+'_debug_warp.png')
-##        debug_warped(outpath, debugpath, controlpoints)
 
     
