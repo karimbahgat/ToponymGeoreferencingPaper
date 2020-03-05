@@ -19,6 +19,7 @@ import datetime
 import time
 import os
 import json
+import itertools
 
 
 ### FUNCS FOR DIFFERENT STAGES
@@ -66,18 +67,59 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample):
     toponym_colors = set((r['color'] for r in texts))
 
     # deduplicate overlapping texts from different colors
-    # ...
+    # very brute force...
+    if len(toponym_colors) > 1:
+        print 'textlen',len(texts)
+        # for every combination of text colors
+        for col,col2 in itertools.combinations(toponym_colors, 2):
+            coltexts = [r for r in texts if r['color'] == col]
+            coltexts2 = [r for r in texts if r['color'] == col2]
+            print 'comparing textcolor',col,len(coltexts),'with',col2,len(coltexts2)
+            # we got two different colored groups of text
+            for r in coltexts:
+                for r2 in coltexts2:
+                    # find texts that overlap
+                    if not (r['left'] > (r2['left']+r2['width']) \
+                            or (r['left']+r['width']) < r2['left'] \
+                            or r['top'] > (r2['top']+r2['height']) \
+                            or (r['top']+r['height']) < r2['top'] \
+                            ):
+                        # drop the one with the poorest color match
+                        print 'found duplicate texts of different colors, dropping worst match'
+                        print r
+                        print r2
+                        #text_im.crop((r['left'], r['top'], r['left']+r['width'], r['top']+r['height'])).show()
+                        #text_im.crop((r2['left'], r2['top'], r2['left']+r2['width'], r2['top']+r2['height'])).show()
+                        if r2['color_match'] > r['color_match']:
+                            r2['drop'] = True
+                        else:
+                            r['drop'] = True
+        texts = [r for r in texts if not r.get('drop')]
+        print 'textlen deduplicated',len(texts)
 
-    # connect text
+    # connect texts
     print '(connecting texts)'
     grouped = []
+    # connect each color texts separately
     for col in toponym_colors:
         coltexts = [r for r in texts if r['color'] == col]
-        grouped.extend( textgroup.connect_text(coltexts) )
+        # divide into lower and upper case subgroups
+        # upper = more than half of alpha characters is uppercase (to allow for minor ocr upper/lower errors)
+        lowers = []
+        uppers = []
+        for text in coltexts:
+            alphachars = text['text_alphas']
+            isupper = len([ch for ch in alphachars if ch.isupper()]) > (len(alphachars) / 2.0) 
+            if isupper:
+                uppers.append(text)
+            else:
+                lowers.append(text)
+        # connect lower and upper case texts separately
+        if len(lowers) > 1:
+            grouped.extend( textgroup.connect_text(lowers) )
+        if len(uppers) > 1:
+            grouped.extend( textgroup.connect_text(uppers) )
     texts = grouped
-
-    # ignore small texts?
-    texts = [text for text in texts if len(text['text_clean']) >= 3]
 
     # store metadata
     textinfo = {'type': 'FeatureCollection', 'features': []}
@@ -91,17 +133,21 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample):
 
     return textinfo
 
-def toponym_selection(im, textinfo, colorthresh):
+def toponym_selection(im, textinfo, colorthresh, seginfo):
     ################
     # Toponym selection
+    texts = [f['properties'] for f in textinfo['features']]
 
     # text anchor points
-    print 'determening text anchors'
-    texts = [f['properties'] for f in textinfo['features']]
-    toponym_colors = set((r['color'] for r in texts))
+    print 'filtering toponym candidates'
+    topotexts = toponyms.filter_toponym_candidates(texts, seginfo)
+
+    # text anchor points
+    print 'determening toponym anchors'
+    toponym_colors = set((r['color'] for r in topotexts))
     anchored = []
     for col in toponym_colors:
-        coltexts = [r for r in texts if r['color'] == col]
+        coltexts = [r for r in topotexts if r['color'] == col]
         diff = segmentation.color_difference(segmentation.quantize(im), col)
         diff[diff > colorthresh] = 255
         anchor_im = PIL.Image.fromarray(diff)
@@ -393,7 +439,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     # text anchor points
     print '\n' + 'seleting toponyms with anchor points'
     t = time.time()
-    toponyminfo = toponym_selection(im, textinfo, colorthresh)
+    toponyminfo = toponym_selection(im, textinfo, colorthresh, seginfo)
 
     # store timing
     elaps = time.time() - t

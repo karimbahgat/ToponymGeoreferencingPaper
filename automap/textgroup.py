@@ -10,14 +10,15 @@ def connect_text(data, ythresh=6, xthresh=6):
             group = newdata[i]
             dct = {'text': ' '.join([r['text'] for r in group]),
                    'text_clean': ' '.join([r['text_clean'] for r in group]),
+                   'text_alphas': ''.join([r['text_alphas'] for r in group]),
                    #'numeric': min([r['numeric'] for r in group]),
                    #'uppercase': min([r['uppercase'] for r in group]),
                    'conf': sum([r['conf'] for r in group]) / float(len(group)),
                    'left': min([r['left'] for r in group]),
                    'top': min([r['top'] for r in group]),
                    'fontheight': max([r['fontheight'] for r in group]),
-                   #'function': group[0]['function'],
                    'color': group[0]['color'],
+                   'color_match': sum([r['color_match'] for r in group]) / float(len(group)),
                    }
             dct['width'] = max([r['left']+r['width'] for r in group]) - dct['left']
             dct['height'] = max([r['top']+r['height'] for r in group]) - dct['top']

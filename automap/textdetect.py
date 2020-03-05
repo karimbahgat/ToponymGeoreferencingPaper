@@ -120,6 +120,8 @@ def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
     return textcolors
 
 def sample_texts(im, textcolors, threshold=25, textconf=60, samplesize=(300,300), max_samples=8, max_texts=10):
+    # REMEMBER: update text processing/filtering to be same as extract_texts(), maybe by calling it?
+    # ... 
     w,h = im.size
     sw,sh = samplesize
     texts = []
@@ -274,30 +276,32 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
         for text in data:
             
             # process text
-            if float(text['conf']) > textconf and len(text['text']) >= 2:
+            if float(text['conf']) > textconf: 
                 
                 # clean text
                 text['text_clean'] = re.sub('^\\W+|\\W+$', '', text['text'], flags=re.UNICODE) # strips nonalpha chars from start/end
 
-                # ignore nontoponyms
-                if not text['text_clean'].replace(' ',''):
-                    # empty text
+                # ignore empty text
+                if not text['text_clean']:
                     continue
-                if not any((ch.isalpha() for ch in text['text_clean'])):
-                    # does not contain any alpha chars
-                    continue
-                if len([ch for ch in text['text_clean'] if ch.isupper()]) > len(text['text_clean']) / 2:
-                    # more than half of characters is uppercase
-                    continue
+
+                # enhance
+                alphachars = [ch for ch in text['text_clean'] if ch.isalpha()]
+                text['text_alphas'] = ''.join(alphachars)
+
+                # maybe must have at least one alphanumeric to be considered text (ie just junk symbols)?
+                # ... 
                 
                 # record info
                 text['color'] = col
+                textarr = lmask[text['top']:text['top']+text['height'], text['left']:text['left']+text['width']]
+                text['color_match'] = textarr[textarr < threshold].mean() # average diff of pixels below threshold
 
                 # downscale coords
                 for key in 'left top width height'.split():
                     text[key] = int( round(text[key] / 2.0) )
 
-                # ignore tiny text
+                # ignore tiny text (upscaling results in sometimes detecting ghost text from tiny pixel regions)
                 if text['width'] <= 4 or text['height'] <= 4:
                     continue
                 

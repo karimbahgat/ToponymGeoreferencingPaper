@@ -7,7 +7,57 @@ import PIL, PIL.Image
 
 import cv2
 
+import shapely
 
+
+
+def filter_toponym_candidates(data, seginfo=None):
+    if seginfo:
+        # inclusion region
+        incl_shp = None
+        mapregion = next((f['geometry'] for f in seginfo['features'] if f['properties']['type'] == 'Map'), None)
+        if mapregion:
+            mapshp = shapely.geometry.asShape(mapregion)
+            incl_shp = mapshp
+
+        # exclusion region
+        excl_shp = None
+        boxes = [f['geometry'] for f in seginfo['features'] if f['properties']['type'] == 'Box']
+        if boxes:
+            boxshps = [shapely.geometry.asShape(box) for box in boxes]
+            excl_shp = shapely.ops.unary_union(boxshps)
+    
+    topotexts = []
+    for text in data:
+        # only texts that resemble a toponym
+        alphachars = text['text_alphas']
+        if len(alphachars) < 2:
+            # toponyms must contain at least 2 alpha chars
+            continue
+        if any((ch.isnumeric() for ch in text['text_clean'])):
+            # cannot contain any numbers
+            continue
+        if not text['text_clean'][0].isupper():
+            # first char must be uppercase
+            continue
+        if len([ch for ch in alphachars if ch.isupper()]) > (len(alphachars) / 2.0):
+            # are not all uppercase
+            # upper = more than half of characters is uppercase (to allow for minor ocr upper/lower errors)
+            continue
+
+        # only texts in relevant parts of the image
+        if seginfo and (incl_shp or excl_shp):
+            bbox = [text['left'], text['top'], text['left']+text['width'], text['top']+text['height']]
+            text_shp = shapely.geometry.box(*bbox)
+            # must be in inclusion region
+            if incl_shp and not text_shp.intersects(incl_shp):
+                continue
+            # must not be in exclusion region
+            if excl_shp and text_shp.intersects(excl_shp):
+                continue
+        
+        topotexts.append(text)
+    return topotexts
 
 def detect_toponym_anchors(im, data, debug=False):
 ##    lab = segmentation.rgb_to_lab(im)
