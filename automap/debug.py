@@ -1,6 +1,9 @@
 
 import pythongis as pg
+import json
 import os
+
+import automap as mapfit
 
 
 def render_text_recognition(imagepath, georefpath):
@@ -9,7 +12,7 @@ def render_text_recognition(imagepath, georefpath):
     imagedata = pg.RasterData(imagepath)
     
     # init renderer
-    render = pg.renderer.Map(width=imagedata.width, height=imagedata.height)
+    render = pg.renderer.Map(width=imagedata.width, height=imagedata.height, background='white')
     render._create_drawer()
     render.drawer.pixel_space()
 
@@ -24,8 +27,12 @@ def render_text_recognition(imagepath, georefpath):
     render.add_layer(imagedata)
 
     # add image regions
-    segmentdata = pg.VectorData(segmentpath)
-    render.add_layer(segmentdata, fillcolor=None, outlinecolor='red', outlinewidth=0.3)
+    try:
+        segmentdata = pg.VectorData(segmentpath)
+        render.add_layer(segmentdata, fillcolor=None, outlinecolor='red', outlinewidth=0.3)
+    except:
+        # segment file is empty feature collection
+        pass
 
     # add text
     textdata = pg.VectorData(textpath)
@@ -60,7 +67,7 @@ def render_text_recognition(imagepath, georefpath):
 
 def render_georeferencing(georefpath):
     # init renderer
-    render = pg.renderer.Map(3000,3000)
+    render = pg.renderer.Map(3000,3000, background='white')
 
     # add country background
     render.add_layer(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp",
@@ -75,17 +82,38 @@ def render_georeferencing(georefpath):
     georef_root,ext = os.path.splitext(georefpath)
     candidatepath = georef_root + '_debug_gcps_matched.geojson'
     gcppath = georef_root + '_controlpoints.geojson'
+    transpath = georef_root + '_transform.json'
+    def textpos(f):
+        x,y = f.geometry['coordinates']
+        return x+1,y
 
-    # add gcp candidates
-    candidatedata = pg.VectorData(candidatepath)
-    render.add_layer(candidatedata, fillsize=1, fillcolor=None, outlinecolor='blue')
+    # add gcps as marked in image pixels, ie calculate using the transform...
+    with open(transpath) as fobj:
+        transinfo = json.load(fobj)
+    forward = mapfit.transforms.from_json(transinfo['forward']['model'])
+    pixdata = pg.VectorData(gcppath)
+    for f in pixdata:
+        px,py = f['origx'],f['origy']
+        x,y = forward.predict([px],[py])
+        f.geometry = {'type':'Point', 'coordinates':(x,y)}
+    render.add_layer(pixdata, fillsize=1, fillcolor='red',
+                     text=lambda f: f['origname'],
+                     textoptions={'textcolor':'red', 'xy':textpos, 'anchor':'w', 'textsize':8})
 
-    # add final controlpoints
+    # add arrow from pixel to gcp
+    linedata = pg.VectorData()
+    for f in pixdata:
+        x1,y1 = f.geometry['coordinates']
+        x2,y2 = f['matchx'],f['matchy']
+        geoj = {'type':'LineString', 'coordinates':[(x1,y1),(x2,y2)]}
+        linedata.add_feature([], geoj)
+    render.add_layer(linedata, fillsize=0.2, fillcolor='black')
+
+    # add final controlpoints used to estimate transform
     gcpdata = pg.VectorData(gcppath)
-    render.add_layer(gcpdata, fillsize=1, fillcolor='green')
-
-    # TODO: maybe add where gcps actually end up, eg calculate using the transform...
-    # ... 
+    render.add_layer(gcpdata, fillsize=1, fillcolor='green',
+                     text=lambda f: f['matchname'].split('|')[0],
+                     textoptions={'textcolor':'green', 'xy':textpos, 'anchor':'w', 'textsize':8})
 
     # view
     render.zoom_bbox(*georefdata.bbox)

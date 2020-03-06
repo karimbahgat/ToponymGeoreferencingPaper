@@ -60,7 +60,7 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample):
     # Text detection
     
     # detect text
-    print 'detecting text'
+    print '(detecting text)'
     if textcolor and not isinstance(textcolor, list):
         textcolor = [textcolor]
     texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh, textconf=textconf, sample=sample)
@@ -69,12 +69,13 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample):
     # deduplicate overlapping texts from different colors
     # very brute force...
     if len(toponym_colors) > 1:
+        print '(deduplicating texts of different colors)'
         print 'textlen',len(texts)
         # for every combination of text colors
         for col,col2 in itertools.combinations(toponym_colors, 2):
             coltexts = [r for r in texts if r['color'] == col]
             coltexts2 = [r for r in texts if r['color'] == col2]
-            print 'comparing textcolor',col,len(coltexts),'with',col2,len(coltexts2)
+            print 'comparing textcolor',map(int,col),len(coltexts),'with',map(int,col2),len(coltexts2)
             # we got two different colored groups of text
             for r in coltexts:
                 for r2 in coltexts2:
@@ -85,9 +86,9 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample):
                             or (r['top']+r['height']) < r2['top'] \
                             ):
                         # drop the one with the poorest color match
-                        print 'found duplicate texts of different colors, dropping worst match'
-                        print r
-                        print r2
+                        #print 'found duplicate texts of different colors, dropping worst match'
+                        #print r
+                        #print r2
                         #text_im.crop((r['left'], r['top'], r['left']+r['width'], r['top']+r['height'])).show()
                         #text_im.crop((r2['left'], r2['top'], r2['left']+r2['width'], r2['top']+r2['height'])).show()
                         if r2['color_match'] > r['color_match']:

@@ -192,8 +192,57 @@ def detect_boxes(im):
     #PIL.Image.fromarray(im_arr_draw).show()
     return boxes
 
+##class Quad:
+##    def __init__(self, x, y, w, h):
+##        self.x = x
+##        self.y = y
+##        self.w = w
+##        self.h = h
+##        self.children = []
+##
+##    def __repr__(self):
+##        return 'Quad({}, {}, {}, {}, children={})'.format(self.x, self.y, self.w, self.h, len(self.children))
+##
+##    def bbox(self):
+##        x1,y1 = self.x - self.w/2.0, self.y - self.h/2.0
+##        x2,y2 = x1+self.w, y1+self.h
+##        return x1,y1,x2,y2
+##        
+##    def split(self):
+##        if self.children:
+##            for subq in self.children:
+##                subq.split()
+##        else:
+##            halfwidth = self.w/2.0
+##            halfheight = self.h/2.0
+##            quad = Quad(self.x-halfwidth/2.0, self.y-halfheight/2.0,
+##                        halfwidth, halfheight)
+##            self.children.append(quad)
+##            quad = Quad(self.x+halfwidth/2.0, self.y-halfheight/2.0,
+##                        halfwidth, halfheight)
+##            self.children.append(quad)
+##            quad = Quad(self.x+halfwidth/2.0, self.y+halfheight/2.0,
+##                        halfwidth, halfheight)
+##            self.children.append(quad)
+##            quad = Quad(self.x-halfwidth/2.0, self.y+halfheight/2.0,
+##                        halfwidth, halfheight)
+##            self.children.append(quad)
+##
+##    def sample(self):
+##        if self.children:
+##            q = self.children.pop(0)
+##            if q.children:
+##                # if child quad has children
+##                subq = q.sample() # sample the quad
+##                self.children.append(q) # send to back of the line
+##                return subq
+##            else:
+##                return q
+
 class Quad:
     def __init__(self, x, y, w, h):
+        '''Breadth-first quad tree that infinitely samples each quad to get a spatially balanced sampling with finer and finer detail,
+        and splits subquads when necessary'''
         self.x = x
         self.y = y
         self.w = w
@@ -210,34 +259,40 @@ class Quad:
         
     def split(self):
         if self.children:
-            for subq in self.children:
-                subq.split()
+            # already has children, use existing
+            pass
         else:
             halfwidth = self.w/2.0
             halfheight = self.h/2.0
+            # upper left
             quad = Quad(self.x-halfwidth/2.0, self.y-halfheight/2.0,
                         halfwidth, halfheight)
             self.children.append(quad)
-            quad = Quad(self.x+halfwidth/2.0, self.y-halfheight/2.0,
-                        halfwidth, halfheight)
-            self.children.append(quad)
+            # lower right
             quad = Quad(self.x+halfwidth/2.0, self.y+halfheight/2.0,
                         halfwidth, halfheight)
             self.children.append(quad)
+            # upper right
+            quad = Quad(self.x+halfwidth/2.0, self.y-halfheight/2.0,
+                        halfwidth, halfheight)
+            self.children.append(quad)
+            # lower left
             quad = Quad(self.x-halfwidth/2.0, self.y+halfheight/2.0,
                         halfwidth, halfheight)
             self.children.append(quad)
 
     def sample(self):
-        if self.children:
-            q = self.children.pop(0)
-            if q.children:
-                # if child quad has children
-                subq = q.sample() # sample the quad
-                self.children.append(q) # send to back of the line
-                return subq
-            else:
-                return q
+        '''Samples this quad, either as itself or by further sampling the next in line of its child quads.'''
+        # if doesnt have any children, split and return self 
+        if not self.children:
+            self.split()
+            return self
+        # get next quad
+        q = self.children.pop(0)
+        samp = q.sample()
+        self.children.append(q) # send to back of the line
+        return samp
+        
 
 
 
@@ -273,26 +328,37 @@ def image_segments(im):
 
     return map_outline, boxes
 
-def sample_quads(im, tilesize): 
-    w,h = im.size
-    tw,th = tilesize
+def sample_quads(bbox, samplesize):
+    '''Samples quads of samplesize from a bbox region in a rotating fashion, until all parts of bbox region has been sampled'''
+    x1,y1,x2,y2 = bbox
+    w = abs(x2-x1)
+    h = abs(y2-y1)
+    sw,sh = samplesize
 
-    # round to nearest multiple so fits neatly
-    twtimes = w/float(tw)
-    thtimes = h/float(th)
-    maxtimes = max(twtimes,thtimes)
-    maxtimes = max(0, maxtimes-0.5) # round to nearest half
-    levels = int(math.sqrt(maxtimes))
-    #print 'quad specs',w,h,tw,th,maxtimes,levels
+    # divide image into quad tiles
+    cx = (x1+x2)/2.0
+    cy = (y1+y2)/2.0
+    quads = Quad(cx, cy, w, h)
+    quads.split()
 
-    # divide image into quad tiles            
-    quads = Quad(w/2.0, h/2.0, w, h)
-    for _ in range(levels+1):
-        quads.split()
+    # sample quads in a rotating fashion until all parts of bbox has been covered by the samplesize
+    #xmin,ymin,xmax,ymax = min(x1,x2),min(y1,y2),max(x1,x2),max(y1,y2)
+    #sxmin,symin,sxmax,symax = cx,cy,cx,cy
+    intersects_centroid = 0
+    while True:
+        # sample 4 quads
+        for _ in range(4):
+            q = quads.sample()
+            sq = Quad(q.x, q.y, sw, sh)
+            yield sq
 
-    # sample quads in a rotating fashion until all have been sampled
-    while quads.children:
-        q = quads.sample()
-        yield q
+            # check if sample quad intersects the region centroid
+            _sxmin,_symin,_sxmax,_symax = sq.bbox()
+            if not (_sxmax < cx or _sxmin > cx or _symax < cy or _symin > cy):
+                intersects_centroid += 1
+
+        # when 4 sample quads touches the region centroid, the entire region has been covered
+        if intersects_centroid >= 4:
+            break
 
 
