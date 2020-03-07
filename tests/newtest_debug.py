@@ -2,12 +2,12 @@
 import automap as mapfit
 import os
 
-testim = 'china_pol96.jpg'
+testim = 'nepal_pol90.jpg'
 testim_root,ext = os.path.splitext(testim)
 
 # first produce
-##db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
-##info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp_order=None, db=db, debug=True)
+db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
+info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp_order=None, db=db, debug=True)
 
 # image
 render = mapfit.debug.render_text_recognition('testmaps/{}'.format(testim),

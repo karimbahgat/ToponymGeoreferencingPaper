@@ -54,7 +54,7 @@ class Polynomial(object):
         trans = Polynomial(**init)
         return trans
 
-    def fit(self, inx, iny, outx, outy, invert=False):
+    def fit(self, inx, iny, outx, outy, invert=False): #, exact=False):
         # to arrays
         inx = np.array(inx)
         iny = np.array(iny)
@@ -97,6 +97,11 @@ class Polynomial(object):
             # get inverse transform by switching the from and to coords (warning, not an exact inverse bc different lstsq estimation)
             if invert:
                 inx,iny,outx,outy = outx,outy,inx,iny
+##            if exact:
+##                inx = inx[:6]
+##                iny = iny[:6]
+##                outx = outx[:6]
+##                outy = outy[:6]
             # terms
             x = inx
             y = iny
@@ -107,6 +112,27 @@ class Polynomial(object):
             # u consists of each term in equation, with each term being array if want to transform multiple
             u = np.array([xx,xy,yy,x,y,ones]).transpose()
             # x and y coeffs
+##            if exact:
+##                # lstsq has numerical issues, use exact arg to use .solve since we know the exact to and from?
+##                # https://stackoverflow.com/questions/34170618/normal-equation-and-numpy-least-squares-solve-methods-difference-in-regress
+##                # in and out are supposed to have exact solution (no residuals?)
+##                # ACTUALLY: seems like backward transform can only exactly reverse at the gcps
+##                # (which are limited to fit in square matrix)
+##                # errors increase further away
+##                # hmmm...
+##                #print 'exact'
+##                #print zip(outx,outy)
+##                xcoeffs = np.linalg.solve(u, outx) 
+##                ycoeffs = np.linalg.solve(u, outy) 
+##                A = np.eye(6)
+##                A[0,:] = xcoeffs
+##                A[1,:] = ycoeffs
+##                #print zip(*A.dot(u.transpose())[:2])
+##            else:
+##                # find best coefficients for all equivalent points using least squares
+##                xcoeffs,xres,xrank,xsing = np.linalg.lstsq(u, outx, rcond=-1) 
+##                ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
+            # find best coefficients for all equivalent points using least squares
             xcoeffs,xres,xrank,xsing = np.linalg.lstsq(u, outx, rcond=-1) 
             ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
             # A matrix
@@ -114,6 +140,25 @@ class Polynomial(object):
             # two first rows of the A matrix are equations for the x and y coordinates, respectively
             A[0,:] = xcoeffs
             A[1,:] = ycoeffs
+
+##            # inverse
+##            if invert:
+##                # simply predict the forward coords
+##                # then estimate a new transform from the forward coords to the input coords
+##                # which should be a perfect match (0 residuals) since these are derived from same transform
+##                # ax^2 + bx + c = x'   (input x, coeffs a,b,c estimated, x' predicted)
+##                # rx'^2 + sx' + t = x    (using the predicted x' and known input x, estimate inverse coeffs r,s,t)
+##                u = u.transpose()
+##                predx,predy = A.dot(u)[:2]
+##                #print 'inverse'
+##                #print zip(outx,outy)
+##                print zip(predx,predy)
+##                print zip(inx,iny)
+##
+##                # reuse code by calling same func and reversing args
+##                trans = Polynomial(self.order)
+##                trans.fit(predx, predy, inx, iny) #, exact=True)
+##                A = trans.A
 
         elif self.order == 3:
             # get inverse transform by switching the from and to coords (warning, not an exact inverse bc different lstsq estimation)

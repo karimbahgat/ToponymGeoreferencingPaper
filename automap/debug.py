@@ -83,9 +83,6 @@ def render_georeferencing(georefpath):
     candidatepath = georef_root + '_debug_gcps_matched.geojson'
     gcppath = georef_root + '_controlpoints.geojson'
     transpath = georef_root + '_transform.json'
-    def textpos(f):
-        x,y = f.geometry['coordinates']
-        return x+1,y
 
     # add gcps as marked in image pixels, ie calculate using the transform...
     with open(transpath) as fobj:
@@ -98,7 +95,7 @@ def render_georeferencing(georefpath):
         f.geometry = {'type':'Point', 'coordinates':(x,y)}
     render.add_layer(pixdata, fillsize=1, fillcolor='red',
                      text=lambda f: f['origname'],
-                     textoptions={'textcolor':'red', 'xy':textpos, 'anchor':'w', 'textsize':8})
+                     textoptions={'textcolor':'darkred', 'anchor':'w', 'textsize':8})
 
     # add arrow from pixel to gcp
     linedata = pg.VectorData()
@@ -113,7 +110,7 @@ def render_georeferencing(georefpath):
     gcpdata = pg.VectorData(gcppath)
     render.add_layer(gcpdata, fillsize=1, fillcolor='green',
                      text=lambda f: f['matchname'].split('|')[0],
-                     textoptions={'textcolor':'green', 'xy':textpos, 'anchor':'w', 'textsize':8})
+                     textoptions={'textcolor':'darkgreen', 'anchor':'w', 'textsize':8})
 
     # view
     render.zoom_bbox(*georefdata.bbox)
