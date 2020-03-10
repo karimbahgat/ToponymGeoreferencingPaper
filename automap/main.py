@@ -139,7 +139,7 @@ def toponym_selection(im, textinfo, colorthresh, seginfo):
     # Toponym selection
     texts = [f['properties'] for f in textinfo['features']]
 
-    # text anchor points
+    # filter toponym candidates
     print 'filtering toponym candidates'
     topotexts = toponyms.filter_toponym_candidates(texts, seginfo)
 
@@ -148,6 +148,7 @@ def toponym_selection(im, textinfo, colorthresh, seginfo):
     toponym_colors = set((r['color'] for r in topotexts))
     anchored = []
     for col in toponym_colors:
+        #segmentation.view_colors([col])
         coltexts = [r for r in topotexts if r['color'] == col]
         diff = segmentation.color_difference(segmentation.quantize(im), col)
         diff[diff > colorthresh] = 255

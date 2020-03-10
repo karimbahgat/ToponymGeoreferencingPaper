@@ -309,7 +309,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
                 text['color_match'] = textarr[textarr < threshold].mean() # average diff of pixels below threshold
 
                 # downscale coords
-                for key in 'left top width height'.split():
+                for key in 'left top width height fontheight'.split():
                     text[key] = int( round(text[key] / 2.0) )
 
                 # ignore tiny text (upscaling results in sometimes detecting ghost text from tiny pixel regions)

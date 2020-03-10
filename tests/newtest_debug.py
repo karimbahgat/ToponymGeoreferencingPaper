@@ -2,7 +2,7 @@
 import automap as mapfit
 import os
 
-testim = 'nepal_pol90.jpg'
+testim = 'china_pol96.jpg'
 testim_root,ext = os.path.splitext(testim)
 
 # first produce
