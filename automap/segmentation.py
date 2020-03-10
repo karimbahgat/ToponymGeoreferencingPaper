@@ -78,13 +78,15 @@ def group_colors(colors, thresh=10, categories=None):
                  for gc in diffgroups.keys()]
         similar = [(gc,dist) for gc,dist in dists if c != gc and dist < thresh]
         if similar:
+            # find the most similar group color
             nearest = sorted(similar, key=lambda x: x[1])[0][0]
-            diffgroups[nearest].append(c)
+            diffgroups[nearest].append(c) 
             # update that group key as the new central color (lowest avg dist to group members)
             gdists = [(gc1,[pairdiffs[tuple(sorted([c,gc]))] for gc2 in diffgroups[nearest]]) for gc1 in diffgroups[nearest]]
             central = sorted(gdists, key=lambda(gc,gds): sum(gds)/float(len(gds)))[0][0]
             diffgroups[central] = diffgroups.pop(nearest)
         else:
+            # create new group
             diffgroups[c] = [c]
     return diffgroups
 

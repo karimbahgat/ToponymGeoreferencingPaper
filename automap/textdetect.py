@@ -57,7 +57,7 @@ def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
             # samples must be good examples
             if text['conf'] > 60 and len(text['text']) >= 4:
                 
-                # found text
+                # found text, crop img
                 #print 'SNIFFING text',text
                 top,left = text['top'],text['left']
                 width,height = text['width'],text['height']
@@ -65,18 +65,20 @@ def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
                 textim = sample.crop(textbox)
                 #textim.show()
 
-                # get luminance weighted avg of colors
+                # get color values and luminance
                 rgbs = np.array(textim).reshape((textim.size[0]*textim.size[1],3))
                 rs,gs,bs = rgbs[:,0],rgbs[:,1],rgbs[:,2]
                 textlum = l.crop(textbox)
                 #textlum.show()
-                
+
+                # equalize luminance and ignore the bottom 66% luminant pixels
                 textlum = ImageOps.equalize(textlum)
                 ls = np.array(textlum)
                 ls = 1 - ((ls.flatten()-ls.min()) / float(ls.max()-ls.min()))
                 ls[ls < 0.66] = 0
                 #PIL.Image.fromarray((ls*255).reshape((textim.size[1], textim.size[0]))).show()
-                
+
+                # get luminance weighted avg of colors
                 r = np.average(rs, weights=ls)
                 g = np.average(gs, weights=ls)
                 b = np.average(bs, weights=ls)
@@ -111,9 +113,20 @@ def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
                 
                 #hist = sorted(hist, key=lambda(c,rgb): -c)
                 #textcol = hist[0][1]
+
+                # calc max color diff in high luminance pixels
+                textim = segmentation.quantize(textim)
+                diff_arr = segmentation.color_difference(textim, textcol)
+                coldiff = diff_arr.flatten()[ls > 0].max()
+                #print diff_arr.flatten()[ls > 0].mean(), np.std(diff_arr.flatten()[ls > 0]), coldiff
+                #diff_arr[ls.reshape(diff_arr.shape)==0] = 255.0
+                #PIL.Image.fromarray(diff_arr).show()
+                #textarr = np.array(textim)
+                #textarr[diff_arr>coldiff] = (255,255,255)
+                #PIL.Image.fromarray(textarr).show()
                 
                 #print textcol
-                texts.append((text['text'],textcol))
+                texts.append((text['text'],textcol,coldiff))
                 
         if (i+1) >= 4: # minimum of 4 samples
             if len(texts) >= max_texts or (i+1) >= max_samples:
@@ -121,10 +134,15 @@ def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
 
     # group similar textcolors and return
     textcolors = [t[1] for t in texts]
-    textcolors = segmentation.group_colors(textcolors, 15)
-    print 'textcolors detected',[(col,len(cols)) for col,cols in textcolors.items()]
+    coldiffs = [t[2] for t in texts]
+    colorgroups = segmentation.group_colors(textcolors, 10)
+    print 'textcolors detected',[(col,len(cols)) for col,cols in colorgroups.items()]
     #segmentation.view_colors(textcolors)
-    return textcolors
+    
+    # pair each group color member with their coldiff
+    for col in list(colorgroups.keys()):
+        colorgroups[col] = [(subcol,coldiffs[textcolors.index(subcol)]) for subcol in colorgroups[col]]
+    return colorgroups
 
 ##def sample_texts(im, textcolors, threshold=25, textconf=60, samplesize=(300,300), max_samples=8, max_texts=10):
 ##    # REMEMBER: update text processing/filtering to be same as extract_texts(), maybe by calling it?
@@ -238,6 +256,10 @@ def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
 
 
 def extract_texts(im, textcolors, threshold=25, textconf=60):
+    '''
+    - textcolors is list of colors.
+    - threshold can be either single value used for all colors, or iterable of thresholds same length as textcolors.
+    '''
     # extract from entire image
     w,h = im.size
     texts = []
@@ -249,14 +271,19 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
     #l,a,b = lab.split()
     upscale = segmentation.quantize(upscale)
     #upscale.show()
+
+    if isinstance(threshold, (int,float)):
+        threshold = [threshold for col in textcolors]
+
+    assert len(textcolors) == len(threshold)
     
-    for col in textcolors:
+    for col,colthresh in zip(textcolors,threshold):
         # calculate color difference
-        print 'isolating color', col
+        print 'isolating color', col, colthresh
         diff = segmentation.color_difference(upscale, col)
 
         # mask based on color difference threshold
-        diffmask = diff > threshold
+        diffmask = diff > colthresh
 
         # maybe dilate to get edges?
 ##                from PIL import ImageMorph
@@ -279,6 +306,10 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
 
         lmaskim = PIL.Image.fromarray(lmask.astype(np.uint8))
         #lmaskim.show()
+
+        imarr = np.array(upscale)
+        imarr[lmask==255] = (255,255,255)
+        PIL.Image.fromarray(imarr).show()
         
         # detect text
         print 'running ocr'
@@ -306,7 +337,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
                 # record info
                 text['color'] = col
                 textarr = lmask[text['top']:text['top']+text['height'], text['left']:text['left']+text['width']]
-                text['color_match'] = textarr[textarr < threshold].mean() # average diff of pixels below threshold
+                text['color_match'] = textarr[textarr < colthresh].mean() # average diff of pixels below threshold
 
                 # downscale coords
                 for key in 'left top width height fontheight'.split():
@@ -323,8 +354,17 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
 def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=False, max_samples=8, max_texts=10, max_sniff_samples=8, max_sniff_texts=5):
     if not textcolors:
         print 'sniffing text colors'
-        textcolors = sniff_text_colors(im, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
-        #segmentation.view_colors(textcolors)
+        colorgroups = sniff_text_colors(im, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
+        # colors as grouped colors
+        textcolors = list(colorgroups.keys())
+        # color thresholds as avg colordiff of colors within each group
+        colorthresh = [sum((coldiff for subcol,coldiff in subcols))/float(len(subcols)) for subcols in colorgroups.values()]
+        #colorthresh = [t/2.0 for t in colorthresh]
+        # debug
+        segmentation.view_colors(textcolors)
+        for group in colorgroups.values():
+            groupcols = [subcol for subcol,coldiff in group]
+            segmentation.view_colors(groupcols)
     
     # compare with just luminance
 ##    lab = rgb_to_lab(im)
