@@ -118,7 +118,7 @@ def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
                 textim = segmentation.quantize(textim)
                 diff_arr = segmentation.color_difference(textim, textcol)
                 coldiff = diff_arr.flatten()[ls > 0].max()
-                #print diff_arr.flatten()[ls > 0].mean(), np.std(diff_arr.flatten()[ls > 0]), coldiff
+                print text['text'], textcol, diff_arr.flatten()[ls > 0].mean(), np.std(diff_arr.flatten()[ls > 0]), coldiff
                 #diff_arr[ls.reshape(diff_arr.shape)==0] = 255.0
                 #PIL.Image.fromarray(diff_arr).show()
                 #textarr = np.array(textim)
@@ -358,7 +358,10 @@ def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=Fa
         # colors as grouped colors
         textcolors = list(colorgroups.keys())
         # color thresholds as avg colordiff of colors within each group
-        colorthresh = [sum((coldiff for subcol,coldiff in subcols))/float(len(subcols)) for subcols in colorgroups.values()]
+        colorthresh = []
+        for subcols in colorgroups.values():
+            coldiffs = [coldiff for subcol,coldiff in subcols]
+            colorthresh.append(np.max(coldiffs))
         #colorthresh = [t/2.0 for t in colorthresh]
         # debug
         segmentation.view_colors(textcolors)

@@ -86,9 +86,9 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample):
                             or (r['top']+r['height']) < r2['top'] \
                             ):
                         # drop the one with the poorest color match
-                        #print 'found duplicate texts of different colors, dropping worst match'
-                        #print r
-                        #print r2
+                        print 'found duplicate texts of different colors, dropping worst match'
+                        print r
+                        print r2
                         #text_im.crop((r['left'], r['top'], r['left']+r['width'], r['top']+r['height'])).show()
                         #text_im.crop((r2['left'], r2['top'], r2['left']+r2['width'], r2['top']+r2['height'])).show()
                         if r2['color_match'] > r['color_match']:
@@ -134,7 +134,7 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample):
 
     return textinfo
 
-def toponym_selection(im, textinfo, colorthresh, seginfo):
+def toponym_selection(im, textinfo, seginfo):
     ################
     # Toponym selection
     texts = [f['properties'] for f in textinfo['features']]
@@ -147,14 +147,13 @@ def toponym_selection(im, textinfo, colorthresh, seginfo):
     print 'determening toponym anchors'
     toponym_colors = set((r['color'] for r in topotexts))
     anchored = []
-    for col in toponym_colors:
-        #segmentation.view_colors([col])
-        coltexts = [r for r in topotexts if r['color'] == col]
-        diff = segmentation.color_difference(segmentation.quantize(im), col)
-        diff[diff > colorthresh] = 255
-        anchor_im = PIL.Image.fromarray(diff)
-        anchored.extend( toponyms.detect_toponym_anchors(anchor_im, coltexts) )
-    texts = anchored
+    # threshold img to black pixels only
+    # (anchors are usually thick and almost always black, so not as affected by color blending as text)
+    diff = segmentation.color_difference(segmentation.quantize(im), (0,0,0))
+    diff[diff > 25] = 255
+    anchor_im = PIL.Image.fromarray(diff)
+    # detect anchors
+    texts = toponyms.detect_toponym_anchors(anchor_im, topotexts)
 
     # create control points from toponyms
     points = [(r['text_clean'], r['anchor']) for r in texts if 'anchor' in r] # if r['function']=='placename']
@@ -441,7 +440,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     # text anchor points
     print '\n' + 'seleting toponyms with anchor points'
     t = time.time()
-    toponyminfo = toponym_selection(im, textinfo, colorthresh, seginfo)
+    toponyminfo = toponym_selection(im, textinfo, seginfo)
 
     # store timing
     elaps = time.time() - t

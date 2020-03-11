@@ -60,6 +60,8 @@ def filter_toponym_candidates(data, seginfo=None):
     return topotexts
 
 def detect_toponym_anchors(im, data, debug=False):
+    '''Image must already be grayscale of possible anchor pixels
+    '''
     #debug = True
 ##    lab = segmentation.rgb_to_lab(im)
 ##    l,a,b = lab.split()
