@@ -286,30 +286,32 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
         diffmask = diff > colthresh
 
         # maybe dilate to get edges?
-##                from PIL import ImageMorph
-##                diffmask = PIL.Image.fromarray(255-diffmask*255).convert('L')
-##                op = ImageMorph.MorphOp(op_name='dilation8')
-##                changes,diffmask = op.apply(diffmask)
-##                diffmask = np.array(diffmask) == 0
-##                # mask to luminance
-##                lmask = np.array(l)
-##                lmask[diffmask] = lmask.max() # cap max luminance to parts that are too different
+##        from PIL import ImageMorph
+##        diffmask = PIL.Image.fromarray(255-diffmask*255).convert('L')
+##        op = ImageMorph.MorphOp(op_name='dilation8')
+##        changes,diffmask = op.apply(diffmask)
+##        diffmask = np.array(diffmask) == 0
+
+        # mask to luminance
+        #lmask = np.array(l)
+        #lmask[diffmask] = lmask.max() # cap max luminance to parts that are too different
 
         # OR mask to diff values
-        diff[diffmask] = 255 # = threshold
+        diff[diffmask] = 255 #colthresh
         lmask = diff
 
         # normalize
-##        lmax,lmin = lmask.max(),lmask.min()
-##        lmask = (lmask-lmin) / float(lmax-lmin) * 255.0
-##        #print lmask.min(),lmask.max()
+        #lmax,lmin = lmask.max(),lmask.min()
+        #lmask = (lmask-lmin) / float(lmax-lmin) * 255.0
+        #lmask[diffmask] = 255
+        #print lmask.min(),lmask.max()
 
         lmaskim = PIL.Image.fromarray(lmask.astype(np.uint8))
-        #lmaskim.show()
+        lmaskim.show()
 
-        imarr = np.array(upscale)
-        imarr[lmask==255] = (255,255,255)
-        PIL.Image.fromarray(imarr).show()
+        #imarr = np.array(upscale)
+        #imarr[lmask==255] = (255,255,255)
+        #PIL.Image.fromarray(imarr).show()
         
         # detect text
         print 'running ocr'
@@ -355,19 +357,24 @@ def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=Fa
     if not textcolors:
         print 'sniffing text colors'
         colorgroups = sniff_text_colors(im, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
-        # colors as grouped colors
+        # colors as color groupings
         textcolors = list(colorgroups.keys())
-        # color thresholds as avg colordiff of colors within each group
-        colorthresh = []
-        for subcols in colorgroups.values():
-            coldiffs = [coldiff for subcol,coldiff in subcols]
-            colorthresh.append(np.max(coldiffs))
-        #colorthresh = [t/2.0 for t in colorthresh]
+        # automatic detection of threshold for each textcolor
+##        colorthresh = []
+##        for col,colgroup in colorgroups.items():
+##            gcols,gdiffs = zip(*colgroup)
+##            # calc max diff from central group colors (diff required to incorporate all colors in the group)
+##            pairdiffs = segmentation.color_differences([col] + list(gcols))
+##            centraldiffs = [d for pair,d in pairdiffs.items() if col in pair]
+##            diff = np.max(centraldiffs)
+##            # add in the mean of each individual color diff
+##            diff += np.mean(gdiffs)
+##            colorthresh.append(diff)
         # debug
-        segmentation.view_colors(textcolors)
+        segmentation.view_colors(colorgroups.keys())
         for group in colorgroups.values():
             groupcols = [subcol for subcol,coldiff in group]
-            segmentation.view_colors(groupcols)
+            #segmentation.view_colors(groupcols)
     
     # compare with just luminance
 ##    lab = rgb_to_lab(im)

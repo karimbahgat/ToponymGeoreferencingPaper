@@ -24,12 +24,27 @@ def rgb_to_lab(im):
 def color_difference(im, color):
     im_arr = np.array(im)
 
+    # If wanna do larger more quicker, then do it tiled, eg:
+##    tw,th = 300,300
+##    diff = np.zeros(tuple(reversed(im.size)))
+##    for y in range(0,im.size[1],th):
+##        print y
+##        for x in range(0,im.size[0],tw):
+##            x2 = min(x + tw, im.size[0])
+##            y2 = min(y + th, im.size[1])
+##            tile = im.crop([x,y,x2,y2])
+##            tdiff = mapfit.segmentation.color_difference(tile, col)
+##            tdiff[tdiff>thresh] = 255
+##            diff[y:y2, x:x2] = tdiff
+##    Image.fromarray(diff).show()
+
     #target = color
     #diffs = [pairdiffs[tuple(sorted([target,oth]))] for oth in colors if oth != target]
 
     target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
-    counts,colors = zip(*im.getcolors(256))
-    #colors,counts = np.unique(im_arr, return_counts=True)
+    #counts,colors = zip(*im.getcolors(256))
+    colors,counts = np.unique(im_arr.reshape(-1, 3), return_counts=True, axis=0)
+    colors,counts = map(tuple,colors), map(int,counts)
     colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
                   for col in colors]
     diffs = delta_e_cie2000(target, np.array(colors_lab))
@@ -88,6 +103,12 @@ def group_colors(colors, thresh=10, categories=None):
         else:
             # create new group
             diffgroups[c] = [c]
+    # set each group key to avg color of group members
+    for c,gcols in diffgroups.items():
+        rs,gs,bs = zip(*gcols)
+        avgcol = np.mean(rs), np.mean(gs), np.mean(bs)
+        diffgroups[avgcol] = diffgroups.pop(c)
+            
     return diffgroups
 
 def view_colors(colors):
