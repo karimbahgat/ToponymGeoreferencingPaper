@@ -55,7 +55,7 @@ def image_partitioning(im):
 
     return seginfo
 
-def text_detection(text_im, textcolor, colorthresh, textconf, sample):
+def text_detection(text_im, textcolor, colorthresh, textconf, sample, seginfo):
     ###############
     # Text detection
     
@@ -63,7 +63,7 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample):
     print '(detecting text)'
     if textcolor and not isinstance(textcolor, list):
         textcolor = [textcolor]
-    texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh, textconf=textconf, sample=sample)
+    texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh, textconf=textconf, sample=sample, seginfo=seginfo)
     toponym_colors = set((r['color'] for r in texts))
 
     # deduplicate overlapping texts from different colors
@@ -420,7 +420,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     # detect text
     print '\n' + 'detecting text'
     t = time.time()
-    textinfo = text_detection(text_im, textcolor, colorthresh, textconf, sample)
+    textinfo = text_detection(text_im, textcolor, colorthresh, textconf, sample, seginfo)
 
     # store timing
     elaps = time.time() - t

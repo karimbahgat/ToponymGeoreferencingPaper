@@ -28,9 +28,10 @@ def run_ocr(im, bbox=None):
         
     return drows
 
-def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
+def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
     w,h = im.size
     bbox = [0,0,w,h]
+
     sw,sh = 200,200
     
     texts = []
@@ -115,10 +116,12 @@ def sniff_text_colors(im, samples=5, max_samples=8, max_texts=5):
                 #textcol = hist[0][1]
 
                 # calc max color diff in high luminance pixels
+                # (TODO: maybe should be mean+std?)
                 textim = segmentation.quantize(textim)
                 diff_arr = segmentation.color_difference(textim, textcol)
-                coldiff = diff_arr.flatten()[ls > 0].max()
-                print text['text'], textcol, diff_arr.flatten()[ls > 0].mean(), np.std(diff_arr.flatten()[ls > 0]), coldiff
+                maskdiffs = diff_arr.flatten()[ls > 0]
+                print text['text'], textcol, maskdiffs.mean(), np.std(maskdiffs), maskdiffs.max()
+                coldiff = maskdiffs.max()
                 #diff_arr[ls.reshape(diff_arr.shape)==0] = 255.0
                 #PIL.Image.fromarray(diff_arr).show()
                 #textarr = np.array(textim)
@@ -353,13 +356,13 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
 
     return texts
 
-def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=False, max_samples=8, max_texts=10, max_sniff_samples=8, max_sniff_texts=5):
+def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=False, seginfo=None, max_samples=8, max_texts=10, max_sniff_samples=8, max_sniff_texts=5):
     if not textcolors:
         print 'sniffing text colors'
-        colorgroups = sniff_text_colors(im, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
+        colorgroups = sniff_text_colors(im, seginfo=seginfo, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
         # colors as color groupings
         textcolors = list(colorgroups.keys())
-        # automatic detection of threshold for each textcolor
+        # automatic detection of threshold for each textcolor (disabled for now)
 ##        colorthresh = []
 ##        for col,colgroup in colorgroups.items():
 ##            gcols,gdiffs = zip(*colgroup)
