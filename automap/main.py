@@ -86,15 +86,14 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample, seginfo):
                             or (r['top']+r['height']) < r2['top'] \
                             ):
                         # drop the one with the poorest color match
-                        print 'found duplicate texts of different colors, dropping worst match'
-                        print r
-                        print r2
                         #text_im.crop((r['left'], r['top'], r['left']+r['width'], r['top']+r['height'])).show()
                         #text_im.crop((r2['left'], r2['top'], r2['left']+r2['width'], r2['top']+r2['height'])).show()
                         if r2['color_match'] > r['color_match']:
                             r2['drop'] = True
+                            print u'found duplicate texts of different colors, keeping "{}" (color match={:.2f}), dropping "{}" (color match={:.2f})'.format(r['text_clean'],r['color_match'],r2['text_clean'],r2['color_match'])
                         else:
                             r['drop'] = True
+                            print u'found duplicate texts of different colors, keeping "{}" (color match={:.2f}), dropping "{}" (color match={:.2f})'.format(r2['text_clean'],r2['color_match'],r['text_clean'],r['color_match'])
         texts = [r for r in texts if not r.get('drop')]
         print 'textlen deduplicated',len(texts)
 

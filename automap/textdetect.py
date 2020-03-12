@@ -475,7 +475,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
         #PIL.Image.fromarray(imarr).show()
         
         # detect text
-        print 'running ocr', lmaskim
+        print 'running ocr'
         data = run_ocr(lmaskim)
         print 'processing text'
         for text in data:

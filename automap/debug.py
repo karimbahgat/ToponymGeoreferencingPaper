@@ -24,7 +24,7 @@ def render_text_recognition(imagepath, georefpath):
     gcppath = georef_root + '_controlpoints.geojson'
 
     # add image
-    render.add_layer(imagedata)
+    render.add_layer(imagedata, transparency=0.5)
 
     # add image regions
     try:
@@ -44,9 +44,13 @@ def render_text_recognition(imagepath, georefpath):
         w = xmax-xmin
         h = ymax-ymin
         return xmin,ymin-h*2,xmax+xmax*2,ymax-h
-    render.add_layer(textdata, text=lambda f: f['text'],
-                     textoptions={'textcolor':'green', 'xy':gettopleft, 'anchor':'sw', 'textsize':6},
-                     fillcolor=None, outlinecolor='green')
+##    render.add_layer(textdata, text=lambda f: f['text'],
+##                     textoptions={'textcolor':'green', 'xy':gettopleft, 'anchor':'sw', 'textsize':6},
+##                     fillcolor=None, outlinecolor='green')
+    for col,coltextdata in textdata.manage.split('color'):
+        render.add_layer(coltextdata, text=lambda f: f['text'],
+                         textoptions={'textcolor':col, 'xy':gettopleft, 'anchor':'sw', 'textsize':6},
+                         fillcolor=None, outlinecolor=col, outlinewidth='2px')
 
     # add toponym anchors
     toponymdata = pg.VectorData(toponympath)

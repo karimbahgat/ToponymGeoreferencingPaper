@@ -90,7 +90,7 @@ def detect_toponym_anchors(im, data, debug=False):
 
         buff = int(fh * 1)
         filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff] = False # look in buffer zone around text box
-        filt_im_arr[y1+fh//4:y2-fh//4, x1+fh//4:x2-fh//4] = True # but do not look 1/4th font height inside text region itself (NOTE: is sometimes too big and covers the point too)
+        filt_im_arr[y1:y2, x1:x2] = True # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
         #filt_im_arr[y1:y2, x1:x2] = True # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
     im_arr[filt_im_arr] = 255
     #im_arr[im_arr < 255] = 0
