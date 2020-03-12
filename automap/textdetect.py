@@ -30,7 +30,15 @@ def run_ocr(im, bbox=None):
 
 def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
     w,h = im.size
-    bbox = [0,0,w,h]
+
+    xmin,ymin,xmax,ymax = 0,0,w,h
+    if seginfo:
+        mapregion = next((f['geometry'] for f in seginfo['features'] if f['properties']['type'] == 'Map'), None)
+        if mapregion:
+            xs,ys = zip(*[p for p in mapregion['coordinates'][0]])
+            xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+    bbox = [xmin,ymin,xmax,ymax]
+    print 'sniffing inside', bbox
 
     sw,sh = 200,200
     
