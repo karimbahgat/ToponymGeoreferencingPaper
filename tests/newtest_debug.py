@@ -2,12 +2,28 @@
 import automap as mapfit
 import os
 
-#testim = 'burkina.jpg'
-testim = 'china_pol96.jpg'
+testim = 'burkina.jpg'
+#testim = 'china_pol96.jpg'
 #testim = 'brazil_land_1977.jpg'
 testim_root,ext = os.path.splitext(testim)
 
-# specific test
+# test ocr refine
+##from PIL import Image
+##import numpy as np
+##textline = {u'word_num': u'2', 'fontheight': 33, u'line_num': u'1', u'text': u'Boba', u'top': 1288, u'level': u'5', u'page_num': u'1', u'block_num': u'130', u'height': 33, u'width': 58, u'conf': 77.0, u'par_num': u'1', u'left': 264}
+##im = Image.open('testmaps/'+testim)
+##im = im.resize((im.size[0]*2,im.size[1]*2), Image.LANCZOS)
+####for k in 'left top width height'.split():
+####    textline[k] /= 2 # downscale
+##col = (0,0,0) 
+##thresh = 25 
+##diff = mapfit.segmentation.color_difference(mapfit.segmentation.quantize(im), col)
+##diff[diff>thresh] = 255
+##refined = mapfit.textdetect.refine_textbox(diff, textline)
+##print refined
+##fsfsd
+
+# test thresh
 ##from PIL import Image
 ##import numpy as np
 ##im = Image.open('testmaps/'+testim)

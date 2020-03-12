@@ -11,10 +11,11 @@ import pytesseract
 
 
 
-def run_ocr(im, bbox=None):
+def run_ocr(im, bbox=None, mode=11):
     if bbox:
+        xoff,yoff = bbox[:2]
         im = im.crop(bbox)
-    data = pytesseract.image_to_data(im, lang='eng+fra', config='--psm 11') # +equ
+    data = pytesseract.image_to_data(im, lang='eng+fra', config='--psm {}'.format(mode)) # +equ
     drows = [[v for v in row.split('\t')] for row in data.split('\n')]
     dfields = drows.pop(0)
     drows = [dict(zip(dfields,row)) for row in drows]
@@ -23,10 +24,159 @@ def run_ocr(im, bbox=None):
     for d in drows:
         for k in 'left top width height'.split():
             d[k] = int(d[k])
+        if bbox:
+            d['left'] += xoff
+            d['top'] += yoff
         d['conf'] = float(d['conf'])
         d['fontheight'] = d['height']
         
     return drows
+
+def refine_textbox(im_arr, textdata):
+    x,y = textdata['left'],textdata['top']
+    w,h = textdata['width'],textdata['height']
+
+    debug = False
+##    debug = ('BENIN' in textdata['text'] or \
+##             'BAM' in textdata['text'] or \
+##             'OUDALAN' in textdata['text'] or \
+##             'GHANA' in textdata['text'] or \
+##             'Wa' in textdata['text'] or \
+##             'ound' in textdata['text'] or \
+##             'Toug' in textdata['text'] or \
+##             'Krach' in textdata['text'] or \
+##             'Navronge' in textdata['text'])
+    histdebug = False
+
+    # crop img to box
+    im_box = im_arr[y:y+h, x:x+w]
+    if im_box.shape[1] <= 4 or im_box.shape[0] <= 4:
+        return textdata # too small
+    if histdebug:
+        PIL.Image.fromarray(255-im_box).show()
+
+    # calc y hist
+    horiz = []
+    ys = list(range(y, y+h))
+    for boxy in range(im_box.shape[0]):
+        summ = (im_box[boxy,:] < 255).sum()
+        horiz.append(summ)
+
+    # define upper and lower font core as first and last time hist reaches more than 90% of above-avg mean
+    histmean = np.mean(horiz)
+    histmeanpos = np.mean([v for v in horiz if v > histmean])
+    histthresh = histmeanpos * 0.9
+    ystart = textdata['top']
+    for y,ycount in zip(ys,horiz):
+        if ycount >= histthresh:
+            ystart = y
+            break
+    yend = textdata['top'] + textdata['height']
+    for y,ycount in reversed(zip(ys,horiz)):
+        if ycount >= histthresh:
+            yend = y
+            break
+
+    # view
+    if histdebug:
+        import matplotlib.pyplot as plt
+        plt.gca().invert_yaxis()
+        plt.barh(ys, horiz)
+        plt.axvline(histthresh, color='blue')
+        plt.axhline(ystart, color='black')
+        plt.axhline(yend, color='black')
+        plt.show()
+
+    # calc x hist
+    vertic = []
+    xs = list(range(x, x+w))
+    for x in range(im_box.shape[1]):
+        summ = (im_box[:,x] < 255).sum()
+        vertic.append(summ)
+
+    # define left and right text boundary as first and last time hist reaches more than 90% of above-avg mean
+    histmean = np.mean(vertic)
+    histmeanpos = np.mean([v for v in vertic if v > histmean])
+    histthresh = histmeanpos * 0.9
+    xstart = textdata['left']
+    for x,xcount in zip(xs,vertic):
+        if xcount >= histthresh:
+            xstart = x
+            break
+    xend = textdata['left'] + textdata['width']
+    for x,xcount in reversed(zip(xs,vertic)):
+        if xcount >= histthresh:
+            xend = x
+            break
+
+    # view
+    if histdebug:
+        import matplotlib.pyplot as plt
+        plt.bar(xs, vertic)
+        plt.axhline(histthresh, color='blue')
+        plt.axvline(xstart, color='black')
+        plt.axvline(xend, color='black')
+        plt.show()
+
+    # if reduced by >33% (25% is the max expected vertical reduction), refine
+    x1change = (xstart-textdata['left']) / float(textdata['width'])
+    x2change = (xend-(textdata['left']+textdata['width'])) / float(textdata['width'])
+    y1change = (ystart-textdata['top']) / float(textdata['width'])
+    y2change = (yend-(textdata['top']+textdata['height'])) / float(textdata['height'])
+    #print 'text refined to', x1change, x2change, y1change, y2change
+    changethresh = 0.33
+    if x1change > changethresh or x2change < -changethresh or y1change > changethresh or y2change < -changethresh:
+        # debug before
+        if debug:
+            PIL.Image.fromarray(255-im_box).show()
+
+        # expand the vertical font core to upper and lower fourths
+        h = yend-ystart
+        ystart -= int(round(h/4.0))
+        yend += int(round(h/4.0))
+
+        # expand the horizontal edges by a fourth the new font core
+        h = yend-ystart
+        xstart -= int(round(h/4.0))
+        xend += int(round(h/4.0))
+
+        # expand entire thing by a tenth, to give some padding
+        expand = int(round(h/10.0))
+        ystart -= expand
+        yend += expand
+        xstart -= expand
+        xend += expand
+
+        # limit to within img
+        ystart,yend = max(0,ystart), min(im_arr.shape[0], yend)
+        xstart,xend = max(0,xstart), min(im_arr.shape[1], xend)
+
+        # crop img to refined box
+        im_box = im_arr[ystart:yend, xstart:xend]
+        if im_box.shape[1] <= 4 or im_box.shape[0] <= 4:
+            return textdata # too small
+        newim = PIL.Image.fromarray(im_box.astype(np.uint8))
+
+        # debug after
+        if debug:
+            PIL.Image.fromarray((255-im_box).astype(np.uint8)).show()
+
+        # rerun single line ocr
+        # psm 7 = Treat the image as a single text line.
+        # psm 8 = Treat the image as a single word.
+        # psm 13 is used with the new LSTM engine to OCR a single textline image.
+        origtextdata = textdata
+        result = run_ocr(newim, mode=13) 
+        textdata = sorted(result, key=lambda d: d['conf'])[-1] # for some reason returns multiple junk results, only use the highest confidence result
+        textdata['left'] += xstart # offset relative to whole img
+        textdata['top'] += ystart # offset relative to whole img
+        textdata['text'] = textdata.pop('text', '') # in case no text
+        
+        fromdims = [origtextdata[k] for k in 'left top width height'.split()]
+        todims = [textdata[k] for k in 'left top width height'.split()]
+        print u'ocr rerun from "{}" ({}) to "{}" ({})'.format(origtextdata['text'], fromdims, textdata['text'], todims)
+
+    return textdata
 
 def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
     w,h = im.size
@@ -325,13 +475,18 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
         #PIL.Image.fromarray(imarr).show()
         
         # detect text
-        print 'running ocr'
+        print 'running ocr', lmaskim
         data = run_ocr(lmaskim)
         print 'processing text'
         for text in data:
             
             # process text
-            if text['conf'] > textconf: 
+            if text['conf'] > textconf:
+
+                # refine ocr
+                #print 'text orig -->', text
+                text = refine_textbox(lmask, text)
+                #print 'text refined -->', text
                 
                 # clean text
                 text['text_clean'] = re.sub('^\\W+|\\W+$', '', text['text'], flags=re.UNICODE) # strips nonalpha chars from start/end

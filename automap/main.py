@@ -86,9 +86,9 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample, seginfo):
                             or (r['top']+r['height']) < r2['top'] \
                             ):
                         # drop the one with the poorest color match
-                        #print 'found duplicate texts of different colors, dropping worst match'
-                        #print r
-                        #print r2
+                        print 'found duplicate texts of different colors, dropping worst match'
+                        print r
+                        print r2
                         #text_im.crop((r['left'], r['top'], r['left']+r['width'], r['top']+r['height'])).show()
                         #text_im.crop((r2['left'], r2['top'], r2['left']+r2['width'], r2['top']+r2['height'])).show()
                         if r2['color_match'] > r['color_match']:
