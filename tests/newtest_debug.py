@@ -2,9 +2,9 @@
 import automap as mapfit
 import os
 
-#testim = 'burkina.jpg'
+testim = 'burkina.jpg'
 #testim = 'china_pol96.jpg'
-testim = 'brazil_land_1977.jpg'
+#testim = 'brazil_land_1977.jpg'
 testim_root,ext = os.path.splitext(testim)
 
 # test ocr refine
@@ -35,8 +35,8 @@ testim_root,ext = os.path.splitext(testim)
 ##Image.fromarray(diff).show()
 
 # first produce
-db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
-info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp_order=None, db=db, debug=True)
+#db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
+#info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp_order=None, db=db, debug=True)
 
 # image
 render = mapfit.debug.render_text_recognition('testmaps/{}'.format(testim),

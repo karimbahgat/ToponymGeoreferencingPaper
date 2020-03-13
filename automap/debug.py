@@ -79,7 +79,8 @@ def render_georeferencing(georefpath):
 
     # load georeferenced image
     print 'loading'
-    georefdata = pg.RasterData(georefpath) 
+    georefdata = pg.RasterData(georefpath)
+    georefdata.mask = georefdata.bands[-1].compute('255-val').img # use alpha band as mask
     render.add_layer(georefdata, transparency=0.3)
 
     # determine paths (all debug files are relative to this)

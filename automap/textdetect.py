@@ -151,30 +151,37 @@ def refine_textbox(im_arr, textdata):
         ystart,yend = max(0,ystart), min(im_arr.shape[0], yend)
         xstart,xend = max(0,xstart), min(im_arr.shape[1], xend)
 
+        # update textbox
+        textdata['left'] = xstart
+        textdata['width'] = xend-xstart
+        textdata['top'] = ystart
+        textdata['height'] = yend-ystart
+        textdata['fontheight'] = textdata['height']
+
         # crop img to refined box
-        im_box = im_arr[ystart:yend, xstart:xend]
-        if im_box.shape[1] <= 4 or im_box.shape[0] <= 4:
-            return textdata # too small
-        newim = PIL.Image.fromarray(im_box.astype(np.uint8))
-
-        # debug after
-        if debug:
-            PIL.Image.fromarray((255-im_box).astype(np.uint8)).show()
-
-        # rerun single line ocr
-        # psm 7 = Treat the image as a single text line.
-        # psm 8 = Treat the image as a single word.
-        # psm 13 is used with the new LSTM engine to OCR a single textline image.
-        origtextdata = textdata
-        result = run_ocr(newim, mode=13) 
-        textdata = sorted(result, key=lambda d: d['conf'])[-1] # for some reason returns multiple junk results, only use the highest confidence result
-        textdata['left'] += xstart # offset relative to whole img
-        textdata['top'] += ystart # offset relative to whole img
-        textdata['text'] = textdata.pop('text', '') # in case no text
-        
-        fromdims = [origtextdata[k] for k in 'left top width height'.split()]
-        todims = [textdata[k] for k in 'left top width height'.split()]
-        print u'ocr rerun from "{}" ({}) to "{}" ({})'.format(origtextdata['text'], fromdims, textdata['text'], todims)
+##        im_box = im_arr[ystart:yend, xstart:xend]
+##        if im_box.shape[1] <= 4 or im_box.shape[0] <= 4:
+##            return textdata # too small
+##        newim = PIL.Image.fromarray(im_box.astype(np.uint8))
+##
+##        # debug after
+##        if debug:
+##            PIL.Image.fromarray((255-im_box).astype(np.uint8)).show()
+##
+##        # rerun single line ocr
+##        # psm 7 = Treat the image as a single text line.
+##        # psm 8 = Treat the image as a single word.
+##        # psm 13 is used with the new LSTM engine to OCR a single textline image.
+##        origtextdata = textdata
+##        result = run_ocr(newim, mode=13) 
+##        textdata = sorted(result, key=lambda d: d['conf'])[-1] # for some reason returns multiple junk results, only use the highest confidence result
+##        textdata['left'] += xstart # offset relative to whole img
+##        textdata['top'] += ystart # offset relative to whole img
+##        textdata['text'] = textdata.pop('text', '') # in case no text
+##        
+##        fromdims = [origtextdata[k] for k in 'left top width height'.split()]
+##        todims = [textdata[k] for k in 'left top width height'.split()]
+##        print u'ocr rerun from "{}" ({}) to "{}" ({})'.format(origtextdata['text'], fromdims, textdata['text'], todims)
 
     return textdata
 
