@@ -465,13 +465,13 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
         #lmask[diffmask] = lmask.max() # cap max luminance to parts that are too different
 
         # OR mask to diff values
-        diff[diffmask] = 255 #colthresh
+        diff[diffmask] = colthresh
         lmask = diff
 
         # normalize
-        #lmax,lmin = lmask.max(),lmask.min()
-        #lmask = (lmask-lmin) / float(lmax-lmin) * 255.0
-        #lmask[diffmask] = 255
+        lmax,lmin = lmask.max(),lmask.min()
+        lmask = (lmask-lmin) / float(lmax-lmin) * 127.0 # lowest matching color is half gray
+        lmask[diffmask] = 255
         #print lmask.min(),lmask.max()
 
         lmaskim = PIL.Image.fromarray(lmask.astype(np.uint8))
@@ -533,16 +533,18 @@ def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=Fa
         # colors as color groupings
         textcolors = list(colorgroups.keys())
         # automatic detection of threshold for each textcolor (disabled for now)
-##        colorthresh = []
-##        for col,colgroup in colorgroups.items():
-##            gcols,gdiffs = zip(*colgroup)
-##            # calc max diff from central group colors (diff required to incorporate all colors in the group)
-##            pairdiffs = segmentation.color_differences([col] + list(gcols))
-##            centraldiffs = [d for pair,d in pairdiffs.items() if col in pair]
-##            diff = np.max(centraldiffs)
-##            # add in the mean of each individual color diff
-##            diff += np.mean(gdiffs)
-##            colorthresh.append(diff)
+        colorthresh = []
+        for col,colgroup in colorgroups.items():
+            gcols,gdiffs = zip(*colgroup)
+            # calc max diff from central group colors (diff required to incorporate all colors in the group)
+            pairdiffs = segmentation.color_differences([col] + list(gcols))
+            centraldiffs = [d for pair,d in pairdiffs.items() if col in pair]
+            diff = np.max(centraldiffs)
+            # add in the mean of each individual color diff
+            diff += np.mean(gdiffs)
+            # cap at 30
+            diff = min(diff, 30)
+            colorthresh.append(diff)
         # debug
         segmentation.view_colors(colorgroups.keys())
         for group in colorgroups.values():

@@ -27,16 +27,17 @@ testim_root,ext = os.path.splitext(testim)
 ##from PIL import Image
 ##import numpy as np
 ##im = Image.open('testmaps/'+testim)
-##col = (0,0,0) #(33.42117154811716, 42.028535564853556, 18.39589958158996) #(26.159759905047157, 44.41302692450912, 26.73344983188299)
-##thresh = 15 #18.8*1.5 #9.188087506560446+5.054860732095406 #19.892093984040308+13.6/5.0
+##col = (188,0,0) #(33.42117154811716, 42.028535564853556, 18.39589958158996) #(26.159759905047157, 44.41302692450912, 26.73344983188299)
+##thresh = 25 #18.8*1.5 #9.188087506560446+5.054860732095406 #19.892093984040308+13.6/5.0
 ##diff = mapfit.segmentation.color_difference(mapfit.segmentation.quantize(im),
 ##                                            col)
 ##diff[diff>thresh] = 255
 ##Image.fromarray(diff).show()
+##fdsfds
 
 # first produce
-#db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
-#info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp_order=None, db=db, debug=True)
+db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
+info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp_order=None, db=db, debug=True)
 
 # image
 render = mapfit.debug.render_text_recognition('testmaps/{}'.format(testim),

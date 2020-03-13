@@ -103,11 +103,12 @@ def group_colors(colors, thresh=10, categories=None):
         else:
             # create new group
             diffgroups[c] = [c]
+            
     # set each group key to avg color of group members
-    for c,gcols in diffgroups.items():
-        rs,gs,bs = zip(*gcols)
-        avgcol = np.mean(rs), np.mean(gs), np.mean(bs)
-        diffgroups[avgcol] = diffgroups.pop(c)
+##    for c,gcols in diffgroups.items():
+##        rs,gs,bs = zip(*gcols)
+##        avgcol = np.mean(rs), np.mean(gs), np.mean(bs)
+##        diffgroups[avgcol] = diffgroups.pop(c)
             
     return diffgroups
 
