@@ -2,10 +2,10 @@
 import automap as mapfit
 import os
 
-#testim = 'burkina.jpg'
+testim = 'burkina.jpg'
 #testim = 'china_pol96.jpg'
 #testim = 'brazil_land_1977.jpg'
-testim = 'france_admin91.jpg'
+#testim = 'france_admin91.jpg'
 testim_root,ext = os.path.splitext(testim)
 
 # test ocr refine

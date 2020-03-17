@@ -45,14 +45,23 @@ def refine_textbox(im_arr, textdata):
 ##             'ound' in textdata['text'] or \
 ##             'Toug' in textdata['text'] or \
 ##             'Krach' in textdata['text'] or \
+##             'aux' in textdata['text'] or \
+##             'cass' in textdata['text'] or \
+##             'Kaya' in textdata['text'] or \
+##             'Nouna' in textdata['text'] or \
 ##             'Navronge' in textdata['text'])
     histdebug = False
+    changedebug = True
+
+    # textbox histograms is not very accurate for short text strings, skip
+    if len(textdata['text']) < 3:
+        return textdata
 
     # crop img to box
     im_box = im_arr[y:y+h, x:x+w]
     if im_box.shape[1] <= 4 or im_box.shape[0] <= 4:
         return textdata # too small
-    if histdebug:
+    if debug and histdebug:
         PIL.Image.fromarray(255-im_box).show()
 
     # calc y hist
@@ -78,7 +87,7 @@ def refine_textbox(im_arr, textdata):
             break
 
     # view
-    if histdebug:
+    if debug and histdebug:
         import matplotlib.pyplot as plt
         plt.gca().invert_yaxis()
         plt.barh(ys, horiz)
@@ -110,7 +119,7 @@ def refine_textbox(im_arr, textdata):
             break
 
     # view
-    if histdebug:
+    if debug and histdebug:
         import matplotlib.pyplot as plt
         plt.bar(xs, vertic)
         plt.axhline(histthresh, color='blue')
@@ -118,34 +127,45 @@ def refine_textbox(im_arr, textdata):
         plt.axvline(xend, color='black')
         plt.show()
 
-    # if reduced by >33% (25% is the max expected vertical reduction), refine
-    x1change = (xstart-textdata['left']) / float(textdata['width'])
-    x2change = (xend-(textdata['left']+textdata['width'])) / float(textdata['width'])
-    y1change = (ystart-textdata['top']) / float(textdata['width'])
+    # calc bbox change as percent of font height
+    x1change = (xstart-textdata['left']) / float(textdata['height'])
+    x2change = (xend-(textdata['left']+textdata['width'])) / float(textdata['height'])
+    y1change = (ystart-textdata['top']) / float(textdata['height'])
     y2change = (yend-(textdata['top']+textdata['height'])) / float(textdata['height'])
-    #print 'text refined to', x1change, x2change, y1change, y2change
-    changethresh = 0.33
-    if x1change > changethresh or x2change < -changethresh or y1change > changethresh or y2change < -changethresh:
+    if debug:
+        print 'text', textdata['text'], (textdata['width'],textdata['height']), 'was at x1,x2,y1,y2', textdata['left'], textdata['left']+textdata['width'], textdata['top'], textdata['top']+textdata['height']
+        print 'refined to x1,x2,y1,y2', xstart, xend, ystart, yend
+        print 'as percent', x1change, x2change, y1change, y2change
+
+    # only change boundaries that change beyond threshold
+    xchangethresh = 1.5 # left right moved by >1.5x font height
+    ychangethresh = 0.5 # top bottom moved by >50% font height
+    h = yend-ystart
+    if x1change > xchangethresh:
+        xstart -= int(round(h)) # expand the left by 1x the font core
+    else:
+        xstart = textdata['left'] # set back to original
+        
+    if x2change < -xchangethresh:
+        xend += int(round(h)) # expand the right edge by 1x the font core
+    else:
+        xend = textdata['left']+textdata['width'] # set back to original
+        
+    if y1change > ychangethresh:
+        ystart -= int(round(h/2.0)) # expand the font core vertically to upper fourth (font core is two fourths)
+    else:
+        ystart = textdata['top'] # set back to original
+        
+    if y2change < -ychangethresh:
+        yend += int(round(h/2.0)) # expand the font core vertically to lower fourth (font core is two fourths)
+    else:
+        yend = textdata['top']+textdata['height'] # set back to original
+
+    # modify the bbox
+    if x1change > xchangethresh or x2change < -xchangethresh or y1change > ychangethresh or y2change < -ychangethresh:
         # debug before
-        if debug:
+        if debug and changedebug:
             PIL.Image.fromarray(255-im_box).show()
-
-        # expand the vertical font core to upper and lower fourths
-        h = yend-ystart
-        ystart -= int(round(h/4.0))
-        yend += int(round(h/4.0))
-
-        # expand the horizontal edges by a fourth the new font core
-        h = yend-ystart
-        xstart -= int(round(h/4.0))
-        xend += int(round(h/4.0))
-
-        # expand entire thing by a tenth, to give some padding
-        expand = int(round(h/10.0))
-        ystart -= expand
-        yend += expand
-        xstart -= expand
-        xend += expand
 
         # limit to within img
         ystart,yend = max(0,ystart), min(im_arr.shape[0], yend)
@@ -159,19 +179,19 @@ def refine_textbox(im_arr, textdata):
         textdata['fontheight'] = textdata['height']
 
         # crop img to refined box
-##        im_box = im_arr[ystart:yend, xstart:xend]
-##        if im_box.shape[1] <= 4 or im_box.shape[0] <= 4:
-##            return textdata # too small
-##        newim = PIL.Image.fromarray(im_box.astype(np.uint8))
-##
-##        # debug after
-##        if debug:
-##            PIL.Image.fromarray((255-im_box).astype(np.uint8)).show()
-##
+        im_box = im_arr[ystart:yend, xstart:xend]
+        if im_box.shape[1] <= 4 or im_box.shape[0] <= 4:
+            return textdata # too small
+
+        # debug after
+        if debug and changedebug:
+            PIL.Image.fromarray((255-im_box).astype(np.uint8)).show()
+
 ##        # rerun single line ocr
 ##        # psm 7 = Treat the image as a single text line.
 ##        # psm 8 = Treat the image as a single word.
 ##        # psm 13 is used with the new LSTM engine to OCR a single textline image.
+##        newim = PIL.Image.fromarray(im_box.astype(np.uint8))
 ##        origtextdata = textdata
 ##        result = run_ocr(newim, mode=13) 
 ##        textdata = sorted(result, key=lambda d: d['conf'])[-1] # for some reason returns multiple junk results, only use the highest confidence result
