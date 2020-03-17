@@ -152,7 +152,10 @@ def toponym_selection(im, textinfo, seginfo):
     diff[diff > 25] = 255
     anchor_im = PIL.Image.fromarray(diff)
     # detect anchors
-    texts = toponyms.detect_toponym_anchors(anchor_im, topotexts)
+    texts = toponyms.detect_toponym_anchors_distance(anchor_im, topotexts)
+    #templates = []
+    #texts = toponyms.detect_toponym_anchors_template_contours(anchor_im, topotexts, templates)
+    #texts = toponyms.detect_toponym_anchors_template_images(anchor_im, topotexts)
 
     # create control points from toponyms
     points = [(r['text_clean'], r['anchor']) for r in texts if 'anchor' in r] # if r['function']=='placename']
