@@ -146,13 +146,21 @@ def toponym_selection(im, textinfo, seginfo):
     print 'determening toponym anchors'
     toponym_colors = set((r['color'] for r in topotexts))
     anchored = []
+
     # threshold img to black pixels only
     # (anchors are usually thick and almost always black, so not as affected by color blending as text)
     diff = segmentation.color_difference(segmentation.quantize(im), (0,0,0))
     diff[diff > 25] = 255
     anchor_im = PIL.Image.fromarray(diff)
+
+    # OR get color changes/edges
+    #changes = segmentation.color_changes(im)
+    #changes[changes > 10] = 255
+    #anchor_im = PIL.Image.fromarray(changes)
+    
     # detect anchors
-    texts = toponyms.detect_toponym_anchors_distance(anchor_im, topotexts)
+    #texts = toponyms.detect_toponym_anchors_distance(anchor_im, topotexts)
+    texts = toponyms.detect_toponym_anchors_contour(anchor_im, topotexts)
     #templates = []
     #texts = toponyms.detect_toponym_anchors_template_contours(anchor_im, topotexts, templates)
     #texts = toponyms.detect_toponym_anchors_template_images(anchor_im, topotexts)

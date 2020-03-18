@@ -307,6 +307,141 @@ def detect_toponym_anchors_distance(im, data, debug=False):
 
     return data
 
+def detect_toponym_anchors_contour(im, data, debug=False):
+    '''Detect anchor points via contour method, set each text's anchor point with the 'anchor' key.
+    - im must already be grayscale of possible anchor pixels.
+    - data is list of tesseract text dict results, preferably already filtered to toponyms. 
+    '''
+    #debug = True
+
+    # blank out all text regions
+    im_arr = np.array(im).astype(np.uint8)
+    im_arr_orig = im_arr.copy()
+    for r in data:
+        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+        x2 = x1+w
+        y2 = y1+h
+        fh = int(r['fontheight'])
+
+        # do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
+        im_arr[y1:y2, x1:x2] = 255
+
+    # find contours around each text buffer       
+    for r in data:
+        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+        x2 = x1+w
+        y2 = y1+h
+        fh = int(r['fontheight'])
+
+##        debug = ('Bouna' in r['text'] or \
+##                 'Tchamba' in r['text'] or \
+##                 'Orodaro' in r['text'] or \
+##                 'Yendi' in r['text'])
+        
+        # extract subimg from buffer around text
+        buff = int(fh * 1)
+        edge = int(fh * 0.5)
+        buff_im_arr = im_arr[y1-buff-edge:y2+buff+edge, x1-buff-edge:x2+buff+edge] #im_arr[filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff]]
+        thresh = 20
+        buff_im_arr[buff_im_arr < thresh] = 0 # binarize
+        buff_im_arr[buff_im_arr >= thresh] = 255 # binarize
+        buff_im_arr = 255 - buff_im_arr # invert
+
+##        # remove noise + touching lines via erosion->dilation
+##        # BUT MAYBE REMOVES ENTIRE THING IF THIN OUTLINE...
+##        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
+##        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_OPEN, kernel)
+##
+##        # fill any gaps via dilation->erosion
+##        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
+##        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_CLOSE, kernel)
+
+        # take care of gaps by filling all blobs (third of fontsize), via dilation-erosion (morphology closing)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1,fh//3),max(1,fh//3)))
+        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_CLOSE, kernel)
+
+        # remove noise + touching lines (fourth of fontsize), via erosion->dilation  (morphology opening)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1,fh//5),max(1,fh//5)))
+        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_OPEN, kernel)
+
+        if 0: #debug:
+            PIL.Image.fromarray(buff_im_arr).show()
+        
+        if debug:
+            import pyagg
+            print 'text',r['text'],w,h,buff_im_arr.shape
+            c = pyagg.canvas.from_image(PIL.Image.fromarray(im_arr_orig[y1-buff-edge:y2+buff+edge, x1-buff-edge:x2+buff+edge]))
+            c.custom_space(x1-buff-edge, y1-buff-edge, x2+buff+edge, y2+buff+edge)
+            c.draw_box(bbox=[x1,y1,x2,y2], fillcolor=None, outlinecolor='green', outlinewidth='1px')
+
+        # get outline contours
+        contours,_ = cv2.findContours(buff_im_arr, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+##        if debug:
+##            import pythongis as pg
+##            contours_geoj = [{'type': 'Polygon',
+##                              'coordinates': [ [tuple(p[0].tolist()) for p in cnt] ]}
+##                              for cnt in contours]
+##            contourdata = pg.VectorData()
+##            for geoj in contours_geoj:
+##                contourdata.add_feature([], geoj)
+##            contourdata.view(fillcolor='red', fillalpha=127)
+
+        # only find contours of significant size
+        # so limit to contours larger than 1/4th font height, but smaller than 1.5x font height
+        ch_lower = fh/4.0
+        ch_upper = fh*1.5
+        if debug:
+            print 'limit to dist range', ch_lower, ch_upper
+        candidates = []
+        for cnt in contours:
+            # make sure significant size and roughly rectangular shape bbox
+            x,y,w,h = cv2.boundingRect(cnt)
+            if debug:
+                print 'size', (w,h)
+            if not (ch_lower <= w <= ch_upper and ch_lower <= h <= ch_upper and min(w,h)/float(max(w,h))) >= 0.75:
+                continue
+        
+            # make sure is an areal shape, not a line
+            area = cv2.contourArea(cnt)
+            fillrate = area / float(w*h)
+            if debug:
+                print 'area', area, fillrate
+            if not fillrate >= 0.20:
+                continue
+
+            # get shape center
+            pt = x+w/2.0, y+h/2.0
+            pt = x1-buff-edge+pt[0], y1-buff-edge+pt[1] # offset to total img coords
+            pt = map(int, pt)
+
+            # ensure within pure buffer
+            if not (x1-buff <= pt[0] <= x2+buff and y1-buff <= pt[1] <= y2+buff):
+                continue
+
+            candidates.append((cnt,pt))
+
+        if candidates:
+            # choose the largest contour as anchor
+            cnt,pt = sorted(candidates, key=lambda(cnt,pt): cv2.contourArea(cnt))[-1]
+            r['anchor'] = pt
+
+            if debug:
+                print 'found', pt
+##                candidates_geoj = [{'type': 'Polygon',
+##                                  'coordinates': [ [tuple(p[0].tolist()) for p in cnt] ]}
+##                                  for cnt,pt in candidates]
+##                for geoj in candidates_geoj:
+##                    geoj['coordinates'] = [ [(x1-buff-edge+xy[0], y1-buff-edge+xy[1]) for xy in geoj['coordinates'][0]] ] # offset
+##                    c.draw_geojson(geoj, fillcolor=None, outlinecolor=(0,0,255), outlinewidth='0.5px')
+                for _cnt,_pt in candidates:
+                    c.draw_circle(xy=_pt, fillsize='3px', fillcolor=None, outlinecolor=(0,0,255), outlinewidth='0.5px')
+                c.draw_circle(xy=pt, fillsize='5px', fillcolor=None, outlinecolor=(255,0,0), outlinewidth='1px')
+
+        if 0: #debug:
+            c.get_image().show()
+
+    return data
+
 def detect_toponym_anchors_template_contours(im, data, templates, debug=False):
     '''Detect anchor points via template matching method, set each text's anchor point with the 'anchor' key.
     - im must already be grayscale of possible anchor pixels. 

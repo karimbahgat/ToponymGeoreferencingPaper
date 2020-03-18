@@ -167,6 +167,36 @@ def edge_filter(im):
     edges = ImageOps.expand(edges, 1, fill=0)
     return edges
 
+def color_changes(im):
+    im_arr = np.array(im)
+    
+    # quantize and convert colors
+    quant = im.convert('P', palette=PIL.Image.ADAPTIVE, colors=256)
+    quant_arr = np.array(quant)
+    qcounts,qcolors = zip(*sorted(quant.getcolors(256), key=lambda x: x[0]))
+    counts,colors = zip(*sorted(quant.convert('RGB').getcolors(256), key=lambda x: x[0]))
+
+    # calc diffs
+    pairdiffs = color_differences(colors)
+    pairdiffs_arr = np.zeros((256,256))
+    for k,v in list(pairdiffs.items()):
+        qx,qy = (qcolors[colors.index(k[0])], qcolors[colors.index(k[1])])
+        pairdiffs_arr[qx,qy] = v
+    #PIL.Image.fromarray(pairdiffs_arr*50).show()
+
+    # detect color edges
+    orig_flat = np.array(quant).flatten()
+    diff_im_flat = np.zeros(quant.size).flatten()
+    for xoff in range(-1, 1+1, 1):
+        for yoff in range(-1, 1+1, 1):
+            if xoff == yoff == 0: continue
+            off_flat = np.roll(quant, (xoff,yoff), (0,1)).flatten()
+            diff_im_flat = diff_im_flat + pairdiffs_arr[orig_flat,off_flat] #np.maximum(diff_im_flat, pairdiffs[orig_flat,off_flat])
+    diff_im_flat = diff_im_flat / 8.0
+
+    diff_im = diff_im_flat.reshape((im.height, im.width))
+    return diff_im
+
 def close_edge_gaps(im):
     grow = ImageMorph.MorphOp(op_name='dilation4')
     changes,im = grow.apply(im)
