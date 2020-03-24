@@ -309,10 +309,10 @@ def detect_toponym_anchors_distance(im, data, debug=False):
 
 def detect_toponym_anchors_contour(im, data, debug=False):
     '''Detect anchor points via contour method, set each text's anchor point with the 'anchor' key.
-    - im must already be grayscale of possible anchor pixels.
+    - im must already be BINARY of possible anchor pixels.
     - data is list of tesseract text dict results, preferably already filtered to toponyms. 
     '''
-    #debug = True
+    debug = True
 
     # blank out all text regions
     im_arr = np.array(im).astype(np.uint8)
@@ -342,31 +342,38 @@ def detect_toponym_anchors_contour(im, data, debug=False):
         buff = int(fh * 1)
         edge = int(fh * 0.5)
         buff_im_arr = im_arr[y1-buff-edge:y2+buff+edge, x1-buff-edge:x2+buff+edge] #im_arr[filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff]]
-        thresh = 20
-        buff_im_arr[buff_im_arr < thresh] = 0 # binarize
-        buff_im_arr[buff_im_arr >= thresh] = 255 # binarize
         buff_im_arr = 255 - buff_im_arr # invert
 
-##        # remove noise + touching lines via erosion->dilation
-##        # BUT MAYBE REMOVES ENTIRE THING IF THIN OUTLINE...
-##        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
+        # MAYBE ONLY DO THESE MORPHOLOGY OPS IN SECOND ROUND IF RAW CONTOURS FAIL? 
+        # ...
+
+        # remove speck, to avoid merging noise pixels?
+##        if debug:
+##            PIL.Image.fromarray(buff_im_arr).show()
+##            
+##        kernel = np.array([[-1,-1,-1],
+##                           [-1,1,-1],
+##                           [-1,-1,-1]], dtype=np.uint8) 
+##        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_HITMISS, kernel)
+##
+##        if debug:
+##            PIL.Image.fromarray(buff_im_arr).show()
+
+        # merge unrelated text strings plus fill in symbol holes+gaps (half of fontsize), via dilation-erosion (morphology closing)
+##        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1,fh//2),max(1,fh//2)))
+##        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_CLOSE, kernel)
+##
+##        if debug:
+##            PIL.Image.fromarray(buff_im_arr).show()
+##
+##        # remove noise + touching lines (fourth of fontsize), via erosion->dilation  (morphology opening)
+##        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1,fh//5),max(1,fh//5)))
 ##        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_OPEN, kernel)
 ##
-##        # fill any gaps via dilation->erosion
-##        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
-##        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_CLOSE, kernel)
+##        if debug:
+##            PIL.Image.fromarray(buff_im_arr).show()
 
-        # take care of gaps by filling all blobs (third of fontsize), via dilation-erosion (morphology closing)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1,fh//3),max(1,fh//3)))
-        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_CLOSE, kernel)
-
-        # remove noise + touching lines (fourth of fontsize), via erosion->dilation  (morphology opening)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1,fh//5),max(1,fh//5)))
-        buff_im_arr = cv2.morphologyEx(buff_im_arr, cv2.MORPH_OPEN, kernel)
-
-        if 0: #debug:
-            PIL.Image.fromarray(buff_im_arr).show()
-        
+        #########
         if debug:
             import pyagg
             print 'text',r['text'],w,h,buff_im_arr.shape
@@ -418,6 +425,8 @@ def detect_toponym_anchors_contour(im, data, debug=False):
             if not (x1-buff <= pt[0] <= x2+buff and y1-buff <= pt[1] <= y2+buff):
                 continue
 
+            if debug:
+                print 'candidate anchor at',pt
             candidates.append((cnt,pt))
 
         if candidates:
@@ -426,7 +435,7 @@ def detect_toponym_anchors_contour(im, data, debug=False):
             r['anchor'] = pt
 
             if debug:
-                print 'found', pt
+                print 'final anchor at', pt
 ##                candidates_geoj = [{'type': 'Polygon',
 ##                                  'coordinates': [ [tuple(p[0].tolist()) for p in cnt] ]}
 ##                                  for cnt,pt in candidates]
@@ -437,7 +446,7 @@ def detect_toponym_anchors_contour(im, data, debug=False):
                     c.draw_circle(xy=_pt, fillsize='3px', fillcolor=None, outlinecolor=(0,0,255), outlinewidth='0.5px')
                 c.draw_circle(xy=pt, fillsize='5px', fillcolor=None, outlinecolor=(255,0,0), outlinewidth='1px')
 
-        if 0: #debug:
+        if debug:
             c.get_image().show()
 
     return data
@@ -507,175 +516,177 @@ def detect_toponym_anchors_template_images(im, data, debug=False):
     - im must already be grayscale of possible anchor pixels. 
     - data is list of tesseract text dict results, preferably already filtered to toponyms.
     '''
-    debug = True
+    raise NotImplementedError
 
-    # blank out all text regions
-    im_arr_orig = np.array(im)
-    im_arr =  np.ones(im_arr_orig.shape) * 255
-    for r in data:
-        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
-        x2 = x1+w
-        y2 = y1+h
-        fh = int(r['fontheight'])
-
-        # look inside buffer region
-        buff = int(fh * 1)
-        im_arr[y1-buff:y2+buff, x1-buff:x2+buff] = im_arr_orig[y1-buff:y2+buff, x1-buff:x2+buff]
-
-        # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
-        im_arr[y1:y2, x1:x2] = 255
-
-    # find anchor candidates within text buffers
-    template_candidates = []
-    for r in data:
-        print 'finding template candidates near', r['text']
-        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
-        x2 = x1+w
-        y2 = y1+h
-        fh = int(r['fontheight'])
-        
-        # extract subimg from buffer around text
-        buff = int(fh * 1)
-        buff_im_arr = im_arr[y1-buff:y2+buff, x1-buff:x2+buff] #im_arr[filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff]]
-        thresh = 25
-        bin_im_arr = buff_im_arr.astype(np.uint8)
-        bin_im_arr[bin_im_arr < thresh] = 0 # binarize
-        bin_im_arr[bin_im_arr >= thresh] = 255 # binarize
-        bin_im_arr = 255 - bin_im_arr # invert
-
-        # extract contours from img
-        contours,_ = cv2.findContours(bin_im_arr, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-        contours_geoj = [{'type': 'Polygon',
-                          'coordinates': [ [tuple(p[0].tolist()) for p in cnt] ]}
-                          for cnt in contours]
-        
-        # only find templates of significant size
-        # so limit to centers larger than 1/4th font height, but smaller than 1x font height
-        ch = fh/2.0 # value of center the size of fontsize will be half the fontsize
-        ch_lower = ch/4.0
-        ch_upper = ch
-        for geoj in contours_geoj:
-            coords = geoj['coordinates'][0]
-            xs,ys = zip(*coords)
-            xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
-            w,h = xmax-xmin, ymax-ymin
-            if ch_lower <= w <= ch_upper and ch_lower <= h <= ch_upper and 0.75 < (w/float(h)) < 1.25:
-                templ = buff_im_arr[ymin:ymax+1, xmin:xmax+1].copy()
-                templ[templ == 255] = thresh
-                templ = thresh - templ # invert
-                template_candidates.append(templ)
-    print 'total candidates', len(template_candidates)
-
-    # group templates
-    print 'grouping templates'
-    grouped_template_candidates = []
-    hs,ws = zip(*[templ.shape for templ in template_candidates])
-    maxw,maxh = max(ws),max(hs)
-    def mse(imageA, imageB):
-        print 'mse',imageA.shape,'vs',imageB.shape
-        # first make same dimensions to allow comparison
-        hs,ws = zip(imageA.shape, imageB.shape)
-        maxw,maxh = max(ws),max(hs)
-        # A
-        frame = np.zeros((maxh,maxw))
-        h,w = imageA.shape
-        xoff = (maxw-w) // 2
-        yoff = (maxh-h) // 2
-        frame[yoff:yoff+h, xoff:xoff+w] = imageA
-        imageA = frame
-        print 'A',imageA
-        # B
-        frame = np.zeros((maxh,maxw))
-        h,w = imageB.shape
-        xoff = (maxw-w) // 2
-        yoff = (maxh-h) // 2
-        frame[yoff:yoff+h, xoff:xoff+w] = imageB
-        imageB = frame
-        print 'B',imageB
-        # https://www.pyimagesearch.com/2014/09/15/python-compare-two-images/
-	# the 'Mean Squared Error' between the two images is the
-	# sum of the squared difference between the two images;
-	# NOTE: the two images must have the same dimension
-	#PIL.Image.fromarray(imageA).show()
-	#PIL.Image.fromarray(imageB).show()
-	err = ((imageA.astype("float") - imageB.astype("float")) ** 2).mean()
-	print 'error', err
-	# return the MSE, the lower the error, the more "similar"
-	# the two image
-	return err
-    for templ in template_candidates:
-        # determine similarity threshold
-        max_mse = ((thresh-templ)**2.0).mean() #255**2 #(templ**2.0).sum() / float((templ > 0).sum())
-        simil_thresh = max_mse * 0.15 # max 15% error of max error
-        print 'thresh',simil_thresh,max_mse
-        # look for similar template groups
-        simil = [(grouptempl,mse(templ,grouptempl)) for grouptempl in grouped_template_candidates]
-        simil = [(grouptempl,err) for grouptempl,err in simil if err < simil_thresh]
-        if simil:
-            # similar, add to group
-            mostsimil = sorted(simil, key=lambda(grouptempl,err): err)[0]
-            #grouped_template_candidates[mostsimil].append(templ)
-        else:
-            # not similar, create new group
-            #grouped_template_candidates[templ] = []
-            grouped_template_candidates.append(templ)
-##    if debug:
-##        #for templ,group in grouped_template_candidates.items():
-##        for templ in grouped_template_candidates:
-##            print templ.shape #, len(group)
-##            PIL.Image.fromarray(templ).show()
-    template_candidates = grouped_template_candidates #.keys()
-    print 'grouped', len(template_candidates)
-
-    # search for templates
-    template_candidate_matches = []
-    for templ in template_candidates:
-        print 'searching for template matches', templ.shape
-        matches = []
-        for r in data:
-            x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
-            x2 = x1+w
-            y2 = y1+h
-            fh = int(r['fontheight'])
-            
-            # extract subimg from buffer around text
-            buff = int(fh * 1)
-            buff_im_arr = im_arr[y1-buff:y2+buff, x1-buff:x2+buff].copy()
-            buff_im_arr[buff_im_arr == 255] = thresh
-            buff_im_arr = thresh - buff_im_arr # invert
-            buff_im_arr = buff_im_arr.astype(np.uint8)
-
-            # match template
-            templ = templ.astype(np.uint8)
-            res = cv2.matchTemplate(buff_im_arr, templ, cv2.TM_CCOEFF_NORMED)
-            thresh = 0.66
-            res[res < thresh] = 0
-
-            # get template centers
-            centers = np.nonzero(res)
-            centers = [(pt[1],pt[0]) for pt in np.transpose(centers)] # upperleft coords
-            centers = [(cx+templ.shape[1]/2.0, cy+templ.shape[0]/2.0) for cx,cy in centers] # move to center of template
-            centers = [(x1-buff+cx, y1-buff+cy) for cx,cy in centers] # offset to total img coords
-            matches.append(centers)
-
-        template_candidate_matches.append(matches)
-
-    # get the templates by number of matches
-    for templ,matches in sorted(zip(template_candidates, template_candidate_matches), key=lambda(t,ms): -len([centers for centers in ms if centers])):
-        # template
-        PIL.Image.fromarray(templ * 100).show()
-        # matches
-        if debug:
-            import pyagg
-            c = pyagg.canvas.from_image(PIL.Image.fromarray(im_arr))
-            print 'found', len([centers for centers in matches if centers])
-            for centers in matches:
-                for pt in centers:
-                    c.draw_circle(xy=pt, fillcolor=None, outlinecolor=(0,0,255), outlinewidth='1px')
-            c.get_image().show()
-
-    # assign
-    # ...
+##    debug = True
+##
+##    # blank out all text regions
+##    im_arr_orig = np.array(im)
+##    im_arr =  np.ones(im_arr_orig.shape) * 255
+##    for r in data:
+##        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+##        x2 = x1+w
+##        y2 = y1+h
+##        fh = int(r['fontheight'])
+##
+##        # look inside buffer region
+##        buff = int(fh * 1)
+##        im_arr[y1-buff:y2+buff, x1-buff:x2+buff] = im_arr_orig[y1-buff:y2+buff, x1-buff:x2+buff]
+##
+##        # but do not look inside text region itself (NOTE: is sometimes too big and covers the point too)
+##        im_arr[y1:y2, x1:x2] = 255
+##
+##    # find anchor candidates within text buffers
+##    template_candidates = []
+##    for r in data:
+##        print 'finding template candidates near', r['text']
+##        x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+##        x2 = x1+w
+##        y2 = y1+h
+##        fh = int(r['fontheight'])
+##        
+##        # extract subimg from buffer around text
+##        buff = int(fh * 1)
+##        buff_im_arr = im_arr[y1-buff:y2+buff, x1-buff:x2+buff] #im_arr[filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff]]
+##        thresh = 25
+##        bin_im_arr = buff_im_arr.astype(np.uint8)
+##        bin_im_arr[bin_im_arr < thresh] = 0 # binarize
+##        bin_im_arr[bin_im_arr >= thresh] = 255 # binarize
+##        bin_im_arr = 255 - bin_im_arr # invert
+##
+##        # extract contours from img
+##        contours,_ = cv2.findContours(bin_im_arr, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+##        contours_geoj = [{'type': 'Polygon',
+##                          'coordinates': [ [tuple(p[0].tolist()) for p in cnt] ]}
+##                          for cnt in contours]
+##        
+##        # only find templates of significant size
+##        # so limit to centers larger than 1/4th font height, but smaller than 1x font height
+##        ch = fh/2.0 # value of center the size of fontsize will be half the fontsize
+##        ch_lower = ch/4.0
+##        ch_upper = ch
+##        for geoj in contours_geoj:
+##            coords = geoj['coordinates'][0]
+##            xs,ys = zip(*coords)
+##            xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
+##            w,h = xmax-xmin, ymax-ymin
+##            if ch_lower <= w <= ch_upper and ch_lower <= h <= ch_upper and 0.75 < (w/float(h)) < 1.25:
+##                templ = buff_im_arr[ymin:ymax+1, xmin:xmax+1].copy()
+##                templ[templ == 255] = thresh
+##                templ = thresh - templ # invert
+##                template_candidates.append(templ)
+##    print 'total candidates', len(template_candidates)
+##
+##    # group templates
+##    print 'grouping templates'
+##    grouped_template_candidates = []
+##    hs,ws = zip(*[templ.shape for templ in template_candidates])
+##    maxw,maxh = max(ws),max(hs)
+##    def mse(imageA, imageB):
+##        print 'mse',imageA.shape,'vs',imageB.shape
+##        # first make same dimensions to allow comparison
+##        hs,ws = zip(imageA.shape, imageB.shape)
+##        maxw,maxh = max(ws),max(hs)
+##        # A
+##        frame = np.zeros((maxh,maxw))
+##        h,w = imageA.shape
+##        xoff = (maxw-w) // 2
+##        yoff = (maxh-h) // 2
+##        frame[yoff:yoff+h, xoff:xoff+w] = imageA
+##        imageA = frame
+##        print 'A',imageA
+##        # B
+##        frame = np.zeros((maxh,maxw))
+##        h,w = imageB.shape
+##        xoff = (maxw-w) // 2
+##        yoff = (maxh-h) // 2
+##        frame[yoff:yoff+h, xoff:xoff+w] = imageB
+##        imageB = frame
+##        print 'B',imageB
+##        # https://www.pyimagesearch.com/2014/09/15/python-compare-two-images/
+##	# the 'Mean Squared Error' between the two images is the
+##	# sum of the squared difference between the two images;
+##	# NOTE: the two images must have the same dimension
+##	#PIL.Image.fromarray(imageA).show()
+##	#PIL.Image.fromarray(imageB).show()
+##	err = ((imageA.astype("float") - imageB.astype("float")) ** 2).mean()
+##	print 'error', err
+##	# return the MSE, the lower the error, the more "similar"
+##	# the two image
+##	return err
+##    for templ in template_candidates:
+##        # determine similarity threshold
+##        max_mse = ((thresh-templ)**2.0).mean() #255**2 #(templ**2.0).sum() / float((templ > 0).sum())
+##        simil_thresh = max_mse * 0.15 # max 15% error of max error
+##        print 'thresh',simil_thresh,max_mse
+##        # look for similar template groups
+##        simil = [(grouptempl,mse(templ,grouptempl)) for grouptempl in grouped_template_candidates]
+##        simil = [(grouptempl,err) for grouptempl,err in simil if err < simil_thresh]
+##        if simil:
+##            # similar, add to group
+##            mostsimil = sorted(simil, key=lambda(grouptempl,err): err)[0]
+##            #grouped_template_candidates[mostsimil].append(templ)
+##        else:
+##            # not similar, create new group
+##            #grouped_template_candidates[templ] = []
+##            grouped_template_candidates.append(templ)
+####    if debug:
+####        #for templ,group in grouped_template_candidates.items():
+####        for templ in grouped_template_candidates:
+####            print templ.shape #, len(group)
+####            PIL.Image.fromarray(templ).show()
+##    template_candidates = grouped_template_candidates #.keys()
+##    print 'grouped', len(template_candidates)
+##
+##    # search for templates
+##    template_candidate_matches = []
+##    for templ in template_candidates:
+##        print 'searching for template matches', templ.shape
+##        matches = []
+##        for r in data:
+##            x1,y1,w,h = [int(r[k]) for k in 'left top width height'.split()]
+##            x2 = x1+w
+##            y2 = y1+h
+##            fh = int(r['fontheight'])
+##            
+##            # extract subimg from buffer around text
+##            buff = int(fh * 1)
+##            buff_im_arr = im_arr[y1-buff:y2+buff, x1-buff:x2+buff].copy()
+##            buff_im_arr[buff_im_arr == 255] = thresh
+##            buff_im_arr = thresh - buff_im_arr # invert
+##            buff_im_arr = buff_im_arr.astype(np.uint8)
+##
+##            # match template
+##            templ = templ.astype(np.uint8)
+##            res = cv2.matchTemplate(buff_im_arr, templ, cv2.TM_CCOEFF_NORMED)
+##            thresh = 0.66
+##            res[res < thresh] = 0
+##
+##            # get template centers
+##            centers = np.nonzero(res)
+##            centers = [(pt[1],pt[0]) for pt in np.transpose(centers)] # upperleft coords
+##            centers = [(cx+templ.shape[1]/2.0, cy+templ.shape[0]/2.0) for cx,cy in centers] # move to center of template
+##            centers = [(x1-buff+cx, y1-buff+cy) for cx,cy in centers] # offset to total img coords
+##            matches.append(centers)
+##
+##        template_candidate_matches.append(matches)
+##
+##    # get the templates by number of matches
+##    for templ,matches in sorted(zip(template_candidates, template_candidate_matches), key=lambda(t,ms): -len([centers for centers in ms if centers])):
+##        # template
+##        PIL.Image.fromarray(templ * 100).show()
+##        # matches
+##        if debug:
+##            import pyagg
+##            c = pyagg.canvas.from_image(PIL.Image.fromarray(im_arr))
+##            print 'found', len([centers for centers in matches if centers])
+##            for centers in matches:
+##                for pt in centers:
+##                    c.draw_circle(xy=pt, fillcolor=None, outlinecolor=(0,0,255), outlinewidth='1px')
+##            c.get_image().show()
+##
+##    # assign
+##    # ...
             
         
         

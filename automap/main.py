@@ -151,6 +151,7 @@ def toponym_selection(im, textinfo, seginfo):
     # (anchors are usually thick and almost always black, so not as affected by color blending as text)
     diff = segmentation.color_difference(segmentation.quantize(im), (0,0,0))
     diff[diff > 25] = 255
+    diff[diff <= 25] = 0
     anchor_im = PIL.Image.fromarray(diff)
 
     # OR get color changes/edges

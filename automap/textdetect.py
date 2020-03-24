@@ -323,9 +323,9 @@ def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
     # group similar textcolors and return
     textcolors = [t[1] for t in texts]
     coldiffs = [t[2] for t in texts]
-    colorgroups = segmentation.group_colors(textcolors, 10)
+    colorgroups = segmentation.group_colors(textcolors, 15)
     print 'textcolors detected',[(col,len(cols)) for col,cols in colorgroups.items()]
-    #segmentation.view_colors(textcolors)
+    segmentation.view_colors(textcolors)
     
     # pair each group color member with their coldiff
     for col in list(colorgroups.keys()):
