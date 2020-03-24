@@ -42,6 +42,7 @@ def image_partitioning(im):
         props = {'type':'Map'}
         feat = {'type': 'Feature', 'properties': props, 'geometry': mapp_geoj}
         seginfo['features'].append(feat)
+        
     
     # (boxes)
     if box_polys:
@@ -52,6 +53,13 @@ def image_partitioning(im):
             props = {'type':'Box'}
             feat = {'type': 'Feature', 'properties': props, 'geometry': box_geoj}
             seginfo['features'].append(feat)
+
+    # debug extracted segments...
+##    import pythongis as pg
+##    d = pg.VectorData()
+##    for geoj in seginfo['features']:
+##        d.add_feature([], geoj['geometry'])
+##    d.view(fillcolor=None)
 
     return seginfo
 

@@ -167,7 +167,7 @@ def edge_filter(im):
     edges = ImageOps.expand(edges, 1, fill=0)
     return edges
 
-def color_changes(im):
+def color_changes(im, neighbours=1):
     im_arr = np.array(im)
     
     # quantize and convert colors
@@ -187,12 +187,14 @@ def color_changes(im):
     # detect color edges
     orig_flat = np.array(quant).flatten()
     diff_im_flat = np.zeros(quant.size).flatten()
-    for xoff in range(-1, 1+1, 1):
-        for yoff in range(-1, 1+1, 1):
+    buff = (neighbours,neighbours)
+    for xoff in range(-buff[0], buff[0]+1, 1):
+        for yoff in range(-buff[1], buff[1]+1, 1):
             if xoff == yoff == 0: continue
             off_flat = np.roll(quant, (xoff,yoff), (0,1)).flatten()
-            diff_im_flat = diff_im_flat + pairdiffs_arr[orig_flat,off_flat] #np.maximum(diff_im_flat, pairdiffs[orig_flat,off_flat])
-    diff_im_flat = diff_im_flat / 8.0
+            #diff_im_flat = diff_im_flat + pairdiffs_arr[orig_flat,off_flat]
+            diff_im_flat = np.maximum(diff_im_flat, pairdiffs_arr[orig_flat,off_flat])
+    #diff_im_flat = diff_im_flat / 8.0
 
     diff_im = diff_im_flat.reshape((im.height, im.width))
     return diff_im
@@ -221,7 +223,7 @@ def detect_map_outline(im):
     im_area = w*h
     if cv2.contourArea(largest) > im_area/(3.0**2):
         # maybe also require that contour doesnt touch edges of the image
-        xbuf,ybuf = 4,4 #w/100.0, h/100.0 # 1 percent
+        xbuf,ybuf = 2,2 #w/100.0, h/100.0 # 1 percent
         if largest[:,:,0].min() > 0+xbuf and largest[:,:,0].max() < w-xbuf \
            and largest[:,:,1].max() > 0+ybuf and largest[:,:,1].max() < h-ybuf:
             return largest
@@ -232,17 +234,19 @@ def detect_boxes(im):
     # https://stackoverflow.com/questions/46641101/opencv-detecting-a-circle-using-findcontours
     # see esp: https://www.learnopencv.com/blob-detection-using-opencv-python-c/
     contours,_ = cv2.findContours(np.array(im), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    #im_arr_draw = cv2.cvtColor(im_arr, cv2.COLOR_GRAY2RGB)
+    #im_arr_draw = cv2.cvtColor(np.array(im), cv2.COLOR_GRAY2RGB)
+    #from random import randrange
     boxes = []
     im_area = im.size[0] * im.size[1]
-    for cnt in contours:
+    for cnt in contours: #sorted(contours,key=lambda c: cv2.contourArea(c), reverse=True)[:10]:
+        #cv2.drawContours(im_arr_draw, [cnt], -1, (randrange(0,255),randrange(0,255),randrange(0,255)), -1) #-1, (0,255,0), 1)
         epsilon = 5 # pixels # 0.01*cv2.arcLength(cnt,True)
         approx = cv2.approxPolyDP(cnt,epsilon,True)
         if len(approx) == 4:
+            # less than half the size (a quarter corner), and bigger than one-sixteenth (half of half of half of a quarter corner)
             if (im_area/(2.0**2)) > cv2.contourArea(cnt) > (im_area/(16.0**2)):
-                boxes.append(approx)
-            
-    #cv2.drawContours(im_arr_draw, boxes, -1, (0,255,0), 1)
+                boxes.append(cnt) #approx
+
     #PIL.Image.fromarray(im_arr_draw).show()
     return boxes
 
@@ -359,23 +363,34 @@ def image_segments(im):
     w,h = im.size
     dw,dh = 1000,1000
     ratio = max(w/float(dw), h/float(dh))
-    im_small = im.resize((int(w/ratio), int(h/ratio)), PIL.Image.ANTIALIAS)
+    im_small = im.resize((int(w/ratio), int(h/ratio)), PIL.Image.NEAREST)
+    #im_small.show()
 
     # filter to edges
-    edges = edge_filter(im_small)
+    #edges = edge_filter(im_small)
+
+    # OR edges from 3x3 color changes
+    changes = color_changes(im_small, neighbours=1)
+    thresh = 10
+    changes[changes < thresh] = 0
+    changes[changes >= thresh] = 255
+    edges = PIL.Image.fromarray(changes.astype(np.uint8))
 
     # grow to close small edge holes
-    edges = close_edge_gaps(edges)
+    #edges = close_edge_gaps(edges)
 
     # NOTE: masking should be done on each sample image
 
     # find map outline
+    #edges.show()
     map_outline = detect_map_outline(edges)
     if map_outline is not None:
         # convert back to original image coords
         map_outline = (map_outline * ratio).astype(np.uint64)
 
     # find boxes
+    #edges = edges.point(lambda v: 255-v) # inverse, since we expect the inside of boxes to be cleaner/less noise? 
+    #edges.show()
     boxes = detect_boxes(edges)
     # convert back to original image coords
     boxes = [(box*ratio).astype(np.uint64) for box in boxes]

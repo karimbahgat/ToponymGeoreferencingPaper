@@ -312,7 +312,7 @@ def detect_toponym_anchors_contour(im, data, debug=False):
     - im must already be BINARY of possible anchor pixels.
     - data is list of tesseract text dict results, preferably already filtered to toponyms. 
     '''
-    debug = True
+    #debug = True
 
     # blank out all text regions
     im_arr = np.array(im).astype(np.uint8)

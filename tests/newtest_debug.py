@@ -3,10 +3,10 @@ import automap as mapfit
 import os
 
 #testim = 'burkina.jpg'
-#testim = 'china_pol96.jpg'
+testim = 'china_pol96.jpg'
 #testim = 'brazil_land_1977.jpg'
 #testim = 'france_admin91.jpg'
-testim = 'russia_autonomous92.jpg'
+#testim = 'russia_autonomous92.jpg'
 #testim = 'israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
 testim_root,ext = os.path.splitext(testim)
 
@@ -69,7 +69,7 @@ testim_root,ext = os.path.splitext(testim)
 
 # first produce
 db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
-info = mapfit.automap('testmaps/{}'.format(testim), textcolor=(0,0,0), colorthresh=20, warp_order=None, db=db, debug=True)
+info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp_order=None, db=db, debug=True)
 
 # image
 render = mapfit.debug.render_text_recognition('testmaps/{}'.format(testim),
