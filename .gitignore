@@ -48,5 +48,6 @@ Temporary Items
 # Folders
 tests/testmaps/
 simulations/maps/
+simulations/output/
 simulations/data/
 simulations/analyze/

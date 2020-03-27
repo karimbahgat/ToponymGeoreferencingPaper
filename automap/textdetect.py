@@ -302,6 +302,7 @@ def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
 
                 # calc max color diff in high luminance pixels
                 # (TODO: maybe should be mean+std?)
+                # (TODO: switch so only based on the same pixels that made up the color detection, ie weighted avg of top 66% of luminance pixels)
                 textim = segmentation.quantize(textim)
                 diff_arr = segmentation.color_difference(textim, textcol)
                 maskdiffs = diff_arr.flatten()[ls > 0]
@@ -325,7 +326,7 @@ def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
     coldiffs = [t[2] for t in texts]
     colorgroups = segmentation.group_colors(textcolors, 15)
     print 'textcolors detected',[(col,len(cols)) for col,cols in colorgroups.items()]
-    segmentation.view_colors(textcolors)
+    #segmentation.view_colors(textcolors)
     
     # pair each group color member with their coldiff
     for col in list(colorgroups.keys()):
@@ -495,7 +496,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
         #print lmask.min(),lmask.max()
 
         lmaskim = PIL.Image.fromarray(lmask.astype(np.uint8))
-        lmaskim.show()
+        #lmaskim.show()
 
         #imarr = np.array(upscale)
         #imarr[lmask==255] = (255,255,255)
@@ -550,8 +551,10 @@ def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=Fa
     if not textcolors:
         print 'sniffing text colors'
         colorgroups = sniff_text_colors(im, seginfo=seginfo, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
+
         # colors as color groupings
         textcolors = list(colorgroups.keys())
+        
         # automatic detection of threshold for each textcolor (disabled for now)
         colorthresh = []
         for col,colgroup in colorgroups.items():
@@ -565,11 +568,17 @@ def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=Fa
             # cap at 30
             diff = min(diff, 30)
             colorthresh.append(diff)
+            
         # debug
-        segmentation.view_colors(colorgroups.keys())
-        for group in colorgroups.values():
-            groupcols = [subcol for subcol,coldiff in group]
-            #segmentation.view_colors(groupcols)
+##        segmentation.view_colors(colorgroups.keys())
+##        for group in colorgroups.values():
+##            groupcols = [subcol for subcol,coldiff in group]
+##            segmentation.view_colors(groupcols)
+
+        # fallback on black if no samples detected
+        if not textcolors:
+            textcolors = [(0,0,0)]
+            colorthresh = [25]
     
     # compare with just luminance
 ##    lab = rgb_to_lab(im)
@@ -596,7 +605,7 @@ def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=Fa
 ##
 ##    print time()-t
 
-    # sample text detection
+    # run text detection
     if sample:
         texts = sample_texts(im, textcolors, threshold=colorthresh, textconf=textconf, max_samples=max_samples, max_texts=max_texts)
     else:

@@ -289,7 +289,7 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, placeopts, projectio
 
     # store rendering with original geo coordinates
     r = pg.RasterData(image=img) 
-    r.set_geotransform(affine=m.drawer.coordspace_invtransform) 
+    r.set_geotransform(affine=m.drawer.coordspace_invtransform) # inverse bc the drawer actually goes from coords -> pixels, we need pixels -> coords
     r.save('maps/{}_image.{}'.format(name, imformat), **saveargs)
 
     # store the original place coordinates

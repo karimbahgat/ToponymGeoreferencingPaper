@@ -47,6 +47,7 @@ testim_root,ext = os.path.splitext(testim)
 ##colors = [(38.876272094268884, 29.178200321371186, 13.807873594001071),
 ##          (103.13357478782636, 72.47267419860533, 44.70322720147035)]
 ##colors = mapfit.textdetect.sniff_text_colors(im).keys()
+##mapfit.segmentation.view_colors(colors)
 ##thresh = 25 
 ##out = np.zeros((im.size[1],im.size[0],3,), dtype=np.uint8)
 ##out[:,:,None] = (255,255,255)

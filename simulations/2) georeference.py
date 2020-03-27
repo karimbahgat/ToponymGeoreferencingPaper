@@ -32,7 +32,8 @@ except:
 
 ###################
 # PARAMS
-ORDER = None
+TEXTCOLOR = None
+WARPORDER = None
 
 
 ###################
@@ -42,34 +43,25 @@ def mapfiles():
         if fil.endswith(('_image.png','_image.jpg')):
             yield fil
 
-def georeference_auto(fil, db, source, textcolor, warp_order):
+def georeference_auto(fil, outfil, db, source, textcolor, warp_order):
     # EITHER automated tool
-    fil_root = os.path.splitext(fil)[0].replace('_image', '')
-    logger = codecs.open('{}_georeferenced_auto_log.txt'.format(fil_root), 'w', encoding='utf8', buffering=0)
-    sys.stdout = logger
-    sys.stderr = logger
-    print('PID:',os.getpid())
-    print('time',datetime.datetime.now().isoformat())
-    print('working path',os.path.abspath(''))
+    outfil_root = os.path.splitext(outfil)[0]
     
     mapfit.automap(fil,
-               outpath='{}_georeferenced_auto.tif'.format(fil_root),
-               db=db,
-               source=source,
-               textcolor=textcolor,
-               warp_order=warp_order,
-               debug='ocr',
-               )
+                   outpath=outfil,
+                   db=db,
+                   source=source,
+                   textcolor=textcolor,
+                   warp_order=warp_order,
+                   debug=True,
+                   )
 
-def georeference_exact(fil, warp_order):
+def georeference_exact(fil, outfil, warp_order):
     # OR use the actual coordinates for the rendered placenames (should be approx 0 error...)
-    fil_root = os.path.splitext(fil)[0].replace('_image', '')
-    logger = codecs.open('{}_georeferenced_exact_log.txt'.format(fil_root), 'w', encoding='utf8', buffering=0)
-    sys.stdout = logger
-    sys.stderr = logger
-    print('PID:',os.getpid())
-    print('time',datetime.datetime.now().isoformat())
-    print('working path',os.path.abspath(''))
+    # TODO: NEEDS MORE FIXING, eg load transform from json, dont reestimate... 
+    # ...
+    fil_root = os.path.splitext(fil)[0]
+    outfil_root = os.path.splitext(outfil)[0]
     
     print('exact georeferencing based on original placename coordinates')
     t=time()
@@ -87,7 +79,7 @@ def georeference_exact(fil, warp_order):
 
     wim,aff = mapfit.imwarp.warp(im, forward, backward) # warp
     warped = pg.RasterData(image=wim, affine=aff) # to geodata
-    warped.save('{}_georeferenced_exact.tif'.format(fil_root))
+    warped.save(outfil)
     
     #warped = mapfit.main.warp(im, '{}_georeferenced_exact.tif'.format(fil_root), tiepoints, order=warp_order)
     #gcps = [('',oc,'',mc,[]) for oc,mc in tiepoints]
@@ -98,9 +90,24 @@ def georeference_exact(fil, warp_order):
     places.rename_field('row', 'origy')
     places.rename_field('x', 'matchx')
     places.rename_field('y', 'matchy')
-    places.save('{}_georeferenced_exact_controlpoints.geojson'.format(fil_root))
+    places.save('{}_controlpoints.geojson'.format(outfil_root))
 
     print('finished exact georeferencing', time()-t)
+
+def process_logger(func, **kwargs):
+    fil = kwargs.get('fil')
+    outfil = kwargs.get('outfil')
+    
+    fil_root = os.path.splitext(fil)[0]
+    outfil_root = os.path.splitext(outfil)[0]
+    logger = codecs.open('{}_log.txt'.format(outfil_root), 'w', encoding='utf8', buffering=0)
+    sys.stdout = logger
+    sys.stderr = logger
+    print('PID:',os.getpid())
+    print('time',datetime.datetime.now().isoformat())
+    print('working path',os.path.abspath(''))
+    # run it
+    func(**kwargs)
 
 
 ####################
@@ -108,20 +115,22 @@ def georeference_exact(fil, warp_order):
 
 if __name__ == '__main__':
 
-    maxprocs = 2
+    maxprocs = 4
     procs = []
 
     for fil in mapfiles():
         print(fil)
+        fil_root = os.path.splitext(fil)[0].replace('_image', '')
 
-##        # Local testing
-##
-##        ## auto
+        # Local testing
+
+        ## auto
 ##        georeference_auto(fil='maps/{}'.format(fil),
-##                       db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db",
-##                       source='best',
-##                       textcolor=(0,0,0),
-##                       warp_order=ORDER,)
+##                          outfil='output/{}_georeferenced_auto.tif'.format(fil_root),
+##                           db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db",
+##                           source='best',
+##                           textcolor=TEXTCOLOR,
+##                           warp_order=WARPORDER,)
 ##
 ##        ## exact
 ####        georeference_exact(fil='maps/{}'.format(fil),
@@ -132,20 +141,25 @@ if __name__ == '__main__':
         # Begin process
 
         ## auto
-        p = mp.Process(target=georeference_auto,
+        p = mp.Process(target=process_logger,
+                       args=[georeference_auto],
                        kwargs=dict(fil='maps/{}'.format(fil),
+                                   outfil='output/{}_georeferenced_auto.tif'.format(fil_root),
                                    db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db", #"data/gazetteers.db",
                                    source='best',
-                                   textcolor=None,
-                                   warp_order=ORDER,),
+                                   textcolor=TEXTCOLOR,
+                                   warp_order=WARPORDER,
+                                   ),
                        )
         p.start()
         procs.append((p,time()))
 
         ## exact
-##        p = mp.Process(target=georeference_exact,
+##        p = mp.Process(target=process_logger,
+##                       args=[georeference_exact],
 ##                       kwargs=dict(fil='maps/{}'.format(fil),
-##                                   warp_order=ORDER,),
+##                                   outfil='output/{}_georeferenced_exact.tif'.format(fil_root),
+##                                   warp_order=WARPORDER,),
 ##                       )
 ##        p.start()
 ##        procs.append((p,time()))
