@@ -496,7 +496,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
         #print lmask.min(),lmask.max()
 
         lmaskim = PIL.Image.fromarray(lmask.astype(np.uint8))
-        lmaskim.show()
+        #lmaskim.show()
 
         #imarr = np.array(upscale)
         #imarr[lmask==255] = (255,255,255)

@@ -69,6 +69,8 @@ def georeference_exact(fil, outfil, warp_order):
     
     places = pg.VectorData('{}_placenames.geojson'.format(fil_root))
     tiepoints = [((f['col'],f['row']),(f['x'],f['y'])) for f in places]
+    # maybe transform the xy placename coordinates to the map crs (by mistake saved as wgs84)
+    # ... 
     pixels,coords = zip(*tiepoints)
     (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
     trans = mapfit.transforms.Polynomial(order=warp_order)
@@ -115,7 +117,7 @@ def process_logger(func, **kwargs):
 
 if __name__ == '__main__':
 
-    maxprocs = 4
+    maxprocs = 3
     procs = []
 
     for fil in mapfiles():

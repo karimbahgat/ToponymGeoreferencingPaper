@@ -18,14 +18,23 @@ def filter_toponym_candidates(data, seginfo=None):
         mapregion = next((f['geometry'] for f in seginfo['features'] if f['properties']['type'] == 'Map'), None)
         if mapregion:
             mapshp = shapely.geometry.asShape(mapregion)
-            incl_shp = mapshp
+            mapshp = mapshp if mapshp.is_valid else mapshp.buffer(0) # try to fix if invalid
+            mapshp = mapshp if b.is_valid else None # only keep if valid
+            if mapshp:
+                incl_shp = mapshp
 
         # exclusion region
         excl_shp = None
         boxes = [f['geometry'] for f in seginfo['features'] if f['properties']['type'] == 'Box']
         if boxes:
             boxshps = [shapely.geometry.asShape(box) for box in boxes]
-            excl_shp = shapely.ops.unary_union(boxshps)
+            boxshps = [b if b.is_valid else b.buffer(0) # try to fix invalid ones
+                       for b in boxshps]
+            boxshps = [b for b in boxshps if b.is_valid] # only keep those that remain valid
+            if len(boxshps) > 1:
+                excl_shp = shapely.ops.unary_union(boxshps)
+            elif len(boxshps) == 1:
+                excl_shp = boxshps[0]
     
     topotexts = []
     for text in data:
