@@ -428,6 +428,12 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     # store metadata
     info['segmentation'] = seginfo
 
+    # debug output? 
+    if debug:
+        pth = os.path.join(outfold, outfil+'_debug_segmentation.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['segmentation'], writer)
+
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
     
 
@@ -447,6 +453,12 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
 
     # store metadata
     info['text_recognition'] = textinfo
+
+    # output debug?
+    if debug:
+        pth = os.path.join(outfold, outfil+'_debug_text.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['text_recognition'], writer)
 
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
 
@@ -468,6 +480,12 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     # store metadata
     info['toponym_candidates'] = toponyminfo
 
+    # output debug? 
+    if debug:
+        pth = os.path.join(outfold, outfil+'_debug_text_toponyms.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['toponym_candidates'], writer)
+
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
 
     
@@ -487,6 +505,12 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
 
     # store metadata
     info['gcps_matched'] = gcps_matched_info
+
+    # output debug? 
+    if debug:
+        pth = os.path.join(outfold, outfil+'_debug_gcps_matched.geojson')
+        with open(pth, 'w') as writer:
+            json.dump(info['gcps_matched'], writer)
 
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
 
@@ -573,27 +597,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
             json.dump(info['transform_estimation'], writer)
 
     if debug:
-        print '\n' + 'saving debug data'
-
-        # segmentation
-        pth = os.path.join(outfold, outfil+'_debug_segmentation.geojson')
-        with open(pth, 'w') as writer:
-            json.dump(info['segmentation'], writer)
-
-        # text recognition
-        pth = os.path.join(outfold, outfil+'_debug_text.geojson')
-        with open(pth, 'w') as writer:
-            json.dump(info['text_recognition'], writer)
-
-        # toponym candidates
-        pth = os.path.join(outfold, outfil+'_debug_text_toponyms.geojson')
-        with open(pth, 'w') as writer:
-            json.dump(info['toponym_candidates'], writer)
-
-        # gcps matched
-        pth = os.path.join(outfold, outfil+'_debug_gcps_matched.geojson')
-        with open(pth, 'w') as writer:
-            json.dump(info['gcps_matched'], writer)
+        print '\n' + 'saving final debug data'
 
         # timings
         pth = os.path.join(outfold, outfil+'_debug_timings.json')
