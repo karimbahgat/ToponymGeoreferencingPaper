@@ -4,7 +4,7 @@ import pythongis as pg
 import os
 import sys
 import datetime
-from random import uniform
+from random import uniform, seed
 import math
 import json
 import codecs
@@ -22,6 +22,8 @@ except:
 
 ####################
 # FUNCTIONS
+
+seed(16) # random seed for replication purposes
 
 # select map region
 def mapregion(center, extent, aspect):
@@ -252,7 +254,7 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
                 textoptions=textopts,
                 legendoptions={'title':'Populated place'},
                 **anchoropts)
-    m.zoom_bbox(*bbox)
+    m.zoom_bbox(*bbox, geographic=True)
 
     if metaopts['legend']:
         legendoptions = {'padding':0, 'direction':'s'}
@@ -283,14 +285,15 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, placeopts, projectio
         saveargs['quality'] = 10
 
     # downsample to resolution
-    img = m.img.resize((newwidth, newheight), 1)
+    #img = m.img.resize((newwidth, newheight), 1) # resize img separately using nearest neighbour resampling, since map resize uses antialias
     m = m.copy()
     m.resize(newwidth, newheight)
 
     # store rendering with original geo coordinates
-    r = pg.RasterData(image=img) 
-    r.set_geotransform(affine=m.drawer.coordspace_invtransform) # inverse bc the drawer actually goes from coords -> pixels, we need pixels -> coords
-    r.save('maps/{}_image.{}'.format(name, imformat), **saveargs)
+    m.save('maps/{}_image.{}'.format(name, imformat), meta=True, **saveargs)
+    #r = pg.RasterData(image=img, crs) 
+    #r.set_geotransform(affine=m.drawer.coordspace_invtransform) # inverse bc the drawer actually goes from coords -> pixels, we need pixels -> coords
+    #r.save('maps/{}_image.{}'.format(name, imformat), **saveargs)
 
     # store the original place coordinates
     mapplaces = mapplaces.copy()
@@ -333,17 +336,17 @@ def iteroptions(center, extent):
         # FIX PROJECTION...
         for projection in projections:
 
-            if projection:
-                lonlat = '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
-                projbox = project_bbox(bbox, lonlat, projection)
-                placebox = project_bbox(projbox, projection, lonlat)
-                print('bbox to projbox and back',bbox,placebox)
-            else:
-                placebox = bbox
+##            if projection:
+##                lonlat = '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
+##                projbox = project_bbox(bbox, lonlat, projection)
+##                placebox = project_bbox(projbox, projection, lonlat)
+##                print('bbox to projbox and back',bbox,placebox)
+##            else:
+##                placebox = bbox
 
             # check enough placenames
             placeopts = {'quantity':quantity, 'distribution':distribution, 'uncertainty':uncertainty}
-            mapplaces = get_mapplaces(placebox, **placeopts)
+            mapplaces = get_mapplaces(bbox, **placeopts)
             if len(mapplaces) < 10: #quantity:
                 print('!!! Not enough places, skipping')
                 continue
@@ -503,14 +506,14 @@ quantities = [80, 40, 20, 10]
 distributions = ['dispersed', 'random'] # IMPROVE W NUMERIC
 uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
 alldatas = [
-                [(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
+                [] #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
                 [
                 (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08, 'legendoptions':{'title':'Rivers'}}), # three layers
                 (urban, {'fillcolor':(209,194,151), 'legendoptions':{'title':'Urban area'}}),
                 (roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),
                  ],
             ]
-projections = [None, # lat/lon
+projections = [#None, # lat/lon
                #'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
                #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
                '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
@@ -518,14 +521,15 @@ projections = [None, # lat/lon
 resolutions = [3000, 2000, 1000] #, 750] #, 4000]
 imformats = ['png','jpg']
 metas = [{'title':'','legend':False,'arealabels':False}, # nothing
-         {'title':'This is the Map Title','titleoptions':{'fillcolor':None},'legend':True,'legendoptions':{'fillcolor':None},'arealabels':True}, # text noise (arealabels + title + legend)
-         {'title':'This is the Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes (title + legend)
+         {'title':'This is the Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':True}, # text noise + meta boxes (arealabels + title + legend)
+         #{'title':'This is the Map Title','titleoptions':{'fillcolor':None},'legend':True,'legendoptions':{'fillcolor':None},'arealabels':True}, # text noise (arealabels + title + legend)
+         #{'title':'This is the Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes (title + legend)
          ]
 
 # main process handler
 if __name__ == '__main__':
 
-    maxprocs = 6
+    maxprocs = 4
     procs = []
 
     print('combinations per region', len(list(itertools.product(quantities,distributions,uncertainties,alldatas,projections,metas,resolutions,imformats))))

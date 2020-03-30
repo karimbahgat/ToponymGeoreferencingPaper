@@ -3,6 +3,7 @@ import numpy as np
 
 def from_json(js):
     cls = {'Polynomial':Polynomial,
+           'Projection':Projection,
            'TIN':TIN,
            }[js['type']]
     trans = cls.from_json(js)
@@ -239,7 +240,56 @@ class Polynomial(object):
 
 
 
-class TIN:
+class Projection(object):
+    def __init__(self, fromcrs, tocrs):
+        '''Map projection transform'''
+        import pycrs
+        self.fromcrs = pycrs.parse.from_unknown_text(fromcrs)
+        self.tocrs = pycrs.parse.from_unknown_text(tocrs)
+        self.minpoints = 0
+
+    def __repr__(self):
+        return u'Projection Transform(fromcrs={}, tocrs={})'.format(self.fromcrs.to_proj4(), self.tocrs.to_proj4())
+
+    def copy(self):
+        new = Projection(fromcrs=self.fromcrs, topoints=self.topoints)
+        new.minpoints = self.minpoints
+        return new
+
+    def info(self):
+        # TODO: rename to_json()
+        params = {}
+        data = {'fromcrs': self.fromcrs.to_proj4(),
+                'tocrs': self.tocrs.to_proj4()}
+        info = {'type': 'Projection',
+                'params': params,
+                'data': data,
+                }
+        return info
+
+    @staticmethod
+    def from_json(js):
+        init = {}
+        init['fromcrs'] = js['fromcrs']
+        init['tocrs'] = js['tocrs']
+        trans = Projection(**init)
+        return trans
+
+    def fit(self, *args, **kwargs):
+        raise Exception('The map projection transform is an analytic transformation and does not need to be fit or estimated')
+
+    def predict(self, x, y):
+        import pyproj
+        fromcrs = pyproj.Proj(self.fromcrs.to_proj4())
+        tocrs = pyproj.Proj(self.tocrs.to_proj4())
+        predx,predy = pyproj.transform(fromcrs,
+                               tocrs,
+                               x, y)
+        return predx,predy
+
+
+
+class TIN(object):
     def __init__(self):
         '''Creates a triangulated irregular network (TIN) between control points
         and does a global affine transform within each triangle'''

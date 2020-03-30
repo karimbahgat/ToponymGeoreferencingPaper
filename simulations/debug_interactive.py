@@ -3,6 +3,7 @@ import os
 import json
 import automap as mapfit
 import pythongis as pg
+import pycrs
 
 def inspect_image(fil, outfil):
     # image
@@ -22,6 +23,9 @@ def true_image_errors(georef_fil, truth_fil, error_type):
 
     # original/simulated map
     truth = pg.RasterData(truth_fil)
+    if 'longlat' not in pycrs.parse.from_unknown_text(truth.crs).to_proj4():
+        print 'reprojecting to longlat'
+        truth = truth.manage.reproject("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
     print truth.affine
     
     # georeferenced/transformed map
@@ -44,6 +48,9 @@ def true_georef_errors(georef_fil, truth_fil, error_type):
 
     # original/simulated map
     truth = pg.RasterData(truth_fil)
+    if 'longlat' not in pycrs.parse.from_unknown_text(truth.crs).to_proj4():
+        print 'reprojecting to longlat'
+        truth = truth.manage.reproject("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
     print truth.affine
     
     # georeferenced/transformed map

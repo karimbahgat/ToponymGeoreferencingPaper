@@ -8,6 +8,7 @@ testim = 'china_pol96.jpg'
 #testim = 'france_admin91.jpg'
 #testim = 'russia_autonomous92.jpg'
 #testim = 'israel-and-palestine-travel-reference-map-[2]-1234-p.jpg'
+#testim = 'korean_war_april_1951.jpg'
 testim_root,ext = os.path.splitext(testim)
 
 # test ocr refine

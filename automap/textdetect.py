@@ -205,7 +205,7 @@ def refine_textbox(im_arr, textdata):
 
     return textdata
 
-def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
+def sniff_text_colors(im, seginfo=None, min_samples=4, max_samples=4+4**2, max_texts=3):
     w,h = im.size
 
     xmin,ymin,xmax,ymax = 0,0,w,h
@@ -217,7 +217,7 @@ def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
     bbox = [xmin,ymin,xmax,ymax]
     print 'sniffing inside', bbox
 
-    sw,sh = 200,200
+    sw,sh = 300,300
     
     texts = []
     for i,q in enumerate(segmentation.sample_quads(bbox, (sw,sh))):
@@ -317,7 +317,7 @@ def sniff_text_colors(im, seginfo=None, samples=5, max_samples=8, max_texts=5):
                 #print textcol
                 texts.append((text['text'],textcol,coldiff))
                 
-        if (i+1) >= 4: # minimum of 4 samples
+        if (i+1) >= min_samples: # minimum quad samples
             if len(texts) >= max_texts or (i+1) >= max_samples:
                 break
 
@@ -496,7 +496,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
         #print lmask.min(),lmask.max()
 
         lmaskim = PIL.Image.fromarray(lmask.astype(np.uint8))
-        #lmaskim.show()
+        lmaskim.show()
 
         #imarr = np.array(upscale)
         #imarr[lmask==255] = (255,255,255)
@@ -547,7 +547,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
 
     return texts
 
-def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=False, seginfo=None, max_samples=8, max_texts=10, max_sniff_samples=8, max_sniff_texts=5):
+def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=False, seginfo=None, max_samples=8, max_texts=10, max_sniff_samples=4+4**2, max_sniff_texts=3):
     if not textcolors:
         print 'sniffing text colors'
         colorgroups = sniff_text_colors(im, seginfo=seginfo, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
