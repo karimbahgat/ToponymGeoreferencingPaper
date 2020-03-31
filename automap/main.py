@@ -152,30 +152,10 @@ def toponym_selection(im, textinfo, seginfo):
 
     # text anchor points
     print 'determening toponym anchors'
-    toponym_colors = set((r['color'] for r in topotexts))
-    anchored = []
-
-    # threshold img to black pixels only
-    # (anchors are usually thick and almost always black, so not as affected by color blending as text)
-    diff = segmentation.color_difference(segmentation.quantize(im), (0,0,0))
-    diff[diff > 25] = 255
-    diff[diff <= 25] = 0
-    anchor_im = PIL.Image.fromarray(diff)
-
-    # OR get color changes/edges
-    #changes = segmentation.color_changes(im)
-    #changes[changes > 10] = 255
-    #anchor_im = PIL.Image.fromarray(changes)
-    
-    # detect anchors
-    #texts = toponyms.detect_toponym_anchors_distance(anchor_im, topotexts)
-    texts = toponyms.detect_toponym_anchors_contour(anchor_im, topotexts)
-    #templates = []
-    #texts = toponyms.detect_toponym_anchors_template_contours(anchor_im, topotexts, templates)
-    #texts = toponyms.detect_toponym_anchors_template_images(anchor_im, topotexts)
+    topotexts = toponyms.detect_toponym_anchors(im, texts, topotexts)
 
     # create control points from toponyms
-    points = [(r['text_clean'], r['anchor']) for r in texts if 'anchor' in r] # if r['function']=='placename']
+    points = [(r['text_clean'], r['anchor']) for r in topotexts if 'anchor' in r] # if r['function']=='placename']
 
     # store metadata
     toponyminfo = {'type': 'FeatureCollection', 'features': []}

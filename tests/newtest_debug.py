@@ -71,7 +71,7 @@ testim_root,ext = os.path.splitext(testim)
 
 # first produce
 db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
-info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp_order=None, db=db, debug=True)
+info = mapfit.automap('testmaps/{}'.format(testim), textcolor=(10,10,10), warp_order=None, db=db, debug=True)
 
 # image
 render = mapfit.debug.render_text_recognition('testmaps/{}'.format(testim),

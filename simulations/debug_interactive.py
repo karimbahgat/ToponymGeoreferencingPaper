@@ -73,7 +73,7 @@ if __name__ == '__main__':
     fil = 'maps/{}'.format(root)
     outfil_root = os.path.splitext(root)[0].replace('_image','')
     outfil = 'output/{}_georeferenced_auto.tif'.format(outfil_root)
-
+    
     #inspect_image(fil, outfil).show()
     
     #inspect_georef(outfil).show()

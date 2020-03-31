@@ -171,7 +171,7 @@ if __name__ == '__main__':
             for p,t in procs:
                 if not p.is_alive():
                     procs.remove((p,t))
-                elif time()-t > 300:
+                elif time()-t > 500:
                     p.terminate()
                     procs.remove((p,t))
 
