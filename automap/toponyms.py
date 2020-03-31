@@ -115,14 +115,15 @@ def detect_toponym_anchors(im, texts, toponyms, debug=False):
         # extract subimg from buffer around text
         buff = int(fh * 1)
         edge = int(fh * 1)
-        buff_im_arr = im_arr[y1-buff-edge:y2+buff+edge, x1-buff-edge:x2+buff+edge] #im_arr[filt_im_arr[y1-buff:y2+buff, x1-buff:x2+buff]]
+        top,bottom,left,right = y1-buff-edge, y2+buff+edge, x1-buff-edge, x2+buff+edge
+        top,bottom,left,right = max(top, 0), min(bottom, im_arr.shape[0]), max(left, 0), min(right, im_arr.shape[1])
+        buff_im_arr = im_arr[top:bottom, left:right] 
         
         # look for distance anchor
         newr = detect_text_anchor_distance(buff_im_arr, r, debug=debug)
 
         # otherwise, look for contour anchor
         if 'anchor' not in newr:
-            print 'distance failed, trying contour', r['text']
             newr = detect_text_anchor_contour(buff_im_arr, r, debug=debug)
 
         # add

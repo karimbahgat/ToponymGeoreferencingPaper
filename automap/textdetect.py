@@ -261,13 +261,14 @@ def sniff_text_colors(im, seginfo=None, min_samples=4, max_samples=4+4**2, max_t
                 textlum = ImageOps.equalize(textlum)
                 ls = np.array(textlum)
                 ls = 1 - ((ls.flatten()-ls.min()) / float(ls.max()-ls.min()))
-                ls[ls < 0.66] = 0
-                #PIL.Image.fromarray((ls*255).reshape((textim.size[1], textim.size[0]))).show()
+                ls_top = ls.copy()
+                ls_top[ls < 0.66] = 0
+                #PIL.Image.fromarray((ls_top*255).reshape((textim.size[1], textim.size[0]))).show()
 
                 # get luminance weighted avg of colors
-                r = np.average(rs, weights=ls)
-                g = np.average(gs, weights=ls)
-                b = np.average(bs, weights=ls)
+                r = np.average(rs, weights=ls_top)
+                g = np.average(gs, weights=ls_top)
+                b = np.average(bs, weights=ls_top)
                 textcol = (r,g,b)
                 #segmentation.view_colors([textcol])
                 
@@ -300,14 +301,21 @@ def sniff_text_colors(im, seginfo=None, min_samples=4, max_samples=4+4**2, max_t
                 #hist = sorted(hist, key=lambda(c,rgb): -c)
                 #textcol = hist[0][1]
 
-                # calc max color diff in high luminance pixels
+                # get luminance weighted avg of color diff from detected color
                 # (TODO: maybe should be mean+std?)
                 # (TODO: switch so only based on the same pixels that made up the color detection, ie weighted avg of top 66% of luminance pixels)
                 textim = segmentation.quantize(textim)
                 diff_arr = segmentation.color_difference(textim, textcol)
-                maskdiffs = diff_arr.flatten()[ls > 0]
-                print text['text'], textcol, maskdiffs.mean(), np.std(maskdiffs), maskdiffs.max()
-                coldiff = maskdiffs.max()
+                ls_top = ls.copy()
+                ls_top[ls < 0.33] = 0 # lower, to also include distance required to capture edge pixels
+                #PIL.Image.fromarray((ls_top*255).reshape((textim.size[1], textim.size[0]))).show()
+
+                coldiff = np.average(diff_arr.flatten(), weights=ls_top)
+                
+                #maskdiffs = diff_arr.flatten()[ls > 0.33]
+                #print text['text'], textcol, maskdiffs.mean(), np.std(maskdiffs), maskdiffs.max()
+                #coldiff = maskdiffs.max()
+                
                 #diff_arr[ls.reshape(diff_arr.shape)==0] = 255.0
                 #PIL.Image.fromarray(diff_arr).show()
                 #textarr = np.array(textim)
@@ -555,22 +563,26 @@ def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=Fa
         # colors as color groupings
         textcolors = list(colorgroups.keys())
         
-        # automatic detection of threshold for each textcolor (disabled for now)
+        # automatic detection of threshold for each textcolor
         colorthresh = []
         for col,colgroup in colorgroups.items():
             gcols,gdiffs = zip(*colgroup)
-            # calc max diff from central group colors (diff required to incorporate all colors in the group)
+            # calc mean diff from central group colors
             pairdiffs = segmentation.color_differences([col] + list(gcols))
             centraldiffs = [d for pair,d in pairdiffs.items() if col in pair]
-            diff = np.max(centraldiffs)
+            centraldiff = np.mean(centraldiffs)
+            #print 'color group differences',col,centraldiff,centraldiffs
+            diff = centraldiff
             # add in the mean of each individual color diff
-            diff += np.mean(gdiffs)
+            gdiff = np.mean(gdiffs)
+            #print 'color internal pixel differences',col,gdiff,gdiffs
+            diff += gdiff
             # cap at 30
             diff = min(diff, 30)
             colorthresh.append(diff)
             
         # debug
-##        segmentation.view_colors(colorgroups.keys())
+        #segmentation.view_colors(colorgroups.keys())
 ##        for group in colorgroups.values():
 ##            groupcols = [subcol for subcol,coldiff in group]
 ##            segmentation.view_colors(groupcols)
