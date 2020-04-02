@@ -42,6 +42,23 @@ except:
 # FUNCTIONS
 
 # Error output metrics
+def scat_metric(points):
+    # based on the scat measure from goncalves2009measures
+    # the avg of median of each point's distance to all others should be close to half the avg of the image dimensions
+    meds = []
+    for p in points:
+        dists = []
+        for p2 in points:
+            if p is p2: continue
+            dx = p[0] - p2[0]
+            dy = p[1] - p2[1]
+            d = hypot(dx, dy)
+            dists.append(d)
+        med = sorted(dists)[len(dists)//2] # (lazy) median dist
+        meds.append(med)
+    scat = sum(meds)/float(len(meds)) # avg of medians
+    return scat
+
 def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_surface):
     print('Outputting error metrics')
     georef_root,ext = os.path.splitext(georef_fil)
@@ -66,8 +83,8 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
     # then percent (of image pixel dims)
     im = Image.open('maps/{}'.format(truth_fil))
     diag = hypot(*im.size)
-    pixperc = dct['rmse_georeferenced']['pixels'] / float(diag)
-    maxperc = dct['max_georeferenced']['pixels'] / float(diag)
+    pixperc = dct['rmse_georeferenced']['pixels'] / float(diag/2.0) # percent of half the max dist (from img center to corner)
+    maxperc = dct['max_georeferenced']['pixels'] / float(diag/2.0) # percent of half the max dist (from img center to corner)
     dct['rmse_georeferenced']['percent'] = pixperc
     dct['max_georeferenced']['percent'] = maxperc
     # ...
@@ -82,7 +99,7 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
     # then percent (of image pixel dims)
     im = Image.open('maps/{}'.format(truth_fil))
     diag = hypot(*im.size)
-    pixperc = dct['rmse_controlpoints']['pixels'] / float(diag)
+    pixperc = dct['rmse_controlpoints']['pixels'] / float(diag/2.0) # percent of half the max dist (from img center to corner)
     dct['rmse_controlpoints']['percent'] = pixperc
 
     
@@ -96,8 +113,12 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
     dct['labels'] = len(allnames)
 
 
-    ### distribution of all labels? 
-    # ... 
+    ### distribution of all labels?
+    # ignore for now, bug in col row values
+##    points = [(f['col'],f['row']) for f in allnames] 
+##    scat = scat_metric(points)
+##    dct['labels_scat_pix'] = scat
+##    dct['labels_scat_perc'] = scat / float(diag/2.0) # percent of half the max dist (from img center to corner)
 
 
     ### percent of labels detected
@@ -112,8 +133,11 @@ def error_output(georef_fil, truth_fil, geographic_error_surface, pixel_error_su
     dct['labels_used'] = perc
 
 
-    ### distribution of controlpoints used? 
-    # ... 
+    ### distribution of controlpoints used
+    points = [(f['origx'],f['origy']) for f in gcps]
+    scat = scat_metric(points)
+    dct['labels_used_scat_pix'] = scat
+    dct['labels_used_scat_perc'] = scat / float(diag/2.0) # percent of half the max dist (from img center to corner)
     
 
     return dct
@@ -189,18 +213,18 @@ if __name__ == '__main__':
         # LOCAL 
 
         ## auto
-        autofil = '{}_georeferenced_auto.tif'.format(fil_root)
-        print(imfil,autofil)
-        if os.path.lexists('output/{}'.format(autofil)):
-            run_error_assessment(autofil,imfil)
-
-        ## exact
-##        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
-##        if os.path.lexists('maps/{}'.format(exactfil)):
-##            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
-##            run_error_assessment(exactfil,imfil,gcps)
-
-        continue
+##        autofil = '{}_georeferenced_auto.tif'.format(fil_root)
+##        print(imfil,autofil)
+##        if os.path.lexists('output/{}'.format(autofil)):
+##            run_error_assessment(autofil,imfil)
+##
+##        ## exact
+####        exactfil = '{}_georeferenced_exact.tif'.format(fil_root)
+####        if os.path.lexists('maps/{}'.format(exactfil)):
+####            gcps = '{}_georeferenced_exact_controlpoints.geojson'.format(fil_root)
+####            run_error_assessment(exactfil,imfil,gcps)
+##
+##        continue
             
 
         # MULTIPROCESS
