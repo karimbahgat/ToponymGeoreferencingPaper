@@ -9,7 +9,7 @@ import automap as mapfit
 
 # Debugging basic processing
 
-def render_text_recognition(imagepath, georefpath):
+def render_image_output(imagepath, georefpath):
     # load image
     print 'loading'
     im = Image.open(imagepath)
@@ -73,7 +73,7 @@ def render_text_recognition(imagepath, georefpath):
     render.zoom_auto()
     return render
 
-def render_georeferencing(georefpath):
+def render_georeferencing_output(georefpath):
     # init renderer
     render = pg.renderer.Map(3000,3000, background='white')
 
@@ -239,10 +239,10 @@ def error_surface_georef(sampling_trans, georef, truth, error_type='geographic')
 
     # return as raster
     errors = errors.reshape((out.height,out.width))
-    out.add_band(img=Image.fromarray(errors))
+    outband = out.add_band(img=Image.fromarray(errors))
 
-    # maybe blank out nodata values from the error surface?
-    #out.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
+    # maybe blank out nodata values from the original? 
+    outband.mask = georef.mask
     
     return out
 
@@ -305,7 +305,11 @@ def error_surface_image(sampling_trans, georef, truth, error_type='pixel'):
 
     # return as raster
     errors = errors.reshape((out.height,out.width))
-    out.add_band(img=Image.fromarray(errors))
+    outband = out.add_band(img=Image.fromarray(errors))
+
+    # maybe blank out nodata values from the original? 
+    outband.mask = truth.mask
+    
     return out
 
 def error_surface_vis(rast, error_surface):
@@ -318,8 +322,51 @@ def error_surface_vis(rast, error_surface):
     m.add_layer(error_surface, transparency=0.2, legendoptions={'title':'Error', 'valueformat':'.1f'})
     m.zoom_bbox(*rast.bbox)
     m.add_legend({'padding':0})
-    m.render_all()
     return m
+
+def render_image_errors(georef_fil, truth_fil, error_type):
+    georef_root,ext = os.path.splitext(georef_fil)
+
+    # original/simulated map
+    truth = pg.RasterData(truth_fil)
+    print truth.affine
+    
+    # georeferenced/transformed map
+    georef = pg.RasterData(georef_fil)
+    georef.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
+    print georef.affine
+
+    # calc error surface
+    with open('{}_transform.json'.format(georef_root), 'r') as fobj:
+        transdict = json.load(fobj)
+        sampling_trans = mapfit.transforms.from_json(transdict['backward']['model'])
+    image_errorsurf = mapfit.debug.error_surface_image(sampling_trans, georef, truth, error_type)
+
+    # visualize geographic error
+    mapp = mapfit.debug.error_surface_vis(truth, image_errorsurf)
+    return mapp
+
+def render_georeferencing_errors(georef_fil, truth_fil, error_type):
+    georef_root,ext = os.path.splitext(georef_fil)
+
+    # original/simulated map
+    truth = pg.RasterData(truth_fil)
+    print truth.affine
+    
+    # georeferenced/transformed map
+    georef = pg.RasterData(georef_fil)
+    georef.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
+    print georef.affine
+
+    # calc error surface
+    with open('{}_transform.json'.format(georef_root), 'r') as fobj:
+        transdict = json.load(fobj)
+        sampling_trans = mapfit.transforms.from_json(transdict['backward']['model'])
+    georef_errorsurf = mapfit.debug.error_surface_georef(sampling_trans, georef, truth, error_type)
+
+    # visualize geographic error
+    mapp = mapfit.debug.error_surface_vis(georef, georef_errorsurf)
+    return mapp
 
 
 
