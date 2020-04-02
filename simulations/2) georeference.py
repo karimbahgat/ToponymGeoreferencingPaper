@@ -117,7 +117,7 @@ def process_logger(func, **kwargs):
 
 if __name__ == '__main__':
 
-    maxprocs = 3
+    maxprocs = 2
     procs = []
 
     for fil in mapfiles():

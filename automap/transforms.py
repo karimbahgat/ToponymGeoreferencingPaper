@@ -9,6 +9,20 @@ def from_json(js):
     trans = cls.from_json(js)
     return trans
 
+class Chain(object):
+
+    def __init__(self, transforms=None):
+        '''A chain of multiple transforms executed consecutively'''
+        self.transforms = [t for t in transforms] if transforms else []
+
+    def add(self, transform):
+        self.transforms.append(transform)
+
+    def predict(self, x, y):
+        for trans in self.transforms:
+            x,y = trans.predict(x, y)
+        return x,y
+
 class Polynomial(object):
     
     def __init__(self, order=None, A=None):

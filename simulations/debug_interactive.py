@@ -23,13 +23,14 @@ def true_image_errors(georef_fil, truth_fil, error_type):
 
     # original/simulated map
     truth = pg.RasterData(truth_fil)
-    if 'longlat' not in pycrs.parse.from_unknown_text(truth.crs).to_proj4():
-        print 'reprojecting to longlat'
-        truth = truth.manage.reproject("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+##    if 'longlat' not in truth.crs.to_proj4():
+##        print 'reprojecting to longlat'
+##        truth = truth.manage.reproject("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
     print truth.affine
     
     # georeferenced/transformed map
     georef = pg.RasterData(georef_fil)
+    georef.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
     print georef.affine
 
     # calc error surface
@@ -48,13 +49,14 @@ def true_georef_errors(georef_fil, truth_fil, error_type):
 
     # original/simulated map
     truth = pg.RasterData(truth_fil)
-    if 'longlat' not in pycrs.parse.from_unknown_text(truth.crs).to_proj4():
-        print 'reprojecting to longlat'
-        truth = truth.manage.reproject("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+##    if 'longlat' not in truth.crs.to_proj4():
+##        print 'reprojecting to longlat'
+##        truth = truth.manage.reproject("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
     print truth.affine
     
     # georeferenced/transformed map
     georef = pg.RasterData(georef_fil)
+    georef.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
     print georef.affine
 
     # calc error surface
@@ -69,23 +71,29 @@ def true_georef_errors(georef_fil, truth_fil, error_type):
     return mapp.img
 
 if __name__ == '__main__':
-    root = 'sim_12_11_4_image.jpg'
+    #root = 'sim_1_1_1_image.png'
+    #root = 'sim_20_1_1_image.png'
+    #root = 'sim_1_11_2_image.jpg'
+    root = 'sim_1_10_1_image.png'
+    #root = 'sim_1_10_2_image.jpg'
     fil = 'maps/{}'.format(root)
     outfil_root = os.path.splitext(root)[0].replace('_image','')
     outfil = 'output/{}_georeferenced_auto.tif'.format(outfil_root)
     
-    #inspect_image(fil, outfil).show()
+##    inspect_image(fil, outfil).show()
+##    
+##    inspect_georef(outfil).show()
     
-    #inspect_georef(outfil).show()
-
+    ### 
+    
     true_image_errors(outfil, fil, 'geographic').show()
     
     true_image_errors(outfil, fil, 'pixel').show()
-
+    
     true_georef_errors(outfil, fil, 'geographic').show()
     
     true_georef_errors(outfil, fil, 'pixel').show()
-
+    
     # and then for exact...
     #outfil = 'output/{}_georeferenced_exact.tif'.format(outfil_root)
     #inspect_georef(outfil).show()

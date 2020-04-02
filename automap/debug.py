@@ -189,15 +189,50 @@ def error_surface_georef(sampling_trans, georef, truth, error_type='geographic')
     out.mode = 'float32'
 
     # prep args
-    samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
-    sample_xs,sample_ys = zip(*samples)
-    
+    #samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
+    #sample_xs,sample_ys = zip(*samples)
+    A = np.eye(3).flatten()
+    A[:6] = list(out.affine)
+    out_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+    cols,rows = zip(*[(col,row) for row in range(out.height) for col in range(out.width)])
+    sample_xs,sample_ys = out_forward.predict(cols, rows)
+
+    # convert sample coords to wgs84 if necessary
+    if 'longlat' not in out.crs.to_proj4():
+        fromcrs = out.crs.to_proj4()
+        tocrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        trans = mapfit.transforms.Projection(fromcrs, tocrs) # sample coord to wgs84
+        sample_xs,sample_ys = trans.predict(sample_xs, sample_ys)
+
+    # also chain sampling_trans if georef is not wgs84
+    # for now ok, georef is always wgs84
+    # ...
+
+    # truth pixel to truth coord
     A = np.eye(3).flatten()
     A[:6] = list(truth.affine)
     truth_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+
+    # truth coord to truth pixel
     A = np.eye(3).flatten()
     A[:6] = list(truth.inv_affine)
     truth_backward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+
+    # add conversion between truth crs and wgs84 if necessary
+    if 'longlat' not in truth.crs.to_proj4():
+        # truth coord to wgs84
+        fromcrs = truth.crs.to_proj4()
+        tocrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        trans1 = truth_forward # pixel to truth coord
+        trans2 = mapfit.transforms.Projection(fromcrs, tocrs) # truth coord to wgs84
+        truth_forward = mapfit.transforms.Chain([trans1, trans2])
+
+        # wgs84 to truth coord
+        fromcrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        tocrs = truth.crs.to_proj4()
+        trans1 = mapfit.transforms.Projection(fromcrs, tocrs) # wgs84 to truth coord
+        trans2 = truth_backward # truth coord to pixel
+        truth_backward = mapfit.transforms.Chain([trans1, trans2])
 
     # calc errors
     sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
@@ -205,6 +240,10 @@ def error_surface_georef(sampling_trans, georef, truth, error_type='geographic')
     # return as raster
     errors = errors.reshape((out.height,out.width))
     out.add_band(img=Image.fromarray(errors))
+
+    # maybe blank out nodata values from the error surface?
+    #out.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
+    
     return out
 
 def error_surface_image(sampling_trans, georef, truth, error_type='pixel'):
@@ -216,15 +255,50 @@ def error_surface_image(sampling_trans, georef, truth, error_type='pixel'):
     out.mode = 'float32'
 
     # prep args
-    samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
-    sample_xs,sample_ys = zip(*samples)
+    #samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
+    #sample_xs,sample_ys = zip(*samples)
+    A = np.eye(3).flatten()
+    A[:6] = list(out.affine)
+    out_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+    cols,rows = zip(*[(col,row) for row in range(out.height) for col in range(out.width)])
+    sample_xs,sample_ys = out_forward.predict(cols, rows)
+
+    # convert sample coords to wgs84 if necessary
+    if 'longlat' not in out.crs.to_proj4():
+        fromcrs = out.crs.to_proj4()
+        tocrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        trans = mapfit.transforms.Projection(fromcrs, tocrs) # sample coord to wgs84
+        sample_xs,sample_ys = trans.predict(sample_xs, sample_ys)
+
+    # also chain sampling_trans if georef is not wgs84
+    # for now ok, georef is always wgs84
+    # ...
     
+    # truth pixel to truth coord
     A = np.eye(3).flatten()
     A[:6] = list(truth.affine)
-    truth_forward = mapfit.transforms.Polynomial(order=1, A=A.reshape((3,3)))
+    truth_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+
+    # truth coord to truth pixel
     A = np.eye(3).flatten()
     A[:6] = list(truth.inv_affine)
-    truth_backward = mapfit.transforms.Polynomial(order=1, A=A.reshape((3,3)))
+    truth_backward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+
+    # add conversion between truth crs and wgs84 if necessary
+    if 'longlat' not in truth.crs.to_proj4():
+        # truth coord to wgs84
+        fromcrs = truth.crs.to_proj4()
+        tocrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        trans1 = truth_forward # pixel to truth coord
+        trans2 = mapfit.transforms.Projection(fromcrs, tocrs) # truth coord to wgs84
+        truth_forward = mapfit.transforms.Chain([trans1, trans2])
+
+        # wgs84 to truth coord
+        fromcrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        tocrs = truth.crs.to_proj4()
+        trans1 = mapfit.transforms.Projection(fromcrs, tocrs) # wgs84 to truth coord
+        trans2 = truth_backward # truth coord to pixel
+        truth_backward = mapfit.transforms.Chain([trans1, trans2])
 
     # calc errors
     sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
@@ -238,6 +312,7 @@ def error_surface_vis(rast, error_surface):
     print('Visualizing rast overlaid with errors')
     m = pg.renderer.Map(background='white',
                         #textoptions={'font':'freesans'},
+                        crs=rast.crs,
                         )
     m.add_layer(rast)
     m.add_layer(error_surface, transparency=0.2, legendoptions={'title':'Error', 'valueformat':'.1f'})
