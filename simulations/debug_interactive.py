@@ -32,10 +32,12 @@ def inspect_georef_errors(georef_fil, truth_fil, error_type):
 
 if __name__ == '__main__':
     #root = 'sim_1_1_1_image.png'
-    root = 'sim_20_1_1_image.png'
+    #root = 'sim_1_1_2_image.jpg'
+    #root = 'sim_20_1_1_image.png'
     #root = 'sim_1_11_2_image.jpg'
-    #root = 'sim_1_10_1_image.png'
+    root = 'sim_1_10_1_image.png'
     #root = 'sim_1_10_2_image.jpg'
+    #root = 'sim_1_11_4_image.jpg'
     fil = 'maps/{}'.format(root)
     outfil_root = os.path.splitext(root)[0].replace('_image','')
     outfil = 'output/{}_georeferenced_auto.tif'.format(outfil_root)
@@ -46,9 +48,9 @@ if __name__ == '__main__':
     
     ### 
     
-    inspect_image_errors(outfil, fil, 'geographic').show()
+    #inspect_image_errors(outfil, fil, 'geographic').show()
     
-    inspect_image_errors(outfil, fil, 'pixel').show()
+    #inspect_image_errors(outfil, fil, 'pixel').show()
     
     inspect_georef_errors(outfil, fil, 'geographic').show()
     
