@@ -20,6 +20,7 @@ import time
 import os
 import json
 import itertools
+import warnings
 
 
 ### FUNCS FOR DIFFERENT STAGES
@@ -312,7 +313,7 @@ def estimate_transform(gcps_matched_info, warp_order, residual_type):
 
     return transinfo,gcps_final_info
 
-def warp(mapp_im, transinfo):
+def warp_image(mapp_im, transinfo):
     #################
     # Warping
 
@@ -333,13 +334,55 @@ def warp(mapp_im, transinfo):
 
 ### MAIN FUNC
 
-def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
+def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp=True, warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
     info = dict()
     start = time.time()
 
     timinginfo = dict()
     timinginfo['start'] = datetime.datetime.now().isoformat()
-    
+
+
+
+
+
+    # determine various paths
+    # outpath can be string, True, or False/None
+    if isinstance(im, basestring):
+        # load from path
+        inpath = im
+    else:
+        # already a PIL image
+        inpath = None
+        if outpath is True:
+            # deactivate auto outpath since there is no inpath to base it on
+            outpath = False
+        
+    if outpath:
+        # outputting to path
+        if outpath is True:
+            if inpath:
+                # auto, relative to inpath
+                infold,infil = os.path.split(inpath)
+                infil,ext = os.path.splitext(infil)
+                outfold = infold
+                outfil = infil + '_georeferenced'
+            else:
+                # processing a preloaded image, no inpath available to determine outpath
+                raise Exception('Cannot determine an appropriate outpath from a preloaded image, outpath must be set to False or specified manually.')
+        else:
+            # relative to manual outpath
+            outfold,outfil = os.path.split(outpath)
+            
+        outfil,ext = os.path.splitext(outfil)
+        
+    else:
+        # no output
+        pass
+
+
+
+
+    # register params
     params = dict(inpath=inpath,
                   outpath=outpath,
                   matchthresh=matchthresh,
@@ -353,34 +396,39 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
                   )
     info['params'] = params
 
+    # debug output? 
+    if outpath and debug:
+        pth = os.path.join(outfold, outfil+'_debug_params.json')
+        with open(pth, 'w') as writer:
+            json.dump(info['params'], writer)
 
-    
-    # load image
-    print 'loading image', inpath
-    im = PIL.Image.open(inpath).convert('RGB')
 
 
 
-    # determine various paths
-    # outpath can be string, True, or False/None
-    infold,infil = os.path.split(inpath)
-    infil,ext = os.path.splitext(infil)
-    if outpath:
-        # output
-        if outpath is True:
-            # auto, relative to inpath
-            outfold = infold
-            outfil = infil + '_georeferenced'
-        else:
-            # relative to manual outpath
-            outfold,outfil = os.path.split(outpath)
+
+    # determine input image
+    print '\n' + 'loading image', im
+    if inpath:
+        # load from path
+        im = PIL.Image.open(inpath)
     else:
-        # dont output, but still need for debug
-        # relative to inpath
-        outfold = infold
-        outfil = infil + '_georeferenced'
+        # already a PIL image
+        im = im
+        
+    if not im.mode == 'RGB':
+        im = im.convert('RGB')
 
-    outfil,ext = os.path.splitext(outfil)
+    imageinfo = dict(width=im.size[0],
+                     height=im.size[1],
+                     )
+    info['image'] = imageinfo
+
+    # debug output? 
+    if outpath and debug:
+        pth = os.path.join(outfold, outfil+'_debug_image.json')
+        with open(pth, 'w') as writer:
+            json.dump(info['image'], writer)
+            
 
     
 
@@ -409,7 +457,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     info['segmentation'] = seginfo
 
     # debug output? 
-    if debug:
+    if outpath and debug:
         pth = os.path.join(outfold, outfil+'_debug_segmentation.geojson')
         with open(pth, 'w') as writer:
             json.dump(info['segmentation'], writer)
@@ -435,7 +483,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     info['text_recognition'] = textinfo
 
     # output debug?
-    if debug:
+    if outpath and debug:
         pth = os.path.join(outfold, outfil+'_debug_text.geojson')
         with open(pth, 'w') as writer:
             json.dump(info['text_recognition'], writer)
@@ -461,7 +509,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     info['toponym_candidates'] = toponyminfo
 
     # output debug? 
-    if debug:
+    if outpath and debug:
         pth = os.path.join(outfold, outfil+'_debug_text_toponyms.geojson')
         with open(pth, 'w') as writer:
             json.dump(info['toponym_candidates'], writer)
@@ -477,7 +525,12 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     # find matches
     print '\n' + 'finding matches'
     t = time.time()
-    gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
+    #gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
+    try:
+        gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
+    except Exception as err:
+        warnings.warn('Georeferencing failed - unable to find matching control points: {}.'.format(err))
+        return info
 
     # store timing
     elaps = time.time() - t
@@ -487,7 +540,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
     info['gcps_matched'] = gcps_matched_info
 
     # output debug? 
-    if debug:
+    if outpath and debug:
         pth = os.path.join(outfold, outfil+'_debug_gcps_matched.geojson')
         with open(pth, 'w') as writer:
             json.dump(info['gcps_matched'], writer)
@@ -520,26 +573,28 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
 
     #################
     # Warping
-    print '\n' + 'warping'
-    print '{} points, warp_method={}'.format(len(gcps_final_info['features']), transinfo['forward']['model'])
+    if warp:
+        print '\n' + 'warping'
+        print '{} points, warp_method={}'.format(len(gcps_final_info['features']), transinfo['forward']['model'])
 
-    # mask the image before warping
-    mapp_im = im
-    #if mapp_poly is not None:
-    #    mapp_im = segmentation.mask_image(im.convert('RGBA'), mapp_poly) # map region
+        # mask the image before warping
+        mapp_im = im
+        #if mapp_poly is not None:
+        #    mapp_im = segmentation.mask_image(im.convert('RGBA'), mapp_poly) # map region
 
-    # warp the image
-    t = time.time()
-    warp_info = warp(mapp_im, transinfo)
+        # warp the image
+        t = time.time()
+        warp_info = warp_image(mapp_im, transinfo)
 
-    # store timing
-    elaps = time.time() - t
-    timinginfo['warping'] = elaps
+        # store timing
+        elaps = time.time() - t
+        timinginfo['warping'] = elaps
 
-    # store metadata
-    info['warping'] = warp_info
+        # store metadata
+        info['warping'] = warp_info
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+        print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+
 
 
 
@@ -555,6 +610,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
 
 
 
+
     ##############
     # Save output?
 
@@ -562,9 +618,10 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
         print '\n' + 'saving output'
         
         # warped image
-        pth = os.path.join(outfold, outfil + '.tif') # suffix already added (manual or auto, see top)
-        rast = pg.RasterData(image=warp_info['image'], affine=warp_info['affine']) # to geodata
-        rast.save(pth)
+        if warp:
+            pth = os.path.join(outfold, outfil + '.tif') # suffix already added (manual or auto, see top)
+            rast = pg.RasterData(image=warp_info['image'], affine=warp_info['affine']) # to geodata
+            rast.save(pth)
 
         # final control points
         pth = os.path.join(outfold, outfil+'_controlpoints.geojson')
@@ -576,7 +633,7 @@ def automap(inpath, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=2
         with open(pth, 'w') as writer:
             json.dump(info['transform_estimation'], writer)
 
-    if debug:
+    if outpath and debug:
         print '\n' + 'saving final debug data'
 
         # timings
