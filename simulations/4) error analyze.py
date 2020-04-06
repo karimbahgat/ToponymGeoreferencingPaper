@@ -25,7 +25,7 @@ except:
 
 
 # Loop and create table
-if False:
+if True:
     out = pg.VectorData()
     out.fields = ['sim_id', 'opts', 'error_auto', 'error_exact']
 
@@ -45,7 +45,7 @@ if False:
     ##            for k,v in opts.items():
     ##                vals['opt_'.format(k)] = v
 
-        erraut_path = 'maps/{}_georeferenced_auto_error.json'.format(root)
+        erraut_path = 'output/{}_georeferenced_auto_error.json'.format(root)
         if os.path.lexists(erraut_path):
             with open(erraut_path) as fobj:
                 error_auto = json.load(fobj)
@@ -54,16 +54,16 @@ if False:
     ##            for k,v in error_auto.items():
     ##                vals['erraut_'.format(k)] = v
 
-        errexa_path = 'maps/{}_georeferenced_exact_error.json'.format(root)
-        if os.path.lexists(errexa_path):
-            with open(errexa_path) as fobj:
-                error_exact = json.load(fobj)
-                vals['error_exact'] = error_exact
+##        errexa_path = 'output/{}_georeferenced_exact_error.json'.format(root)
+##        if os.path.lexists(errexa_path):
+##            with open(errexa_path) as fobj:
+##                error_exact = json.load(fobj)
+##                vals['error_exact'] = error_exact
 
     ##            for k,v in error_exact.items():
     ##                vals['errexa_'.format(k)] = v
 
-        print vals
+        #print vals
         
         out.add_feature(vals, None)
 
@@ -84,6 +84,9 @@ if False:
 stats = pg.VectorData('analyze/stats.xls')
 for fl in stats.fields:
     stats.compute(fl, lambda f: json.loads(f[fl]))
+
+
+fsadfas
 
 
     
@@ -184,6 +187,14 @@ errors = [geterror(open('maps/'+fil).read()) for fil in os.listdir('maps') if fi
 set(errors)
 # test number of georeferences that timed out
 len(set(fil for fil in os.listdir('maps') if fil.endswith('auto_log.txt') and 'total runtime: ' not in open('maps/'+fil).read() and 'Error:' not in open('maps/'+fil).read()))
+
+
+
+
+
+
+
+
 
 
 
