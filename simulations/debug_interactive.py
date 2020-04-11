@@ -35,8 +35,8 @@ if __name__ == '__main__':
     #root = 'sim_1_1_2_image.jpg'
     #root = 'sim_20_1_1_image.png'
     #root = 'sim_1_11_2_image.jpg'
-    root = 'sim_1_10_1_image.png'
-    #root = 'sim_1_10_2_image.jpg'
+    #root = 'sim_1_10_1_image.png'
+    root = 'sim_1_10_2_image.jpg'
     #root = 'sim_1_11_4_image.jpg'
     fil = 'maps/{}'.format(root)
     outfil_root = os.path.splitext(root)[0].replace('_image','')
