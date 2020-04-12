@@ -452,11 +452,151 @@ def sniff_text_colors(im, seginfo=None, min_samples=4, max_samples=4+4**2, max_t
 ##    return texts
 
 
-def extract_texts(im, textcolors, threshold=25, textconf=60):
+def extract_texts_parallel(im, textcolors, threshold=25, textconf=60, max_procs=None, tilesize=(500,500)):
+    w,h = im.size
+    tw,th = tilesize
+    texts = []
+    
+    # div image into bboxes
+    boxes = []
+    for y1 in range(0, h+1, th):
+        for x1 in range(0, w+1, tw):
+            x2,y2 = min(x1+tw, w), min(y1+th, h)
+            box = [x1,y1,x2,y2]
+            boxes.append(box)
+
+    # save im to temp path, so processes can access
+    import tempfile
+    temppath = tempfile.mktemp() + '.png'
+    im.save(temppath)
+
+    # loop bboxes, starting new subprocess of extract_texts
+    import multiprocessing as mp
+    max_procs = max_procs or mp.cpu_count()
+
+    # pool
+##    print 'procs',max_procs
+##    pool = mp.Pool(max_procs) #, maxtasksperchild=1)
+##    kwargs = [dict(im=temppath,
+##                   textcolors=textcolors,
+##                   threshold=threshold,
+##                   textconf=textconf,
+##                   bbox=box,
+##                   )
+##              for box in boxes]
+##    texts = []
+##    def get_results(ptexts):
+##        print 'finished',len(ptexts)
+##        texts.extend(ptexts)
+##    for dct in kwargs:
+##        pool.apply_async(extract_texts, None, dct, callback=get_results)
+##    for w in pool._pool:
+##        print repr(w.is_alive())
+##    print 'waiting'
+##    pool.close()
+##    pool.join()
+##    for w in pool._pool:
+##        print repr(w.is_alive())
+##    print 'results',len(texts)
+
+    # semimanual
+    if not isinstance(textcolors, list):
+        textcolors = [textcolors]
+    if not isinstance(threshold, list):
+        threshold = [threshold for _ in textcolors]
+    pool = mp.Pool(max_procs) #, maxtasksperchild=1)
+    procs = []
+    results = []
+    texts = []
+    for i,box in enumerate(boxes):
+        print 'processing img tile', box, i+1, 'of', len(boxes)
+        
+        for textcolor,thresh in zip(textcolors, threshold):
+            print 'color',textcolor
+            
+            # manual procs
+            p = pool.apply_async(extract_texts,
+                                 kwds=dict(im=temppath,
+                                           textcolors=[textcolor],
+                                           threshold=thresh,
+                                           textconf=textconf,
+                                           bbox=box,
+                                           ),
+                                 )
+            procs.append(p)
+            results.append(p)
+
+            # Wait in line
+            while len(procs) >= max_procs:
+                for p in procs:
+                    if p.ready():
+                        procs.remove(p)
+
+    # get results of all processes
+    for p in results:
+        try:
+            ptexts = p.get(timeout=None)
+            #print 'finished',len(ptexts)
+            texts.extend(ptexts)
+        except ValueError:
+            # weird error if empty results (i think)
+            pass
+
+    # manual
+##    procs = []
+##    texts = []
+##    for i,box in enumerate(boxes):
+##        print box, i+1, 'of', len(boxes)
+##
+##        # normal debug
+####        ptexts = extract_texts(im=temppath,
+####                               textcolors=textcolors,
+####                               threshold=threshold,
+####                               textconf=textconf,
+####                               bbox=box,
+####                               )
+####        texts.extend(ptexts)
+####        continue
+##
+##        # manual procs
+##        p = mp.Process(target=extract_texts,
+##                       kwargs=dict(im=temppath,
+##                                   textcolors=textcolors,
+##                                   threshold=threshold,
+##                                   textconf=textconf,
+##                                   bbox=box,
+##                                   ),
+##                       )
+##        p.daemon = True
+##        p.start()
+##        procs.append(p)
+##
+##        # Wait in line
+##        while len(procs) >= max_procs:
+##            for p in procs:
+##                if not p.is_alive():
+##                    procs.remove(p)
+##
+##    # final check that remaining procs have finished
+##    for p in procs:
+##        p.join(None)
+
+    return texts
+
+
+def extract_texts(im, textcolors, threshold=25, textconf=60, bbox=None):
     '''
     - textcolors is list of colors.
     - threshold can be either single value used for all colors, or iterable of thresholds same length as textcolors.
     '''
+    # load from file if string
+    if isinstance(im, basestring):
+        im = PIL.Image.open(im)
+
+    # crop to bbox if specified
+    if bbox:
+        im = im.crop(tuple(bbox))
+    
     # extract from entire image
     w,h = im.size
     texts = []
@@ -540,8 +680,8 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
                 
                 # record info
                 text['color'] = col
-                textarr = lmask[text['top']:text['top']+text['height'], text['left']:text['left']+text['width']]
-                text['color_match'] = textarr[textarr < colthresh].mean() # average diff of pixels below threshold
+                textdiffarr = diff[text['top']:text['top']+text['height'], text['left']:text['left']+text['width']]
+                text['color_match'] = float(textdiffarr[textdiffarr < colthresh].mean()) # average diff of pixels below threshold
 
                 # downscale coords
                 for key in 'left top width height fontheight'.split():
@@ -550,12 +690,18 @@ def extract_texts(im, textcolors, threshold=25, textconf=60):
                 # ignore tiny text (upscaling results in sometimes detecting ghost text from tiny pixel regions)
                 if text['width'] <= 4 or text['height'] <= 4:
                     continue
+
+                # offset coords if bbox
+                if bbox:
+                    xoff,yoff = bbox[:2]
+                    text['left'] += xoff
+                    text['top'] += yoff
                 
                 texts.append(text)
 
     return texts
 
-def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=False, seginfo=None, max_samples=8, max_texts=10, max_sniff_samples=4+4**2, max_sniff_texts=3):
+def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, parallel=False, sample=False, seginfo=None, max_procs=None, max_samples=8, max_texts=10, max_sniff_samples=4+4**2, max_sniff_texts=3):
     if not textcolors:
         print 'sniffing text colors'
         colorgroups = sniff_text_colors(im, seginfo=seginfo, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
@@ -620,6 +766,8 @@ def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, sample=Fa
     # run text detection
     if sample:
         texts = sample_texts(im, textcolors, threshold=colorthresh, textconf=textconf, max_samples=max_samples, max_texts=max_texts)
+    elif parallel:
+        texts = extract_texts_parallel(im, textcolors, threshold=colorthresh, textconf=textconf, max_procs=max_procs)
     else:
         texts = extract_texts(im, textcolors, threshold=colorthresh, textconf=textconf)
     

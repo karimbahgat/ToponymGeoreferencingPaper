@@ -17,6 +17,7 @@ import PIL, PIL.Image
 
 import datetime
 import time
+import math
 import os
 import json
 import itertools
@@ -64,7 +65,7 @@ def image_partitioning(im):
 
     return seginfo
 
-def text_detection(text_im, textcolor, colorthresh, textconf, sample, seginfo):
+def text_detection(text_im, textcolor, colorthresh, textconf, parallel, sample, seginfo, max_procs):
     ###############
     # Text detection
     
@@ -72,7 +73,7 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample, seginfo):
     print '(detecting text)'
     if textcolor and not isinstance(textcolor, list):
         textcolor = [textcolor]
-    texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh, textconf=textconf, sample=sample, seginfo=seginfo)
+    texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh, textconf=textconf, parallel=parallel, sample=sample, seginfo=seginfo, max_procs=max_procs)
     toponym_colors = set((r['color'] for r in texts))
 
     # deduplicate overlapping texts from different colors
@@ -97,7 +98,7 @@ def text_detection(text_im, textcolor, colorthresh, textconf, sample, seginfo):
                         # drop the one with the poorest color match
                         #text_im.crop((r['left'], r['top'], r['left']+r['width'], r['top']+r['height'])).show()
                         #text_im.crop((r2['left'], r2['top'], r2['left']+r2['width'], r2['top']+r2['height'])).show()
-                        if r2['color_match'] > r['color_match']:
+                        if r2['color_match'] > r['color_match'] and not math.isnan(r2['color_match']):
                             r2['drop'] = True
                             print u'found duplicate texts of different colors, keeping "{}" (color match={:.2f}), dropping "{}" (color match={:.2f})'.format(r['text_clean'],r['color_match'],r2['text_clean'],r2['color_match'])
                         else:
@@ -334,7 +335,7 @@ def warp_image(mapp_im, transinfo):
 
 ### MAIN FUNC
 
-def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, db=None, source='gns', warp=True, warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
+def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, parallel=False, max_procs=None, db=None, source='gns', warp=True, warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
     info = dict()
     start = time.time()
 
@@ -473,7 +474,7 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     # detect text
     print '\n' + 'detecting text'
     t = time.time()
-    textinfo = text_detection(text_im, textcolor, colorthresh, textconf, sample, seginfo)
+    textinfo = text_detection(text_im, textcolor, colorthresh, textconf, parallel, sample, seginfo, max_procs)
 
     # store timing
     elaps = time.time() - t
