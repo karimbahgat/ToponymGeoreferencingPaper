@@ -14,7 +14,7 @@ testim_root,ext = os.path.splitext(testim)
 # first produce
 db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
 if __name__ == '__main__':
-    info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp=False, warp_order=None, db=db, debug=True, parallel=True, max_procs=8)
+    info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp=False, warp_order=None, db=db, debug=True, parallel=True)
 
 
 

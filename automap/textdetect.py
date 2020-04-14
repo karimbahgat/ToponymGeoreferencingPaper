@@ -454,14 +454,28 @@ def sniff_text_colors(im, seginfo=None, min_samples=4, max_samples=4+4**2, max_t
 
 def extract_texts_parallel(im, textcolors, threshold=25, textconf=60, max_procs=None, tilesize=(500,500)):
     w,h = im.size
-    tw,th = tilesize
+    tw,th = map(int, tilesize)
     texts = []
+    tile_overlap = 0.2 # one fifth
+
+    # div image into bboxes
+##    boxes = []
+##    for y1 in range(0, h+1, th):
+##        for x1 in range(0, w+1, tw):
+##            x2,y2 = min(x1+tw, w), min(y1+th, h)
+##            box = [x1,y1,x2,y2]
+##            boxes.append(box)
     
     # div image into bboxes
     boxes = []
-    for y1 in range(0, h+1, th):
-        for x1 in range(0, w+1, tw):
-            x2,y2 = min(x1+tw, w), min(y1+th, h)
+    for y1 in range(0, h+1, th-int(th*tile_overlap)):
+        y2 = y1+th
+        y2 = min(y2, h) # cap at img limits
+        #y1 = y2 - th # enforce tile size (extend back in case of small ending sliver)
+        for x1 in range(0, w+1, tw-int(tw*tile_overlap)):
+            x2 = x1+tw
+            x2 = min(x2, w) # cap at img limits
+            #x1 = x2 - tw # enforce tile size (extend back in case of small ending sliver)
             box = [x1,y1,x2,y2]
             boxes.append(box)
 
@@ -472,7 +486,7 @@ def extract_texts_parallel(im, textcolors, threshold=25, textconf=60, max_procs=
 
     # loop bboxes, starting new subprocess of extract_texts
     import multiprocessing as mp
-    max_procs = max_procs or mp.cpu_count()
+    max_procs = max_procs or mp.cpu_count() - 1 # excluding main process
 
     # pool
 ##    print 'procs',max_procs
@@ -524,7 +538,7 @@ def extract_texts_parallel(im, textcolors, threshold=25, textconf=60, max_procs=
                                            ),
                                  )
             procs.append(p)
-            results.append(p)
+            results.append((p,box))
 
             # Wait in line
             while len(procs) >= max_procs:
@@ -533,11 +547,25 @@ def extract_texts_parallel(im, textcolors, threshold=25, textconf=60, max_procs=
                         procs.remove(p)
 
     # get results of all processes
-    for p in results:
+    for p,box in results:
         try:
-            ptexts = p.get(timeout=None)
-            #print 'finished',len(ptexts)
-            texts.extend(ptexts)
+            boxtexts = []
+            # ignore any text closer than 1x fontheight away from box edges
+            restexts = p.get(timeout=None)
+            #print 'texts for', box
+            #print 'orig',len(restexts)
+            for text in restexts:
+                if text['left'] < (box[0] + text['fontheight']):
+                    continue
+                if text['top'] < (box[1] + text['fontheight']):
+                    continue
+                if (text['left']+text['width']) > (box[2] - text['fontheight']):
+                    continue
+                if (text['top']+text['height']) > (box[3] - text['fontheight']):
+                    continue
+                boxtexts.append(text)
+            #print 'after dropping edge texts',len(boxtexts)
+            texts.extend(boxtexts)
         except ValueError:
             # weird error if empty results (i think)
             pass
