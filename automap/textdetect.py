@@ -10,6 +10,8 @@ import re
 import pytesseract
 
 
+#pytesseract.pytesseract.tesseract_cmd = '/home/cdsw/conda/bin/tesseract'
+
 
 def run_ocr(im, bbox=None, mode=11):
     if bbox:
@@ -518,57 +520,60 @@ def extract_texts_parallel(im, textcolors, threshold=25, textconf=60, max_procs=
         textcolors = [textcolors]
     if not isinstance(threshold, list):
         threshold = [threshold for _ in textcolors]
-    pool = mp.Pool(max_procs) #, maxtasksperchild=1)
-    procs = []
-    results = []
-    texts = []
-    for i,box in enumerate(boxes):
-        print 'processing img tile', box, i+1, 'of', len(boxes)
-        
-        for textcolor,thresh in zip(textcolors, threshold):
-            print 'color',textcolor
+
+    with mp.Pool(max_procs) as pool:
+        procs = []
+        results = []
+        texts = []
+
+        # initiate processes stepwise
+        for i,box in enumerate(boxes):
+            print 'processing img tile', box, i+1, 'of', len(boxes)
             
-            # manual procs
-            p = pool.apply_async(extract_texts,
-                                 kwds=dict(im=temppath,
-                                           textcolors=[textcolor],
-                                           threshold=thresh,
-                                           textconf=textconf,
-                                           bbox=box,
-                                           ),
-                                 )
-            procs.append(p)
-            results.append((p,box))
+            for textcolor,thresh in zip(textcolors, threshold):
+                print 'color',textcolor
+                
+                # manual procs
+                p = pool.apply_async(extract_texts,
+                                     kwds=dict(im=temppath,
+                                               textcolors=[textcolor],
+                                               threshold=thresh,
+                                               textconf=textconf,
+                                               bbox=box,
+                                               ),
+                                     )
+                procs.append(p)
+                results.append((p,box))
 
-            # Wait in line
-            while len(procs) >= max_procs:
-                for p in procs:
-                    if p.ready():
-                        procs.remove(p)
+                # wait in line
+                while len(procs) >= max_procs:
+                    for p in procs:
+                        if p.ready():
+                            procs.remove(p)
 
-    # get results of all processes
-    for p,box in results:
-        try:
-            boxtexts = []
-            # ignore any text closer than 1x fontheight away from box edges
-            restexts = p.get(timeout=None)
-            #print 'texts for', box
-            #print 'orig',len(restexts)
-            for text in restexts:
-                if text['left'] < (box[0] + text['fontheight']):
-                    continue
-                if text['top'] < (box[1] + text['fontheight']):
-                    continue
-                if (text['left']+text['width']) > (box[2] - text['fontheight']):
-                    continue
-                if (text['top']+text['height']) > (box[3] - text['fontheight']):
-                    continue
-                boxtexts.append(text)
-            #print 'after dropping edge texts',len(boxtexts)
-            texts.extend(boxtexts)
-        except ValueError:
-            # weird error if empty results (i think)
-            pass
+        # get results of all processes
+        for p,box in results:
+            try:
+                boxtexts = []
+                # ignore any text closer than 1x fontheight away from box edges
+                restexts = p.get(timeout=None)
+                #print 'texts for', box
+                #print 'orig',len(restexts)
+                for text in restexts:
+                    if text['left'] < (box[0] + text['fontheight']):
+                        continue
+                    if text['top'] < (box[1] + text['fontheight']):
+                        continue
+                    if (text['left']+text['width']) > (box[2] - text['fontheight']):
+                        continue
+                    if (text['top']+text['height']) > (box[3] - text['fontheight']):
+                        continue
+                    boxtexts.append(text)
+                #print 'after dropping edge texts',len(boxtexts)
+                texts.extend(boxtexts)
+            except ValueError:
+                # weird error if empty results (i think)
+                pass
 
     # manual
 ##    procs = []

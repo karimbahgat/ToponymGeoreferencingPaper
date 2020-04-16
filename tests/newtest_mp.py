@@ -1,8 +1,10 @@
 
 import automap as mapfit
 import os
+#testim = 'txu-pclmaps-oclc-8322829_f_2.jpg'
 #testim = 'txu-oclc-6654394-nb-30-4th-ed.jpg'
 testim = 'burkina.jpg'
+#testim = 'cameroon.jpg'
 #testim = 'china_pol96.jpg'
 #testim = 'brazil_land_1977.jpg'
 #testim = 'france_admin91.jpg'
@@ -14,7 +16,7 @@ testim_root,ext = os.path.splitext(testim)
 # first produce
 db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
 if __name__ == '__main__':
-    info = mapfit.automap('testmaps/{}'.format(testim), textcolor=None, warp=False, warp_order=None, db=db, debug=True, parallel=True)
+    info = mapfit.automap('testmaps/{}'.format(testim), textcolor=(50,50,50), warp=False, warp_order=None, db=db, debug=True, parallel=True)
 
 
 
