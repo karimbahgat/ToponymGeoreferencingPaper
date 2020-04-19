@@ -43,7 +43,7 @@ def mapfiles():
         if fil.endswith(('_image.png','_image.jpg')):
             yield fil
 
-def georeference_auto(fil, outfil, db, source, textcolor, warp_order):
+def georeference_auto(fil, outfil, db, source, textcolor, warp_order, priors=None):
     # EITHER automated tool
     outfil_root = os.path.splitext(outfil)[0]
     
@@ -54,6 +54,7 @@ def georeference_auto(fil, outfil, db, source, textcolor, warp_order):
                    textcolor=textcolor,
                    warp_order=warp_order,
                    debug=True,
+                   priors=priors,
                    )
 
 def georeference_exact(fil, outfil, warp_order):
@@ -124,6 +125,9 @@ if __name__ == '__main__':
         print(fil)
         fil_root = os.path.splitext(fil)[0].replace('_image', '')
 
+        if not ('sim_1_1_' in fil_root or 'sim_1_2_' in fil_root or 'sim_1_3_' in fil_root):
+            continue
+
         # Local testing
 
         ## auto
@@ -133,24 +137,75 @@ if __name__ == '__main__':
 ##                           source='best',
 ##                           textcolor=TEXTCOLOR,
 ##                           warp_order=WARPORDER,)
+
+        ## auto, assuming known placenames
+
+        # create toponyminfo from rendered placenames
+##        placenames = pg.VectorData('maps/{}_placenames.geojson'.format(fil_root))
+##        toponyminfo = {'type':'FeatureCollection', 'features':[]}
+##        for f in placenames:
+##            geoj = {'type': 'Feature',
+##                    'properties': {'name':f['name']},
+##                    'geometry': {'type':'Point',
+##                                 'coordinates':(f['col'],f['row'])}
+##                    }
+##            toponyminfo['features'].append(geoj)
 ##
-##        ## exact
-####        georeference_exact(fil='maps/{}'.format(fil),
-####                       warp_order=ORDER,)
-##
+##        georeference_auto(fil='maps/{}'.format(fil),
+##                          outfil='output/{}_georeferenced_known_places.tif'.format(fil_root),
+##                           db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db",
+##                           source='best',
+##                           textcolor=TEXTCOLOR,
+##                           warp_order=WARPORDER,
+##                           priors={'toponyminfo':toponyminfo}
+##                          )
+
+        ## exact
+##        georeference_exact(fil='maps/{}'.format(fil),
+##                       warp_order=ORDER,)
+
 ##        continue
+
+
 
         # Begin process
 
         ## auto
+##        p = mp.Process(target=process_logger,
+##                       args=[georeference_auto],
+##                       kwargs=dict(fil='maps/{}'.format(fil),
+##                                   outfil='output/{}_georeferenced_auto.tif'.format(fil_root),
+##                                   db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db", #"data/gazetteers.db",
+##                                   source='best',
+##                                   textcolor=TEXTCOLOR,
+##                                   warp_order=WARPORDER,
+##                                   ),
+##                       )
+##        p.start()
+##        procs.append((p,time()))
+
+        ## auto, assuming known placenames
+
+        # create toponyminfo from rendered placenames
+        placenames = pg.VectorData('maps/{}_placenames.geojson'.format(fil_root))
+        toponyminfo = {'type':'FeatureCollection', 'features':[]}
+        for f in placenames:
+            geoj = {'type': 'Feature',
+                    'properties': {'name':f['name']},
+                    'geometry': {'type':'Point',
+                                 'coordinates':(f['col'],f['row'])}
+                    }
+            toponyminfo['features'].append(geoj)
+            
         p = mp.Process(target=process_logger,
                        args=[georeference_auto],
                        kwargs=dict(fil='maps/{}'.format(fil),
-                                   outfil='output/{}_georeferenced_auto.tif'.format(fil_root),
+                                   outfil='output/{}_georeferenced_known_places.tif'.format(fil_root),
                                    db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db", #"data/gazetteers.db",
                                    source='best',
                                    textcolor=TEXTCOLOR,
                                    warp_order=WARPORDER,
+                                   priors={'toponyminfo':toponyminfo}
                                    ),
                        )
         p.start()
@@ -171,7 +226,7 @@ if __name__ == '__main__':
             for p,t in procs:
                 if not p.is_alive():
                     procs.remove((p,t))
-                elif time()-t > 500:
+                elif time()-t > 600:
                     p.terminate()
                     procs.remove((p,t))
 

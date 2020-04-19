@@ -268,7 +268,7 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
     return m
 
 # save map
-def save_map(name, mapp, mapplaces, resolution, regionopts, placeopts, projection, anchoropts, textopts, metaopts, noiseopts):
+def save_map(name, mapp, mapplaces, datas, resolution, regionopts, placeopts, projection, anchoropts, textopts, metaopts, noiseopts):
     print('SAVING:',name)
     
     # downscale to resolution
@@ -322,6 +322,8 @@ def save_map(name, mapp, mapplaces, resolution, regionopts, placeopts, projectio
               textopts=textopts,
               metaopts=metaopts,
               noiseopts=noiseopts,
+              datas=[datadef[-1] if datadef else None
+                     for datadef in datas],
               )
     with open('maps/{}_opts.json'.format(name), 'w') as fobj:
         fobj.write(json.dumps(opts))
@@ -388,7 +390,7 @@ def run(i, center, extent):
             
             noiseopts = {'resolution':resolution, 'format':imformat}
             
-            save_map(name, mapp, mapplaces, resolution, regionopts, placeopts, projection, anchoropts, textopts, metaopts, noiseopts)
+            save_map(name, mapp, mapplaces, datas, resolution, regionopts, placeopts, projection, anchoropts, textopts, metaopts, noiseopts)
             
             subsubi += 1
 
@@ -551,7 +553,8 @@ if __name__ == '__main__':
                 print('!!! Not enough land area, skipping')
                 continue
             
-            #run(i,center,extent)
+            run(i,center,extent)
+            continue
 
             # Begin process
             p = mp.Process(target=process,

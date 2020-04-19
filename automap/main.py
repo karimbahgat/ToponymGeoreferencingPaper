@@ -335,8 +335,9 @@ def warp_image(mapp_im, transinfo):
 
 ### MAIN FUNC
 
-def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, parallel=False, max_procs=None, db=None, source='gns', warp=True, warp_order=None, residual_type='pixels', max_residual=None, debug=False, **kwargs):
+def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, parallel=False, max_procs=None, db=None, source='gns', warp=True, warp_order=None, residual_type='pixels', max_residual=None, debug=False, priors=None, **kwargs):
     info = dict()
+    priors = priors or dict()
     start = time.time()
 
     timinginfo = dict()
@@ -391,9 +392,12 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
                   colorthresh=colorthresh,
                   textconf=textconf,
                   sample=sample,
+                  parallel=parallel,
+                  max_procs=max_procs,
                   source=source,
                   warp_order=warp_order,
                   residual_type=residual_type,
+                  priors=priors,
                   )
     info['params'] = params
 
@@ -448,7 +452,12 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     
     # partition image
     t = time.time()
-    seginfo = image_partitioning(text_im)
+    seginfo = priors.get('seginfo', None)
+    if seginfo:
+        # already given
+        pass
+    else:
+        seginfo = image_partitioning(text_im)
 
     # store timing
     elaps = time.time() - t
@@ -474,7 +483,15 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     # detect text
     print '\n' + 'detecting text'
     t = time.time()
-    textinfo = text_detection(text_im, textcolor, colorthresh, textconf, parallel, sample, seginfo, max_procs)
+    textinfo = priors.get('textinfo', None)
+    if textinfo:
+        # already given
+        pass
+    elif priors.get('toponyminfo', None) or priors.get('gcps_matched_info', None) or (priors.get('transinfo', None) and priors.get('gcps_final_info', None)):
+        # later stage given, so not necessary
+        pass
+    else:
+        textinfo = text_detection(text_im, textcolor, colorthresh, textconf, parallel, sample, seginfo, max_procs)
 
     # store timing
     elaps = time.time() - t
@@ -500,7 +517,15 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     # text anchor points
     print '\n' + 'seleting toponyms with anchor points'
     t = time.time()
-    toponyminfo = toponym_selection(im, textinfo, seginfo)
+    toponyminfo = priors.get('toponyminfo', None)
+    if toponyminfo:
+        # already given
+        pass
+    elif priors.get('gcps_matched_info', None) or (priors.get('transinfo', None) and priors.get('gcps_final_info', None)):
+        # later stage given, so not necessary
+        pass
+    else:
+        toponyminfo = toponym_selection(im, textinfo, seginfo)
 
     # store timing
     elaps = time.time() - t
@@ -527,11 +552,19 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     print '\n' + 'finding matches'
     t = time.time()
     #gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
-    try:
-        gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
-    except Exception as err:
-        warnings.warn('Georeferencing failed - unable to find matching control points: {}.'.format(err))
-        return info
+    gcps_matched_info = priors.get('gcps_matched_info', None)
+    if gcps_matched_info:
+        # already given
+        pass
+    elif (priors.get('transinfo', None) and priors.get('gcps_final_info', None)):
+        # later stage given, so not necessary
+        pass
+    else:
+        try:
+            gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
+        except Exception as err:
+            warnings.warn('Georeferencing failed - unable to find matching control points: {}.'.format(err))
+            return info
 
     # store timing
     elaps = time.time() - t
@@ -557,7 +590,13 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     # estimate the transform and return final gcps
     print '\n' + 'estimating transformation'
     t = time.time()
-    transinfo,gcps_final_info = estimate_transform(gcps_matched_info, warp_order, residual_type)
+    transinfo = priors.get('transinfo', None)
+    gcps_final_info = priors.get('gcps_final_info', None)
+    if (transinfo and gcps_final_info):
+        # already given
+        pass
+    else:
+        transinfo,gcps_final_info = estimate_transform(gcps_matched_info, warp_order, residual_type)
 
     # store timing
     elaps = time.time() - t
