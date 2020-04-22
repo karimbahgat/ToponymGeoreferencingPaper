@@ -553,8 +553,7 @@ if __name__ == '__main__':
                 print('!!! Not enough land area, skipping')
                 continue
             
-            run(i,center,extent)
-            continue
+            #run(i,center,extent)
 
             # Begin process
             p = mp.Process(target=process,

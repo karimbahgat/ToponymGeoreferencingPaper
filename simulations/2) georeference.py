@@ -125,9 +125,6 @@ if __name__ == '__main__':
         print(fil)
         fil_root = os.path.splitext(fil)[0].replace('_image', '')
 
-        if not ('sim_1_1_' in fil_root or 'sim_1_2_' in fil_root or 'sim_1_3_' in fil_root):
-            continue
-
         # Local testing
 
         ## auto

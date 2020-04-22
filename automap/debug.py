@@ -243,6 +243,8 @@ def error_surface_georef(sampling_trans, georef, truth, error_type='geographic')
 
     # maybe blank out nodata values from the original? 
     outband.mask = georef.mask
+    #outband.nodataval = -1
+    #outband.mask = georef.mask
     
     return out
 
@@ -321,8 +323,150 @@ def error_surface_vis(rast, error_surface):
     m.add_layer(rast)
     m.add_layer(error_surface, transparency=0.2, legendoptions={'title':'Error', 'valueformat':'.1f'})
     m.zoom_bbox(*rast.bbox)
-    m.add_legend({'padding':0})
+    m.add_legend({'padding':0, 'direction':'s'})
     return m
+
+def distortion_arrows_georef(sampling_trans, georef, truth, error_type='geographic', sample_density=20):
+    print('Calculating {} distortion arrows for georef'.format(error_type))
+    ### georef grid
+    # ST_out sampled from georef grid
+    out = georef.copy(shallow=True)
+    out.mode = 'float32'
+
+    # prep args
+    #samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
+    #sample_xs,sample_ys = zip(*samples)
+    A = np.eye(3).flatten()
+    A[:6] = list(out.affine)
+    out_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+    dx, dy = out.width / float(sample_density), out.height / float(sample_density)
+    cols,rows = zip(*[(col,row) for row in range(0, out.height, int(dy)) for col in range(0, out.width, int(dx))])
+    sample_xs,sample_ys = out_forward.predict(cols, rows)
+
+    # convert sample coords to wgs84 if necessary
+    if 'longlat' not in out.crs.to_proj4():
+        fromcrs = out.crs.to_proj4()
+        tocrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        trans = mapfit.transforms.Projection(fromcrs, tocrs) # sample coord to wgs84
+        sample_xs,sample_ys = trans.predict(sample_xs, sample_ys)
+
+    # also chain sampling_trans if georef is not wgs84
+    # for now ok, georef is always wgs84
+    # ...
+
+    # truth pixel to truth coord
+    A = np.eye(3).flatten()
+    A[:6] = list(truth.affine)
+    truth_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+
+    # truth coord to truth pixel
+    A = np.eye(3).flatten()
+    A[:6] = list(truth.inv_affine)
+    truth_backward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+
+    # add conversion between truth crs and wgs84 if necessary
+    if 'longlat' not in truth.crs.to_proj4():
+        # truth coord to wgs84
+        fromcrs = truth.crs.to_proj4()
+        tocrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        trans1 = truth_forward # pixel to truth coord
+        trans2 = mapfit.transforms.Projection(fromcrs, tocrs) # truth coord to wgs84
+        truth_forward = mapfit.transforms.Chain([trans1, trans2])
+
+        # wgs84 to truth coord
+        fromcrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        tocrs = truth.crs.to_proj4()
+        trans1 = mapfit.transforms.Projection(fromcrs, tocrs) # wgs84 to truth coord
+        trans2 = truth_backward # truth coord to pixel
+        truth_backward = mapfit.transforms.Chain([trans1, trans2])
+
+    # calc errors
+    sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
+
+    # return as lines
+    arrows = pg.VectorData()
+    for sample_p,truth_p in zip(zip(sample_xs,sample_ys), zip(truth_xs,truth_ys)):
+        sample_px = georef.geo_to_cell(*sample_p)
+        if not georef.mask.getpixel(sample_px):
+            # only for sample points outside nodata mask
+            geoj = {'type':'LineString',
+                    'coordinates':[sample_p, truth_p]}
+            arrows.add_feature([], geoj)
+    
+    return arrows
+
+def distortion_arrows_image(sampling_trans, georef, truth, error_type='geographic', sample_density=20):
+    print('Calculating {} distortion arrows for image'.format(error_type))
+    # NOTE SURE IF CORRECT...
+    
+    ### georef grid
+    # ST_out sampled from georef grid
+    out = truth.copy(shallow=True)
+    out.mode = 'float32'
+
+    # prep args
+    #samples = [out.cell_to_geo(col,row) for row in range(out.height) for col in range(out.width)]
+    #sample_xs,sample_ys = zip(*samples)
+    A = np.eye(3).flatten()
+    A[:6] = list(out.affine)
+    out_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+    dx, dy = out.width / float(sample_density), out.height / float(sample_density)
+    cols,rows = zip(*[(col,row) for row in range(0, out.height, int(dy)) for col in range(0, out.width, int(dx))])
+    sample_xs,sample_ys = out_forward.predict(cols, rows)
+
+    # convert sample coords to wgs84 if necessary
+    if 'longlat' not in out.crs.to_proj4():
+        fromcrs = out.crs.to_proj4()
+        tocrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        trans = mapfit.transforms.Projection(fromcrs, tocrs) # sample coord to wgs84
+        sample_xs,sample_ys = trans.predict(sample_xs, sample_ys)
+
+    # also chain sampling_trans if georef is not wgs84
+    # for now ok, georef is always wgs84
+    # ...
+    
+    # truth pixel to truth coord
+    A = np.eye(3).flatten()
+    A[:6] = list(truth.affine)
+    truth_forward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+
+    # truth coord to truth pixel
+    A = np.eye(3).flatten()
+    A[:6] = list(truth.inv_affine)
+    truth_backward = mapfit.transforms.Polynomial(A=A.reshape((3,3)))
+
+    # add conversion between truth crs and wgs84 if necessary
+    if 'longlat' not in truth.crs.to_proj4():
+        # truth coord to wgs84
+        fromcrs = truth.crs.to_proj4()
+        tocrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        trans1 = truth_forward # pixel to truth coord
+        trans2 = mapfit.transforms.Projection(fromcrs, tocrs) # truth coord to wgs84
+        truth_forward = mapfit.transforms.Chain([trans1, trans2])
+
+        # wgs84 to truth coord
+        fromcrs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+        tocrs = truth.crs.to_proj4()
+        trans1 = mapfit.transforms.Projection(fromcrs, tocrs) # wgs84 to truth coord
+        trans2 = truth_backward # truth coord to pixel
+        truth_backward = mapfit.transforms.Chain([trans1, trans2])
+
+    # calc errors
+    sample_xs,sample_ys,truth_xs,truth_ys,errors = sampling_errors(sample_xs, sample_ys, sampling_trans, truth_forward, truth_backward, error_type=error_type)
+
+    # return as lines
+    arrows = pg.VectorData()
+    for sample_p,truth_p in zip(zip(sample_xs,sample_ys), zip(truth_xs,truth_ys)):
+        sample_x,sample_y = sample_p
+        sample_x,sample_y = truth_backward.predict([sample_x], [sample_y])
+        sample_px = (sample_x[0], sample_y[0])
+        if not truth.mask.getpixel(sample_px):
+            # only for sample points outside nodata mask
+            geoj = {'type':'LineString',
+                    'coordinates':[sample_p, truth_p]}
+            arrows.add_feature([], geoj)
+    
+    return arrows
 
 def render_image_errors(georef_fil, truth_fil, error_type):
     georef_root,ext = os.path.splitext(georef_fil)
@@ -346,7 +490,7 @@ def render_image_errors(georef_fil, truth_fil, error_type):
     mapp = mapfit.debug.error_surface_vis(truth, image_errorsurf)
     return mapp
 
-def render_georeferencing_errors(georef_fil, truth_fil, error_type):
+def render_georeferencing_errors(georef_fil, truth_fil, error_type, errors=True, overlay=False, arrows=False):
     georef_root,ext = os.path.splitext(georef_fil)
 
     # original/simulated map
@@ -358,15 +502,39 @@ def render_georeferencing_errors(georef_fil, truth_fil, error_type):
     georef.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
     print georef.affine
 
-    # calc error surface
-    with open('{}_transform.json'.format(georef_root), 'r') as fobj:
-        transdict = json.load(fobj)
-        sampling_trans = mapfit.transforms.from_json(transdict['backward']['model'])
-    georef_errorsurf = mapfit.debug.error_surface_georef(sampling_trans, georef, truth, error_type)
+    # calc error sampling trans
+    if errors or arrows:
+        with open('{}_transform.json'.format(georef_root), 'r') as fobj:
+            transdict = json.load(fobj)
+            sampling_trans = mapfit.transforms.from_json(transdict['backward']['model'])
 
-    # visualize geographic error
-    mapp = mapfit.debug.error_surface_vis(georef, georef_errorsurf)
-    return mapp
+    # render
+    m = pg.renderer.Map(width=2000)
+
+    # overlay
+    if overlay:
+        #m.crs = truth.crs
+        lyr = m.add_layer(truth)
+        # add box outline
+        lyr.add_effect('glow', color='black', size=3)
+
+    lyr = m.add_layer(georef, transparency=0.3, legend=False)
+    lyr.add_effect('glow', color='black', size=3)
+
+    # error surface
+    if errors:
+        georef_errorsurf = mapfit.debug.error_surface_georef(sampling_trans, georef, truth, error_type)
+        lyr = m.add_layer(georef_errorsurf, transparency=0.4, legendoptions={'title':'Km error', 'valueformat':'.1f'})
+
+    # add arrows
+    if arrows:
+        arrows = distortion_arrows_georef(sampling_trans, georef, truth, error_type)
+        m.add_layer(arrows, fillcolor='red', legendoptions={'title':'Displacement arrow'})
+
+    m.zoom_auto()
+    m.zoom_out(1.1)
+        
+    return m
 
 
 
