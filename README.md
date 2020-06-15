@@ -36,10 +36,10 @@ The simulation scripts are dependent on several external data files. These data 
 
 With the necessary packages, scripts, and data installed, it's time to run the simulations. Be forewarned that the simulations generates very large volumes of map image data and will take days or weeks to process depending on the number of CPU Cores (the number of CPU cores can be specified in the "PARAMETERS" section near the top of each script). Specifically, the scripts should be run in the following order:
 
-- 1) `generate maps.py` (generates the simulated maps and outputs them into "`simulations/maps`)
-- 2) `georeference.py` (uses the automap package to automatically georeference the simulated maps and outputs the results in `simulations/outputs`)
-- 3) `error assessment.py` (generates error metrics and outputs them as files ending in "_error.json" in `simulations/outputs`)
-- 4) `error analyze.py` (collects all the information about simulated maps, map parameters, georeferencing results and errors, and outputs them as json strings in an sqlite database in `simulations/analyze/stats.db`. Also generates some but not all of the article figures in `simulations/analyze/figures`).
+- `1) generate maps.py` (generates the simulated maps and outputs them into "`simulations/maps`)
+- `2) georeference.py` (uses the automap package to automatically georeference the simulated maps and outputs the results in `simulations/outputs`)
+- `3) error assessment.py` (generates error metrics and outputs them as files ending in `_error.json` in `simulations/outputs`)
+- `4) error analyze.py` (collects all the information about simulated maps, map parameters, georeferencing results and errors, and outputs them as json strings in an sqlite database in `simulations/analyze/stats.db`. Also generates some but not all of the article figures in `simulations/analyze/figures`).
 
 
 

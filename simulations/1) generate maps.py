@@ -24,6 +24,7 @@ except:
 
 ####################
 # PARAMETERS
+N = 25 # number of unique map scenes to render (each is rendered hundreds of times with different map parameters)
 MAXPROCS = 2 # number of available cpu cores / parallel processes
 
 
@@ -511,7 +512,7 @@ roads.create_spatial_index()
 
 # options
 print('defining options')
-n = 25 # with 4 extents for each = 40
+n = N # each N is a particular scene at a particular extent
 extents = [10] + [50, 1, 0.1] # ca 5000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
 distributions = ['dispersed', 'random'] # IMPROVE W NUMERIC
