@@ -5,6 +5,7 @@ def from_json(js):
     cls = {'Polynomial':Polynomial,
            'Projection':Projection,
            'TIN':TIN,
+           'Chain':Chain,
            }[js['type']]
     trans = cls.from_json(js)
     return trans
@@ -14,6 +15,26 @@ class Chain(object):
     def __init__(self, transforms=None):
         '''A chain of multiple transforms executed consecutively'''
         self.transforms = [t for t in transforms] if transforms else []
+
+    def info(self):
+        # TODO: rename to_json()
+        params = {}
+        data = {'transforms':[trans.info() for trans in self.transforms] }
+        info = {'type': 'Chain',
+                'params': params,
+                'data': data,
+                }
+        return info
+
+    @staticmethod
+    def from_json(js):
+        print 'chain fromjs', js
+        init = {}
+        transforms = [from_json(transdict) for transdict in js['data']['transforms']]
+        init['transforms'] = transforms
+        init.update(js['params'])
+        trans = Chain(**init)
+        return trans
 
     def add(self, transform):
         self.transforms.append(transform)

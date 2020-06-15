@@ -138,7 +138,7 @@ def text_detection(text_im, textcolor, colorthresh, textconf, parallel, sample, 
         box = [(x1,y1),(x2,y1),(x2,y2),(x1,y2),(x1,y1)]
         geoj = {'type':'Polygon', 'coordinates':[box]}
         props = dict(r)
-        feat = {'geometry':geoj, 'properties':props}
+        feat = {'type':'Feature', 'geometry':geoj, 'properties':props}
         textinfo['features'].append(feat)
 
     return textinfo
@@ -164,7 +164,7 @@ def toponym_selection(im, textinfo, seginfo):
     for name,p in points:
         geoj = {'type':'Point', 'coordinates':p}
         props = {'name':name}
-        feat = {'geometry':geoj, 'properties':props}
+        feat = {'type':'Feature', 'geometry':geoj, 'properties':props}
         toponyminfo['features'].append(feat)
 
     return toponyminfo
@@ -186,7 +186,7 @@ def match_control_points(toponyminfo, matchthresh, db, source, **kwargs):
         geoj = {'type':'Point', 'coordinates':mcoord}
         props = {'origname':oname, 'origx':ocoord[0], 'origy':ocoord[1],
                  'matchname':mname, 'matchx':mcoord[0], 'matchy':mcoord[1]}
-        feat = {'geometry':geoj, 'properties':props}
+        feat = {'type':'Feature', 'geometry':geoj, 'properties':props}
         gcps_matched_info['features'].append(feat)
 
     return gcps_matched_info
@@ -277,7 +277,7 @@ def estimate_transform(gcps_matched_info, warp_order, residual_type):
         props = {'origname':oname, 'origx':ocoord[0], 'origy':ocoord[1],
                  'matchname':mname, 'matchx':mcoord[0], 'matchy':mcoord[1],
                  'residual':res, 'residual_type':residual_type}
-        feat = {'geometry':geoj, 'properties':props}
+        feat = {'type':'Feature', 'geometry':geoj, 'properties':props}
         gcps_final_info['features'].append(feat)
 
     # then transforms
@@ -608,6 +608,19 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
 
     print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
 
+
+
+
+
+    # (add in useful bbox info)
+    forward = transforms.from_json(transinfo['forward']['model'])
+    x,y = forward.predict([0], [0])
+    x1,y1 = float(x[0]), float(y[0])
+    x,y = forward.predict([im.size[0]], [im.size[1]])
+    x2,y2 = float(x[0]), float(y[0])
+    info['bbox'] = [x1,y1,x2,y2]
+
+    
 
 
 
