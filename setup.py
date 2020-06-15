@@ -10,6 +10,7 @@ setup(	long_description="Automated map georeferencing", #open("README.rst").read
 	version="""0.1.0""",
 	keywords="""map georeferencing""",
 	packages=['automap'],
+        requires=['requirements.txt'],
 	classifiers=['License :: OSI Approved', 'Programming Language :: Python', 'Development Status :: 4 - Beta', 'Intended Audience :: Developers', 'Intended Audience :: Science/Research', 'Intended Audience :: End Users/Desktop'],
 	description="""Automated map georeferencing""",
 	)

@@ -37,6 +37,15 @@ except:
 
 
 
+#################
+# PARAMETERS
+
+MAXPROCS = 4 # number of available cpu cores / parallel processes
+
+
+
+
+
 
 ##################
 # FUNCTIONS
@@ -203,7 +212,7 @@ def itermaps():
 
 if __name__ == '__main__':
 
-    maxprocs = 4
+    maxprocs = MAXPROCS 
     procs = []
 
     for imfil in itermaps():

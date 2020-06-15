@@ -1,0 +1,8 @@
+Pillow
+numpy
+opencv-python
+colormath
+pytesseract
+git+https://github.com/karimbahgat/PythonGis/archive/0.2.0.tar.gz
+geographiclib
+

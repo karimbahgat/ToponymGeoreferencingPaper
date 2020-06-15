@@ -12,14 +12,6 @@ import multiprocessing as mp
 
 # Perform the automated georeferencing
 
-# OUTLINE
-# for instance:
-# - no projection difference + same gazetteer (should eliminate error from placename matching?)
-#   (by holding these constant, any error should be from technical details, like rounding, point detection, warp bugs???)
-#   - comparing with self, test should return 0 error
-#   - prespecified georef, just use known placename coords as input controlpoints?? any error should be from the warp process?? 
-#   - auto georeferencing (total error from auto approach, probably mostly from placename matching?? or not if using same gazetteer??)
-
 
 
 print(os.getcwd())
@@ -32,8 +24,9 @@ except:
 
 ###################
 # PARAMS
-TEXTCOLOR = None
-WARPORDER = None
+TEXTCOLOR = None # rgb color tuple of map text, or None for autodetect
+WARPORDER = None # polynomial warp order, or None for detecting optimal order
+MAXPROCS = 2 # number of available cpu cores / parallel processes
 
 
 ###################
@@ -118,7 +111,7 @@ def process_logger(func, **kwargs):
 
 if __name__ == '__main__':
 
-    maxprocs = 2
+    maxprocs = MAXPROCS
     procs = []
 
     for fil in mapfiles():
@@ -168,45 +161,45 @@ if __name__ == '__main__':
         # Begin process
 
         ## auto
-##        p = mp.Process(target=process_logger,
-##                       args=[georeference_auto],
-##                       kwargs=dict(fil='maps/{}'.format(fil),
-##                                   outfil='output/{}_georeferenced_auto.tif'.format(fil_root),
-##                                   db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db", #"data/gazetteers.db",
-##                                   source='best',
-##                                   textcolor=TEXTCOLOR,
-##                                   warp_order=WARPORDER,
-##                                   ),
-##                       )
-##        p.start()
-##        procs.append((p,time()))
-
-        ## auto, assuming known placenames
-
-        # create toponyminfo from rendered placenames
-        placenames = pg.VectorData('maps/{}_placenames.geojson'.format(fil_root))
-        toponyminfo = {'type':'FeatureCollection', 'features':[]}
-        for f in placenames:
-            geoj = {'type': 'Feature',
-                    'properties': {'name':f['name']},
-                    'geometry': {'type':'Point',
-                                 'coordinates':(f['col'],f['row'])}
-                    }
-            toponyminfo['features'].append(geoj)
-            
         p = mp.Process(target=process_logger,
                        args=[georeference_auto],
                        kwargs=dict(fil='maps/{}'.format(fil),
-                                   outfil='output/{}_georeferenced_known_places.tif'.format(fil_root),
-                                   db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db", #"data/gazetteers.db",
+                                   outfil='output/{}_georeferenced_auto.tif'.format(fil_root),
+                                   db="data/gazetteers.db",
                                    source='best',
                                    textcolor=TEXTCOLOR,
                                    warp_order=WARPORDER,
-                                   priors={'toponyminfo':toponyminfo}
                                    ),
                        )
         p.start()
         procs.append((p,time()))
+
+        ## auto, assuming known placenames
+
+        # create toponyminfo from rendered placenames
+##        placenames = pg.VectorData('maps/{}_placenames.geojson'.format(fil_root))
+##        toponyminfo = {'type':'FeatureCollection', 'features':[]}
+##        for f in placenames:
+##            geoj = {'type': 'Feature',
+##                    'properties': {'name':f['name']},
+##                    'geometry': {'type':'Point',
+##                                 'coordinates':(f['col'],f['row'])}
+##                    }
+##            toponyminfo['features'].append(geoj)
+##            
+##        p = mp.Process(target=process_logger,
+##                       args=[georeference_auto],
+##                       kwargs=dict(fil='maps/{}'.format(fil),
+##                                   outfil='output/{}_georeferenced_known_places.tif'.format(fil_root),
+##                                   db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db", #"data/gazetteers.db",
+##                                   source='best',
+##                                   textcolor=TEXTCOLOR,
+##                                   warp_order=WARPORDER,
+##                                   priors={'toponyminfo':toponyminfo}
+##                                   ),
+##                       )
+##        p.start()
+##        procs.append((p,time()))
 
         ## exact
 ##        p = mp.Process(target=process_logger,

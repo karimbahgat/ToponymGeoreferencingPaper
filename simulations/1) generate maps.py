@@ -20,6 +20,15 @@ except:
     pass
 
 
+
+
+####################
+# PARAMETERS
+MAXPROCS = 2 # number of available cpu cores / parallel processes
+
+
+
+
 ####################
 # FUNCTIONS
 
@@ -531,7 +540,7 @@ metas = [{'title':'','legend':False,'arealabels':False}, # nothing
 # main process handler
 if __name__ == '__main__':
 
-    maxprocs = 2
+    maxprocs = MAXPROCS
     procs = []
 
     print('combinations per region', len(list(itertools.product(quantities,distributions,uncertainties,alldatas,projections,metas,resolutions,imformats))))
