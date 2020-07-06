@@ -1,5 +1,6 @@
 
 import pythongis as pg
+import pycrs
 
 import os
 import sys
@@ -61,35 +62,54 @@ def valid_mapregion(bbox):
             return True
 
 # sample n places within focus region
-def _sampleplaces(bbox, n, distribution):
+def _sampleplaces(projbox, projection, n, distribution):
     '''
     Samples...
     '''
-    print('sampling places within',bbox)
+    if projection:
+        lonlat = '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
+        bbox = project_bbox(projbox, projection, lonlat)
+        backward = get_crs_transformer(projection, lonlat)
+        forward = get_crs_transformer(lonlat, projection)
+    else:
+        bbox = projbox
+        
+    print('sampling places within',projbox,bbox)
     #hits = list(places.quick_overlap(bbox))
-    hits = pg.VectorData(fields=['name'])
+    hits = pg.VectorData(fields=['name'], crs=projection)
     db = sqlite3.connect('data/gns.db')
     x1,y1,x2,y2 = bbox
+    projx1,projy1,projx2,projy2 = projbox
+    projxmin,projymin,projxmax,projymax = min(projx1,projx2),min(projy1,projy2),max(projx1,projx2),max(projy1,projy2)
     for names,x,y in db.execute('select names,x,y from data where (x between ? and ?) and (y between ? and ?)', (x1,x2,y1,y2)):
         name = names.split('|')[1] if '|' in names else names
         try: name.encode('latin')
         except: continue
+        
+        # project placecoord and check within projected map bounds
+        if projection:
+            x,y = forward([(x,y)])[0]
+            if not (projxmin <= x <= projxmax) or not (projymin <= y <= projymax):
+                continue
+
+        # add
         geoj = {'type':'Point', 'coordinates':(x,y)}
         hits.add_feature([name], geoj)
+        
     print('possible places in map window',hits)
 
     if distribution == 'random':
         def samplefunc():
             while True:
-                x = uniform(bbox[0], bbox[2])
-                y = uniform(bbox[1], bbox[3])
+                x = uniform(projbox[0], projbox[2])
+                y = uniform(projbox[1], projbox[3])
                 yield x,y
 
     elif distribution == 'dispersed':
         def samplefunc():
             while True:
-                w = bbox[2]-bbox[0]
-                h = bbox[3]-bbox[1]
+                w = projbox[2]-projbox[0]
+                h = projbox[3]-projbox[1]
                 
         ##        aspect_ratio = h/float(w)
         ##        columns = math.sqrt(n/float(aspect_ratio))
@@ -109,10 +129,10 @@ def _sampleplaces(bbox, n, distribution):
                 dy = h / float(rows)
                     
                 for row in range(rows):
-                    y = bbox[1] + row*dy
+                    y = projbox[1] + row*dy
                     y += dy/2.0
                     for col in range(columns):
-                        x = bbox[0] + col*dx
+                        x = projbox[0] + col*dx
                         x += dx/2.0
                         yield x,y
 
@@ -142,6 +162,9 @@ def _sampleplaces(bbox, n, distribution):
                     # dont yield same place multiple times
                     continue
                 i += 1
+                if projection:
+                    # reproj back to lonlat
+                    f.transform(backward)
                 results.append(f)
                 yield f
                 # yield only first match inside bbox, then break
@@ -151,67 +174,81 @@ def _sampleplaces(bbox, n, distribution):
 
     else:
         for f in hits:
+            if projection:
+                # reproj back to lonlat
+                f.transform(backward)
             yield f
 
-def project_bbox(bbox, fromcrs, tocrs):
-    '''Take a bbox from one crs, convert to bbox in another crs, then convert back to the original crs'''
-    def get_crs_transformer(fromcrs, tocrs):
-        import pycrs
-        
-        if not (fromcrs and tocrs):
-            return None
-        
-        if isinstance(fromcrs, basestring):
-            fromcrs = pycrs.parse.from_unknown_text(fromcrs)
+def get_crs_transformer(fromcrs, tocrs):
+    if not (fromcrs and tocrs):
+        return None
+    
+    if isinstance(fromcrs, basestring):
+        fromcrs = pycrs.parse.from_unknown_text(fromcrs)
 
-        if isinstance(tocrs, basestring):
-            tocrs = pycrs.parse.from_unknown_text(tocrs)
+    if isinstance(tocrs, basestring):
+        tocrs = pycrs.parse.from_unknown_text(tocrs)
 
-        fromcrs = fromcrs.to_proj4()
-        tocrs = tocrs.to_proj4()
-        
-        if fromcrs != tocrs:
-            import pyproj
-            fromcrs = pyproj.Proj(fromcrs)
-            tocrs = pyproj.Proj(tocrs)
-            def _project(points):
-                xs,ys = itertools.izip(*points)
-                xs,ys = pyproj.transform(fromcrs,
-                                         tocrs,
-                                         xs, ys)
-                newpoints = list(itertools.izip(xs, ys))
-                return newpoints
-        else:
-            _project = None
+    fromcrs = fromcrs.to_proj4()
+    tocrs = tocrs.to_proj4()
+    
+    if fromcrs != tocrs:
+        import pyproj
+        fromcrs = pyproj.Proj(fromcrs)
+        tocrs = pyproj.Proj(tocrs)
+        def _isvalid(p):
+            x,y = p
+            return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
+        def _project(points):
+            xs,ys = itertools.izip(*points)
+            xs,ys = pyproj.transform(fromcrs,
+                                     tocrs,
+                                     xs, ys)
+            newpoints = list(itertools.izip(xs, ys))
+            newpoints = [p for p in newpoints if _isvalid(p)] # drops inf and nan
+            return newpoints
+    else:
+        _project = None
 
-        return _project
+    return _project
 
-    _transform = get_crs_transformer(fromcrs, tocrs)
+def project_bbox(bbox, fromcrs, tocrs, sampling_freq=10):
+    print 'projecting bbox', bbox, fromcrs, tocrs
+    transformer = get_crs_transformer(fromcrs, tocrs)
+    if not transformer:
+        return bbox
     x1,y1,x2,y2 = bbox
-    corners = [(x1,y1),(x1,y2),(x2,y2),(x2,y1)]
-    corners = _transform(corners)
-    xs,ys = zip(*corners)
+    w,h = x2-x1, y2-y1
+    sampling_freq = int(sampling_freq)
+    dx,dy = w/float(sampling_freq), h/float(sampling_freq)
+    gridsamples = [(x1+dx*ix,y1+dy*iy)
+                   for iy in range(sampling_freq+1)
+                   for ix in range(sampling_freq+1)]
+    gridsamples = transformer(gridsamples)
+    if not gridsamples:
+        print 'no valid gridsamples'
+        return None
+    xs,ys = zip(*gridsamples)
     xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
-    projbox = [xmin,ymin,xmax,ymax] 
-    return projbox
+    bbox = [xmin,ymin,xmax,ymax] 
+    print '-->',bbox
+    return bbox
 
 
 # get map places
-def get_mapplaces(bbox, quantity, distribution, uncertainty):
+def get_mapplaces(projbox, projection, quantity, distribution, uncertainty):
     '''
     - quantity: aka number of placenames
     - distribution: how placenames are distributed across map
         - random
         - dispersed
         - clustered
-    - hierarchy ??? :
-        - only big places
-        - any small or big place
+    - uncertainty: random placename coordinate displacement (in decimal degrees)
     '''
     # get places to be rendered in map
     mapplaces = pg.VectorData()
     mapplaces.fields = ['name']
-    for f in _sampleplaces(bbox, quantity, distribution):
+    for f in _sampleplaces(projbox, projection, quantity, distribution):
         #print f
         name = f['name'].title() #r['names'].split('|')[0]
         row = [name]
@@ -345,20 +382,35 @@ def iteroptions(center, extent):
     # loop placename options
     for quantity,distribution,uncertainty in itertools.product(quantities,distributions,uncertainties):
 
-        # FIX PROJECTION...
+        # projections
         for projection in projections:
 
-##            if projection:
-##                lonlat = '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
-##                projbox = project_bbox(bbox, lonlat, projection)
-##                placebox = project_bbox(projbox, projection, lonlat)
-##                print('bbox to projbox and back',bbox,placebox)
-##            else:
-##                placebox = bbox
+            # customize projection to area
+            if 'lcc' in projection:
+                projparams = dict(lon_0=center[0],
+                                  lat_0=center[1],
+                                lat_1=bbox[1],
+                                lat_2=bbox[3])
+                projection = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_1={lat_1} +lat_2={lat_2}'.format(**projparams)
+                print projection
+            elif 'tmerc' in projection:
+                projparams = dict(lon_0=center[0],
+                                  lat_0=center[1])
+                projection = projection + ' +lon_0={lon_0} +lat_0={lat_0}'.format(**projparams)
+                print projection
+                
+            # get map projected bbox
+            if projection:
+                m = pg.renderer.Map(100, int(100*regionopts['aspect']), crs=projection)
+                m.zoom_bbox(*bbox, geographic=True)
+                projbox = m.bbox
+                projbox = [ projbox[0],projbox[3],projbox[2],projbox[1] ]
+            else:
+                projbox = bbox
 
             # check enough placenames
             placeopts = {'quantity':quantity, 'distribution':distribution, 'uncertainty':uncertainty}
-            mapplaces = get_mapplaces(bbox, **placeopts)
+            mapplaces = get_mapplaces(projbox, projection, **placeopts)
             if len(mapplaces) < 10: #quantity:
                 print('!!! Not enough places, skipping')
                 continue
@@ -379,20 +431,6 @@ def run(i, center, extent):
     subi = 1
     for opts in iteroptions(center, extent):
         regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution = opts
-
-        # customize projection to area
-        if 'lcc' in projection:
-            projparams = dict(lon_0=center[0],
-                              lat_0=center[1],
-                            lat_1=bbox[1],
-                            lat_2=bbox[3])
-            projection = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_1={lat_1} +lat_2={lat_2} +ellps=wgs84 +units=m'.format(**projparams)
-            print projection
-        elif 'tmerc' in projection:
-            projparams = dict(lon_0=center[0],
-                              lat_0=center[1])
-            projection = projection + ' +lon_0={lon_0} +lat_0={lat_0} +ellps=wgs84 +units=m'.format(**projparams)
-            print projection
 
         # render the map
         mapp = render_map(bbox,
@@ -417,6 +455,8 @@ def run(i, center, extent):
             save_map(name, mapp, mapplaces, datas, resolution, regionopts, placeopts, projection, anchoropts, textopts, metaopts, noiseopts)
             
             subsubi += 1
+
+            break # JUST FOR TESTING, REMOVE!!
 
         subi += 1
 
@@ -531,7 +571,7 @@ print('defining options')
 n = N # each N is a particular scene at a particular extent
 extents = [10] + [50, 1, 0.1] # ca 5000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
-distributions = ['random'] #['dispersed', 'random'] # IMPROVE W NUMERIC
+distributions = ['dispersed', 'random'] # IMPROVE W NUMERIC
 uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
 alldatas = [
                 [], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
@@ -545,8 +585,8 @@ projections = [#None, # lat/lon
                #'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
                #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
                #'+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
-               #'+proj=lcc',
-               '+proj=tmerc',
+               #'+proj=lcc +datum=WGS84 +ellps=WGS84 +units=m',
+               '+proj=tmerc +datum=WGS84 +ellps=WGS84 +units=m',
                ]
 resolutions = [3000, 2000, 1000] #, 750] #, 4000]
 imformats = ['png','jpg']
@@ -574,12 +614,25 @@ if __name__ == '__main__':
             print('-------')
             print('REGION:',i,center,extent)
 
+##            if i < 3:
+##                i += 1
+##                continue # REMOVE, JUST FOR TESTING!!
+
             # check enough land before sending to process
             regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
             bbox = mapregion(**regionopts)
             if not valid_mapregion(bbox):
                 print('!!! Not enough land area, skipping')
                 continue
+
+            # test view
+##            m = pg.renderer.Map(crs=projections[0])
+##            for d in alldatas[1]:
+##                m.add_layer(d[0], **d[1])
+##            m.zoom_bbox(*bbox, geographic=True)
+##            m.view()
+##            i+=1
+##            continue
             
             #run(i,center,extent)
 
