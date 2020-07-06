@@ -380,6 +380,20 @@ def run(i, center, extent):
     for opts in iteroptions(center, extent):
         regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution = opts
 
+        # customize projection to area
+        if 'lcc' in projection:
+            projparams = dict(lon_0=center[0],
+                              lat_0=center[1],
+                            lat_1=bbox[1],
+                            lat_2=bbox[3])
+            projection = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_1={lat_1} +lat_2={lat_2} +ellps=wgs84 +units=m'.format(**projparams)
+            print projection
+        elif 'tmerc' in projection:
+            projparams = dict(lon_0=center[0],
+                              lat_0=center[1])
+            projection = projection + ' +lon_0={lon_0} +lat_0={lat_0} +ellps=wgs84 +units=m'.format(**projparams)
+            print projection
+
         # render the map
         mapp = render_map(bbox,
                          mapplaces,
@@ -405,6 +419,8 @@ def run(i, center, extent):
             subsubi += 1
 
         subi += 1
+
+        break # JUST FOR TESTING, REMOVE!!
 
 def process(i, center, extent):
     logger = codecs.open('maps/sim_{}_log.txt'.format(i), 'w', encoding='utf8', buffering=0)
@@ -515,7 +531,7 @@ print('defining options')
 n = N # each N is a particular scene at a particular extent
 extents = [10] + [50, 1, 0.1] # ca 5000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
-distributions = ['dispersed', 'random'] # IMPROVE W NUMERIC
+distributions = ['random'] #['dispersed', 'random'] # IMPROVE W NUMERIC
 uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
 alldatas = [
                 [], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
@@ -525,10 +541,12 @@ alldatas = [
                 (roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),
                  ],
             ]
-projections = [None, # lat/lon
+projections = [#None, # lat/lon
                #'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
                #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
-               '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
+               #'+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
+               #'+proj=lcc',
+               '+proj=tmerc',
                ]
 resolutions = [3000, 2000, 1000] #, 750] #, 4000]
 imformats = ['png','jpg']
