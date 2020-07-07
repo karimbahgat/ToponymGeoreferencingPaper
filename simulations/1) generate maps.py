@@ -301,7 +301,32 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
                 textoptions=textopts,
                 legendoptions={'title':'Populated place'},
                 **anchoropts)
+
     m.zoom_bbox(*bbox, geographic=True)
+
+    if datas:
+        gridlines = pg.VectorData()
+        if projection:
+            projbox = m.bbox
+            projbox = [ projbox[0],projbox[3],projbox[2],projbox[1] ]
+            lonlat = '+proj=longlat +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +nodef'
+            _bbox = project_bbox(projbox, projection, lonlat)
+        else:
+            _bbox = bbox
+        bw,bh = _bbox[2]-_bbox[0], _bbox[3]-_bbox[1]
+        dx,dy = bw/4.0, bh/4.0
+        for gxi in range(4+1):
+            gx = _bbox[0]+dx*gxi
+            vert = [(gx, _bbox[1]+bh/20.0*gyi) for gyi in range(20+1)]
+            geoj = {'type':'LineString', 'coordinates':vert}
+            gridlines.add_feature([], geoj)
+        for gyi in range(4+1):
+            gy = _bbox[1]+dy*gyi
+            horiz = [(_bbox[0]+bw/20.0*gxi, gy) for gxi in range(20+1)]
+            geoj = {'type':'LineString', 'coordinates':horiz}
+            gridlines.add_feature([], geoj)
+        print 'gridlines',gridlines
+        m.add_layer(gridlines, fillcolor=(62,88,130), fillsize=0.15)
 
     if metaopts['legend']:
         legendoptions = {'padding':0, 'direction':'s'}
@@ -387,16 +412,23 @@ def iteroptions(center, extent):
 
             # customize projection to area
             if 'lcc' in projection:
+                bh = bbox[3]-bbox[1]
                 projparams = dict(lon_0=center[0],
                                   lat_0=center[1],
-                                lat_1=bbox[1],
-                                lat_2=bbox[3])
+                                lat_1=bbox[1]+bh*0.25,
+                                lat_2=bbox[1]+bh*0.75)
                 projection = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_1={lat_1} +lat_2={lat_2}'.format(**projparams)
                 print projection
             elif 'tmerc' in projection:
                 projparams = dict(lon_0=center[0],
                                   lat_0=center[1])
                 projection = projection + ' +lon_0={lon_0} +lat_0={lat_0}'.format(**projparams)
+                print projection
+            elif 'eqc' in projection:
+                projparams = dict(lon_0=center[0],
+                                  lat_0=center[1],
+                                  lat_ts=center[1])
+                projection = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_ts={lat_ts}'.format(**projparams)
                 print projection
                 
             # get map projected bbox
@@ -408,12 +440,9 @@ def iteroptions(center, extent):
             else:
                 projbox = bbox
 
-            # check enough placenames
+            # get placenames within map bbox
             placeopts = {'quantity':quantity, 'distribution':distribution, 'uncertainty':uncertainty}
             mapplaces = get_mapplaces(projbox, projection, **placeopts)
-            if len(mapplaces) < 10: #quantity:
-                print('!!! Not enough places, skipping')
-                continue
 
             # loop rendering options
             for datas,meta in itertools.product(alldatas,metas):
@@ -431,6 +460,37 @@ def run(i, center, extent):
     subi = 1
     for opts in iteroptions(center, extent):
         regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution = opts
+
+        # check enough placenames
+        if len(mapplaces) < 10: #quantity:
+            print('!!! Not enough places, skipping')
+            continue
+
+        # check sufficient distribution
+        ul,ur,ll,lr = 0,0,0,0 # quadrant counters
+        cx,cy = regionopts['center']
+        for f in mapplaces:
+            x,y = f.geometry['coordinates']
+            # right
+            if x >= cx:
+                # upper
+                if y >= cy:
+                    ur += 1
+                # lower
+                else:
+                    lr += 1
+            # left
+            else:
+                # upper
+                if y >= cy:
+                    ul += 1
+                # lower
+                else:
+                    ll += 1
+        thresh_quadrants = [True for q in (ul,ur,ll,lr) if q > 2]
+        if len(thresh_quadrants) < 3:
+            print('!!! Too poor toponym distribution, skipping')
+            continue
 
         # render the map
         mapp = render_map(bbox,
@@ -571,21 +631,23 @@ print('defining options')
 n = N # each N is a particular scene at a particular extent
 extents = [10] + [50, 1, 0.1] # ca 5000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
-distributions = ['dispersed', 'random'] # IMPROVE W NUMERIC
+distributions = ['dispersed','random'] # IMPROVE W NUMERIC
 uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
 alldatas = [
-                [], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
+                #[], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
                 [
                 (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08, 'legendoptions':{'title':'Rivers'}}), # three layers
-                (urban, {'fillcolor':(209,194,151), 'legendoptions':{'title':'Urban area'}}),
+                (urban, {'fillcolor':(209,194,151), 'outlinecolor':(209-50,194-50,151-50), 'legendoptions':{'title':'Urban area'}}),
                 (roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),
+                # + gridlines (hardcoded in function above)
                  ],
             ]
 projections = [#None, # lat/lon
                #'+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6378137 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs', #'+init=EPSG:3857', # Web Mercator
                #'+proj=moll +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54009', # World Mollweide
                #'+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
-               #'+proj=lcc +datum=WGS84 +ellps=WGS84 +units=m',
+               '+proj=eqc +datum=WGS84 +ellps=WGS84 +units=m',
+               '+proj=lcc +datum=WGS84 +ellps=WGS84 +units=m',
                '+proj=tmerc +datum=WGS84 +ellps=WGS84 +units=m',
                ]
 resolutions = [3000, 2000, 1000] #, 750] #, 4000]
