@@ -141,10 +141,11 @@ def _sampleplaces(projbox, projection, extent, n, distribution):
 
     itersamples = samplefunc()
     results = []
-    hits = list(hits)
+    visited = set()
+    hits = list(enumerate(hits)) 
     
     # loop all hits/samples
-    while hits:
+    while len(visited) < len(hits):
         x,y = next(itersamples)
         
         # reproj back to longlat
@@ -152,13 +153,17 @@ def _sampleplaces(projbox, projection, extent, n, distribution):
             x,y = backward([(x,y)])[0]
         
         #bufbox = [x-radius, y-radius, x+radius, y+radius]
-        def dist(f):
+        def dist(h):
+            i,f = h
             fx,fy = f.geometry['coordinates']
             return math.hypot(x-fx, y-fy)
+        print 'dist sorting'
         sortplaces = sorted(hits, key=dist)
-        for f in sortplaces: 
+        print 'done'
+        for i,f in sortplaces: 
             #print '---'
             #print('attempt to sample place near', (x,y), f.row, 'of', len(hits) )
+            visited.add(i)
             # compare with previous results
             sameflag = False
             for f2 in results:
@@ -168,18 +173,16 @@ def _sampleplaces(projbox, projection, extent, n, distribution):
                     break
                 fx,fy = f.geometry['coordinates']
                 fx2,fy2 = f2.geometry['coordinates']
-                nearthresh = extent / 100.0 * 1 #(extent * 100 * 1000) / 100.0 # extent dec deg * 100 = ca km * 1000 = ca m / 100 = 1% of extent in projected meters
+                nearthresh = (extent / 100.0) * 5 #(extent * 100 * 1000) / 100.0 # extent dec deg * 100 = ca km * 1000 = ca m / 100 = 1% of extent in projected meters
                 #print('nearness:', math.hypot(fx-fx2, fy-fy2), 'vs', nearthresh)
                 if math.hypot(fx-fx2, fy-fy2) < nearthresh:
-                    # dont yield places that are approximately the same (<1% of map extent)
+                    # dont yield places that are approximately the same (<5% of map extent)
                     sameflag = True
                     break
             if sameflag:
                 #print('ignore sample, same or too close')
-                hits.pop(hits.index(f))
                 continue
             # all tests passed, yield this sample
-            hits.pop(hits.index(f))
             results.append(f)
             print('sampling', len(results), 'of', n)
             yield f
@@ -467,15 +470,15 @@ def iterscenes():
             else:
                 projbox = bbox
 
-            # get placenames within map bbox
-            placeopts = {'quantity':quantity, 'distribution':'dispersed', 'uncertainty':0} # hardcoded just to test available places...
-            mapplaces = get_mapplaces(projbox, proj, extent, **placeopts)
-
             # check enough land before sending to process
             bbox = mapregion(**regionopts)
             if not valid_mapregion(bbox):
                 print('!!! Not enough land area, skipping')
                 continue
+
+            # get placenames within map bbox
+            placeopts = {'quantity':quantity, 'distribution':'dispersed', 'uncertainty':0} # hardcoded just to test available places...
+            mapplaces = get_mapplaces(projbox, proj, extent, **placeopts)
 
             # check enough placenames
             if len(mapplaces) < quantity:
@@ -693,7 +696,7 @@ quantities = [80, 40, 20, 10]
 distributions = ['dispersed','random'] # IMPROVE W NUMERIC
 uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
 alldatas = [
-                #[], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
+                [], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
                 [
                 (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08, 'legendoptions':{'title':'Rivers'}}), # three layers
                 (urban, {'fillcolor':(209,194,151), 'outlinecolor':(209-50,194-50,151-50), 'legendoptions':{'title':'Urban area'}}),
