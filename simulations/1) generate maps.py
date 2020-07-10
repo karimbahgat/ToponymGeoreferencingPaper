@@ -25,7 +25,7 @@ except:
 
 ####################
 # PARAMETERS
-N = 8 # number of unique map scenes to render (each is rendered hundreds of times with different map parameters)
+N = 48*4 # (48*4=192 scenes) (*96=18,432 maps) # number of unique map scenes to render (each is rendered almost a hundred times with different map parameters)
 MAXPROCS = 4 # number of available cpu cores / parallel processes
 
 
@@ -33,8 +33,6 @@ MAXPROCS = 4 # number of available cpu cores / parallel processes
 
 ####################
 # FUNCTIONS
-
-seed(16) # random seed for replication purposes
 
 # select map region
 def mapregion(center, extent, aspect):
@@ -157,9 +155,9 @@ def _sampleplaces(projbox, projection, extent, n, distribution):
             i,f = h
             fx,fy = f.geometry['coordinates']
             return math.hypot(x-fx, y-fy)
-        print 'dist sorting'
+        #print 'dist sorting'
         sortplaces = sorted(hits, key=dist)
-        print 'done'
+        #print 'done'
         for i,f in sortplaces: 
             #print '---'
             #print('attempt to sample place near', (x,y), f.row, 'of', len(hits) )
@@ -420,6 +418,97 @@ def save_map(name, mapp, mapplaces, datas, resolution, regionopts, placeopts, pr
     with open('maps/{}_opts.json'.format(name), 'w') as fobj:
         fobj.write(json.dumps(opts))
 
+def getscene(extent, quantity, projection):
+    # find a center coordinate suitable for these scene params
+    attempts = 0
+    while attempts < 20:
+        attempts += 1
+
+        if extent > 1:
+            center = (uniform(-170,170),uniform(-70,70))
+        else:
+            idx = randrange(1, len(bigcities)+1)
+            city = bigcities[idx]
+            center = city.geometry['coordinates']
+        regionopts = {'center':center, 'extent':extent, 'aspect':0.70744225834}
+        bbox = mapregion(**regionopts)
+        print('attempt', attempts, ': trying scene centered at', center)
+
+        # customize projection to area
+        if not projection:
+            proj = projection
+        elif 'lcc' in projection:
+            bh = bbox[3]-bbox[1]
+            projparams = dict(lon_0=center[0],
+                              lat_0=center[1],
+                            lat_1=bbox[1]+bh*0.25,
+                            lat_2=bbox[1]+bh*0.75)
+            proj = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_1={lat_1} +lat_2={lat_2}'.format(**projparams)
+        elif 'tmerc' in projection:
+            projparams = dict(lon_0=center[0],
+                              lat_0=center[1])
+            proj = projection + ' +lon_0={lon_0} +lat_0={lat_0}'.format(**projparams)
+        elif 'eqc' in projection:
+            projparams = dict(lon_0=center[0],
+                              lat_0=center[1],
+                              lat_ts=center[1])
+            proj = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_ts={lat_ts}'.format(**projparams)
+        print proj
+
+        # get map projected bbox
+        if proj:
+            m = pg.renderer.Map(100, int(100*regionopts['aspect']), crs=proj)
+            m.zoom_bbox(*bbox, geographic=True)
+            projbox = m.bbox
+            projbox = [ projbox[0],projbox[3],projbox[2],projbox[1] ]
+        else:
+            projbox = bbox
+
+        # check enough land before sending to process
+        bbox = mapregion(**regionopts)
+        if not valid_mapregion(bbox):
+            print('!!! Not enough land area, skipping')
+            continue
+
+        # get placenames within map bbox
+        placeopts = {'quantity':quantity, 'distribution':'dispersed', 'uncertainty':0} # hardcoded just to test available places...
+        mapplaces = get_mapplaces(projbox, proj, extent, **placeopts)
+
+        # check enough placenames
+        if len(mapplaces) < quantity:
+            print('!!! Not enough places, skipping')
+            continue
+
+        # check sufficient distribution
+        ul,ur,ll,lr = 0,0,0,0 # quadrant counters
+        cx,cy = regionopts['center']
+        for f in mapplaces:
+            x,y = f.geometry['coordinates']
+            # right
+            if x >= cx:
+                # upper
+                if y >= cy:
+                    ur += 1
+                # lower
+                else:
+                    lr += 1
+            # left
+            else:
+                # upper
+                if y >= cy:
+                    ul += 1
+                # lower
+                else:
+                    ll += 1
+        thresh_quadrants = [True for q in (ul,ur,ll,lr) if q > 2]
+        if len(thresh_quadrants) < 3:
+            print('!!! Too poor toponym distribution, skipping')
+            continue
+
+        return center,extent,quantity,proj
+
+        break # attempt successfull, exit while loop
+
 def iterscenes():
     # loop scene params
     print('scenes at a time', len(list(itertools.product(extents, quantities, projections))))
@@ -546,11 +635,14 @@ def iteroptions(center, extent, quantity, projection):
 
             yield regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution
 
-def run(i, center, extent, quantity, projection):
+def run(i, extent, quantity, projection):
     # each run is on a scene
     # a scene is a combination of extent,quantity,projection, rendered at a center that can fullfill the quantity requirement
+
+    seed(i) # random seed for replication purposes
+    center,extent,quantity,projection = getscene(extent,quantity,projection)
+
     subi = 1
-    
     for opts in iteroptions(center, extent, quantity, projection):
         regionopts,bbox,placeopts,mapplaces,datas,projection,metaopts,textopts,anchoropts,resolution = opts
 
@@ -578,13 +670,13 @@ def run(i, center, extent, quantity, projection):
             
             subsubi += 1
 
-            break # JUST FOR TESTING, REMOVE!!
+            #break # JUST FOR TESTING, REMOVE!!
 
         subi += 1
 
-        break # JUST FOR TESTING, REMOVE!!
+        #break # JUST FOR TESTING, REMOVE!!
 
-def process(i, center, extent, quantity, projection):
+def process(i, extent, quantity, projection):
     logger = codecs.open('maps/sim_{}_log.txt'.format(i), 'w', encoding='utf8', buffering=0)
     sys.stdout = logger
     sys.stderr = logger
@@ -592,7 +684,7 @@ def process(i, center, extent, quantity, projection):
     print('time',datetime.datetime.now().isoformat())
     print('working path',os.path.abspath(''))
 
-    run(i, center, extent, quantity, projection)
+    run(i, extent, quantity, projection)
 
     print('process finished, should exit')
         
@@ -690,10 +782,10 @@ roads.create_spatial_index()
 
 # options
 print('defining options')
-n = N # each N is a particular scene at a particular extent
+n = N # each N is a particular scene at a particular extent, toponym quantity, and projection
 extents = [10] + [50, 1, 0.25] # ca 5000km, 1000km, 100km, and 25km
 quantities = [80, 40, 20, 10]
-distributions = ['dispersed','random'] # IMPROVE W NUMERIC
+distributions = ['random'] # MOST MAPS WILL RESEMBLE RANDOM  #['dispersed','random'] # IMPROVE W NUMERIC
 uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
 alldatas = [
                 [], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
@@ -730,36 +822,42 @@ if __name__ == '__main__':
 
     # begin
     
-    # zoom regions
-    for i,(center,extent,quantity,projection) in enumerate(iterscenes()):
-        i += 1
-        
-        print('-------')
-        print('SCENE:',i,center,extent,quantity,projection)
+    # loop scene params
+    i = 1
+    while i < n:
+        print('scenes at a time', len(list(itertools.product(extents, quantities, projections))))
+        hkkjk
+        for extent,quantity,projection in itertools.product(extents, quantities, projections):
+            #for i,(center,extent,quantity,projection) in enumerate(iterscenes()):
+            
+            print('-------')
+            print('SCENE:',i,extent,quantity,projection)
 
-        # test view
-##            m = pg.renderer.Map(crs=projections[0])
-##            for d in alldatas[1]:
-##                m.add_layer(d[0], **d[1])
-##            m.zoom_bbox(*bbox, geographic=True)
-##            m.view()
-##            i+=1
-##            continue
-        
-        #run(i,center,extent)
+            # test view
+    ##            m = pg.renderer.Map(crs=projections[0])
+    ##            for d in alldatas[1]:
+    ##                m.add_layer(d[0], **d[1])
+    ##            m.zoom_bbox(*bbox, geographic=True)
+    ##            m.view()
+    ##            i+=1
+    ##            continue
+            
+            #run(i,center,extent)
 
-        # Begin process
-        p = mp.Process(target=process,
-                       args=(i, center, extent, quantity, projection),
-                       )
-        p.start()
-        procs.append(p)
+            # Begin process
+            p = mp.Process(target=process,
+                           args=(i, extent, quantity, projection),
+                           )
+            p.start()
+            procs.append(p)
 
-        # Wait for next available process
-        while len(procs) >= maxprocs:
-            for p in procs:
-                if not p.is_alive():
-                    procs.remove(p)
+            i += 1
+
+            # Wait for next available process
+            while len(procs) >= maxprocs:
+                for p in procs:
+                    if not p.is_alive():
+                        procs.remove(p)
 
     # Wait for last process
     for p in procs:
