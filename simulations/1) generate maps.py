@@ -826,7 +826,6 @@ if __name__ == '__main__':
     i = 1
     while i < n:
         print('scenes at a time', len(list(itertools.product(extents, quantities, projections))))
-        hkkjk
         for extent,quantity,projection in itertools.product(extents, quantities, projections):
             #for i,(center,extent,quantity,projection) in enumerate(iterscenes()):
             

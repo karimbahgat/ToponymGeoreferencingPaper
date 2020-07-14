@@ -216,10 +216,13 @@ if __name__ == '__main__':
             for p,t in procs:
                 if not p.is_alive():
                     procs.remove((p,t))
-                elif time()-t > 600:
+                elif time()-t > 900:
                     p.terminate()
                     procs.remove((p,t))
 
+    # waiting for last ones
+    for p in procs:
+        p.join()
 
 
 
