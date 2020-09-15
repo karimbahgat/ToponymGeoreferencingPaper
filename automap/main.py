@@ -452,10 +452,9 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     
     # partition image
     t = time.time()
-    seginfo = priors.get('seginfo', None)
-    if seginfo:
+    if 'segmentation' in priors:
         # already given
-        pass
+        seginfo = priors.get('segmentation')
     else:
         seginfo = image_partitioning(text_im)
 
@@ -483,11 +482,11 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     # detect text
     print '\n' + 'detecting text'
     t = time.time()
-    textinfo = priors.get('textinfo', None)
+    textinfo = priors.get('text_recognition', None)
     if textinfo:
         # already given
         pass
-    elif priors.get('toponyminfo', None) or priors.get('gcps_matched_info', None) or (priors.get('transinfo', None) and priors.get('gcps_final_info', None)):
+    elif priors.get('toponym_candidates', None) or priors.get('gcps_matched', None) or (priors.get('transform_estimation', None) and priors.get('gcps_final', None)):
         # later stage given, so not necessary
         pass
     else:
@@ -517,11 +516,11 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     # text anchor points
     print '\n' + 'seleting toponyms with anchor points'
     t = time.time()
-    toponyminfo = priors.get('toponyminfo', None)
+    toponyminfo = priors.get('toponym_candidates', None)
     if toponyminfo:
         # already given
         pass
-    elif priors.get('gcps_matched_info', None) or (priors.get('transinfo', None) and priors.get('gcps_final_info', None)):
+    elif priors.get('gcps_matched', None) or (priors.get('transform_estimation', None) and priors.get('gcps_final', None)):
         # later stage given, so not necessary
         pass
     else:
@@ -552,11 +551,11 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     print '\n' + 'finding matches'
     t = time.time()
     #gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
-    gcps_matched_info = priors.get('gcps_matched_info', None)
+    gcps_matched_info = priors.get('gcps_matched', None)
     if gcps_matched_info:
         # already given
         pass
-    elif (priors.get('transinfo', None) and priors.get('gcps_final_info', None)):
+    elif (priors.get('transform_estimation', None) and priors.get('gcps_final', None)):
         # later stage given, so not necessary
         pass
     else:
@@ -590,8 +589,8 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     # estimate the transform and return final gcps
     print '\n' + 'estimating transformation'
     t = time.time()
-    transinfo = priors.get('transinfo', None)
-    gcps_final_info = priors.get('gcps_final_info', None)
+    transinfo = priors.get('transform_estimation', None)
+    gcps_final_info = priors.get('gcps_final', None)
     if (transinfo and gcps_final_info):
         # already given
         pass

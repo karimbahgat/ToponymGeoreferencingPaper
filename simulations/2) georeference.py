@@ -221,7 +221,7 @@ if __name__ == '__main__':
                     procs.remove((p,t))
 
     # waiting for last ones
-    for p in procs:
+    for p,t in procs:
         p.join()
 
 

@@ -264,6 +264,10 @@ if __name__ == '__main__':
                 if not p.is_alive():
                     procs.remove(p)
 
+    # wait for last ones
+    for p in procs:
+        p.join()
+
         
 
 

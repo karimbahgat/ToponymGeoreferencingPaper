@@ -28,12 +28,14 @@ def render_image_output(imagepath, georefpath):
     gcppath = georef_root + '_controlpoints.geojson'
 
     # add image
-    render.add_layer(imagedata, transparency=0.5)
+    render.add_layer(imagedata, transparency=0.5,
+                     legend=False)
 
     # add image regions
     try:
         segmentdata = pg.VectorData(segmentpath)
-        render.add_layer(segmentdata, fillcolor=None, outlinecolor='red', outlinewidth=0.3)
+        render.add_layer(segmentdata, fillcolor=None, outlinecolor='red', outlinewidth=0.3,
+                         legendoptions={'title':'Layout Segmentation'})
     except:
         # segment file is empty feature collection
         pass
@@ -54,11 +56,13 @@ def render_image_output(imagepath, georefpath):
     for col,coltextdata in textdata.manage.split('color'):
         render.add_layer(coltextdata, text=lambda f: f['text'],
                          textoptions={'textcolor':col, 'xy':gettopleft, 'anchor':'sw', 'textsize':6},
-                         fillcolor=None, outlinecolor=col, outlinewidth='2px')
+                         fillcolor=None, outlinecolor=col, outlinewidth='2px',
+                         legendoptions={'title':'Text Label'})
 
     # add toponym anchors
     toponymdata = pg.VectorData(toponympath)
-    render.add_layer(toponymdata, fillsize=3, fillcolor=None, outlinecolor='blue', outlinewidth=0.3)
+    render.add_layer(toponymdata, fillsize=3, fillcolor=None, outlinecolor='blue', outlinewidth=0.3,
+                     legendoptions={'title':'Toponym Anchor'})
 
     # add final tiepoints
     gcpdata = pg.VectorData(gcppath)
@@ -67,7 +71,8 @@ def render_image_output(imagepath, georefpath):
         geoj = {'type':'Point', 'coordinates':(col,row)}
         f.geometry = geoj
     if len(gcpdata):
-        render.add_layer(gcpdata, fillsize=3, fillcolor=(255,0,0,200), outlinecolor=None)
+        render.add_layer(gcpdata, fillsize=3, fillcolor=(255,0,0,200), outlinecolor=None,
+                         legendoptions={'title':'Used as Control Point'})
 
     # view
     render.zoom_auto()
@@ -79,13 +84,15 @@ def render_georeferencing_output(georefpath):
 
     # add country background
     render.add_layer(r"C:\Users\kimok\Downloads\cshapes\cshapes.shp",
-                         fillcolor=(222,222,222))
+                     fillcolor=(222,222,222),
+                     legend=False)
 
     # load georeferenced image
     print 'loading'
     georefdata = pg.RasterData(georefpath)
     georefdata.mask = georefdata.bands[-1].compute('255-val').img # use alpha band as mask
-    render.add_layer(georefdata, transparency=0.3)
+    render.add_layer(georefdata, transparency=0.3,
+                     legend=False)
 
     # determine paths (all debug files are relative to this)
     georef_root,ext = os.path.splitext(georefpath)
@@ -93,18 +100,19 @@ def render_georeferencing_output(georefpath):
     gcppath = georef_root + '_controlpoints.geojson'
     transpath = georef_root + '_transform.json'
 
-    # add gcps as marked in image pixels, ie calculate using the transform...
+    # add toponyms as marked in image pixels, ie calculate using the transform...
     with open(transpath) as fobj:
         transinfo = json.load(fobj)
     forward = mapfit.transforms.from_json(transinfo['forward']['model'])
-    pixdata = pg.VectorData(gcppath)
+    pixdata = pg.VectorData(candidatepath)
     for f in pixdata:
         px,py = f['origx'],f['origy']
         x,y = forward.predict([px],[py])
         f.geometry = {'type':'Point', 'coordinates':(x,y)}
-    render.add_layer(pixdata, fillsize=1, fillcolor='red',
+    render.add_layer(pixdata, fillsize=1, fillcolor='red', outlinecolor='gray', transparency=0.4, #fillopacity=0.5,
                      text=lambda f: f['origname'],
-                     textoptions={'textcolor':'darkred', 'anchor':'w', 'textsize':8})
+                     textoptions={'textcolor':'darkred', 'anchor':'w', 'textsize':8},
+                     legendoptions={'title':'Image toponym'})
 
     # add arrow from pixel to gcp
     linedata = pg.VectorData()
@@ -113,13 +121,33 @@ def render_georeferencing_output(georefpath):
         x2,y2 = f['matchx'],f['matchy']
         geoj = {'type':'LineString', 'coordinates':[(x1,y1),(x2,y2)]}
         linedata.add_feature([], geoj)
-    render.add_layer(linedata, fillsize=0.2, fillcolor='black')
+    render.add_layer(linedata, fillsize=0.2, fillcolor='black',
+                     legend=False)
 
-    # add final controlpoints used to estimate transform
-    gcpdata = pg.VectorData(gcppath)
-    render.add_layer(gcpdata, fillsize=1, fillcolor='green',
+    # add toponyms matched to geographic points
+    matchdata = pg.VectorData(candidatepath)
+    render.add_layer(matchdata, fillsize=1, fillcolor='green', outlinecolor='gray', transparency=0.4, #fillopacity=0.5,
                      text=lambda f: f['matchname'].split('|')[0],
-                     textoptions={'textcolor':'darkgreen', 'anchor':'w', 'textsize':8})
+                     textoptions={'textcolor':'darkgreen', 'anchor':'w', 'textsize':8},
+                     legendoptions={'title':'Map toponym'})
+
+    # add final gcps as marked in image pixels, ie calculate using the transform...
+    pixdata = pg.VectorData(gcppath)
+    for f in pixdata:
+        px,py = f['origx'],f['origy']
+        x,y = forward.predict([px],[py])
+        f.geometry = {'type':'Point', 'coordinates':(x,y)}
+    render.add_layer(pixdata, fillsize=1, fillcolor='red',
+                     #text=lambda f: f['origname'],
+                     #textoptions={'textcolor':'darkred', 'anchor':'w', 'textsize':8},
+                     legendoptions={'title':'Image control point'})
+
+    # add final controlpoints matched to geographic points
+    matchdata = pg.VectorData(gcppath)
+    render.add_layer(matchdata, fillsize=1, fillcolor='green',
+                     #text=lambda f: f['matchname'].split('|')[0],
+                     #textoptions={'textcolor':'darkgreen', 'anchor':'w', 'textsize':8},
+                     legendoptions={'title':'Map control point'})
 
     # view
     render.zoom_bbox(*georefdata.bbox)
