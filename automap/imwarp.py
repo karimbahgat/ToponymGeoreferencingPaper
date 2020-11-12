@@ -22,8 +22,8 @@ def warp(im, transform, invtransform, resample='nearest'):
     imw,imh = im.size
 
     # get all pixels
-    for row in range(0, imh+1):
-        for col in range(0, imw+1):
+    for row in range(0, imh+1): #, imh//10):
+        for col in range(0, imw+1): #, imw//10):
             pixels.append((col,row))
     
 ##    # get top and bottom edges
@@ -54,6 +54,12 @@ def warp(im, transform, invtransform, resample='nearest'):
     diag = math.hypot(dx, dy)
     xyscale = diag / float(math.hypot(imw, imh))
     w,h = int(dx / xyscale), int(dy / xyscale)
+
+##    downsize = 10
+##    w = int(w/float(downsize))
+##    h = int(h/float(downsize))
+##    xscale = dx / float(w)
+##    yscale = dy / float(h)
     
     # set affine
     xoff,yoff = xmin,ymin
