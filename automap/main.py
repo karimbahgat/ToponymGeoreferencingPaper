@@ -288,46 +288,51 @@ def estimate_transform(gcps_matched_info, warp_order, residual_type):
         gcps_final_info['features'].append(feat)
 
     # then transforms
-    # NOTE: metadata reports only RMSE error type with leave_one_out=True, maybe allow user customizing this? 
-    if invert:
-        # get forward error, backward is already calculated
-        berr,bresids = err,resids 
-        ferr,fresids = accuracy.model_accuracy(trans, pixels, coords,
-                                             leave_one_out=True,
-                                             invert=False, distance='geodesic',
-                                             accuracy='rmse')
-    else:
-        # get backward error, forward is already calculated
-        ferr,fresids = err,resids 
-        berr,bresids = accuracy.model_accuracy(trans, pixels, coords,
-                                             leave_one_out=True,
-                                             invert=True, distance='eucledian',
-                                             accuracy='rmse')
-    
-    forward_info = {'model': forward.info(),
-                    'error': ferr,
-                    'residuals': list(fresids),
-                    # hardcoded
-                    'error_type': 'rmse',
-                    'leave_one_out': True}
-    backward_info = {'model': backward.info(),
-                     'error': berr,
-                     'residuals': list(bresids),
-                     # hardcoded
-                     'error_type': 'rmse', 
-                     'leave_one_out': True}
-    transinfo = {'forward': forward_info,
-                 'backward': backward_info}
+    transinfo = {'forward': forward.info(),
+                 'backward': backward.info()}
 
     return transinfo,gcps_final_info
+
+def calculate_errors(imageinfo, gcps_final_info):
+    # first, get the model residuals
+    resids_xy = [f['properties']['matchresidual'] for f in gcps_final_info['features']]
+    resids_colrow = [f['properties']['origresidual'] for f in gcps_final_info['features']]
+    
+    # calc model errors
+    errs = {}
+    # first geographic
+    errs['geographic'] = {}
+    errs['geographic']['mae'] = accuracy.MAE(resids_xy)
+    errs['geographic']['rmse'] = accuracy.RMSE(resids_xy)
+    errs['geographic']['max'] = float(max(resids_xy))
+    # then pixels
+    errs['pixel'] = {}
+    errs['pixel']['mae'] = accuracy.MAE(resids_colrow)
+    errs['pixel']['rmse'] = accuracy.RMSE(resids_colrow)
+    errs['pixel']['max'] = float(max(resids_colrow))
+    # then percent (of image pixel dims)
+    errs['percent'] = {}
+    diag = math.hypot(imageinfo['width'], imageinfo['height'])
+    img_radius = float(diag/2.0) # percent of half the max dist (from img center to corner)
+    errs['percent']['mae'] = (errs['pixel']['mae'] / img_radius) * 100.0
+    errs['percent']['rmse'] = (errs['pixel']['mae'] / img_radius) * 100.0
+    errs['percent']['max'] = (errs['pixel']['max'] / img_radius) * 100.0
+
+    # add percent residual to gcps_final_info
+    for f in gcps_final_info['features']:
+        pixres = f['properties']['origresidual']
+        percerr = (pixres / img_radius) * 100.0
+        f['properties']['percresidual'] = percerr
+
+    return errs
 
 def warp_image(mapp_im, transinfo):
     #################
     # Warping
 
     # load the transforms
-    forward = transforms.from_json(transinfo['forward']['model'])
-    backward = transforms.from_json(transinfo['backward']['model'])
+    forward = transforms.from_json(transinfo['forward'])
+    backward = transforms.from_json(transinfo['backward'])
     
     # warp the image
     wim,aff = imwarp.warp(mapp_im, forward, backward) # warp
@@ -618,8 +623,32 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
 
 
 
+    #################
+    # Calculate model errors
+
+    # estimate the model errors and return info
+    print '\n' + 'calculating errors'
+    t = time.time()
+    errinfo = calculate_errors(imageinfo, gcps_final_info)
+
+    # store timing
+    elaps = time.time() - t
+    timinginfo['error_calculation'] = elaps
+
+    # store metadata
+    info['error_calculation'] = errinfo
+
+    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    
+
+
+
+
+    ###############
+    # Bbox
+
     # (add in useful bbox info)
-    forward = transforms.from_json(transinfo['forward']['model'])
+    forward = transforms.from_json(transinfo['forward'])
     x,y = forward.predict([0], [0])
     x1,y1 = float(x[0]), float(y[0])
     x,y = forward.predict([im.size[0]], [im.size[1]])
@@ -634,7 +663,7 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
     # Warping
     if warp:
         print '\n' + 'warping'
-        print '{} points, warp_method={}'.format(len(gcps_final_info['features']), transinfo['forward']['model'])
+        print '{} points, warp_method={}'.format(len(gcps_final_info['features']), transinfo['forward'])
 
         # mask the image before warping
         mapp_im = im
@@ -691,6 +720,11 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
         pth = os.path.join(outfold, outfil+'_transform.json')
         with open(pth, 'w') as writer:
             json.dump(info['transform_estimation'], writer)
+
+        # errors
+        pth = os.path.join(outfold, outfil+'_errors.json')
+        with open(pth, 'w') as writer:
+            json.dump(info['error_calculation'], writer)
 
     if outpath and debug:
         print '\n' + 'saving final debug data'

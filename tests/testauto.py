@@ -26,7 +26,7 @@ print 'beginning'
 #automap('testmaps/satim.png', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, db=db, debug=True)
-#automap('testmaps/ghana_rel_1983.jpg', db=db, debug=True)
+#automap('testmaps/ghana_rel_1983.jpg', db=db, source='best', debug=True)
 #automap('testmaps/tunisia_pol_1990.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)

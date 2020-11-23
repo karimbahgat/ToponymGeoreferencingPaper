@@ -241,9 +241,11 @@ def auto_choose_model(inpoints, outpoints, transforms, improvement_ratio=0.10, m
 # metrics
 
 def RMSE(residuals):
+    residuals = np.array(residuals)
     return math.sqrt( (residuals**2).sum() / float(residuals.shape[0]) )
 
 def MAE(residuals):
+    residuals = np.array(residuals)
     return abs(residuals).sum() / float(residuals.shape[0])
 
 
