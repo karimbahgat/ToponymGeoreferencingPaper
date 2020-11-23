@@ -2,7 +2,7 @@
 print 'importing libs'
 
 from automap import automap
-from automap.main import debug_warped
+#from automap.main import debug_warped
 
 db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
 
@@ -26,6 +26,7 @@ print 'beginning'
 #automap('testmaps/satim.png', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 automap('testmaps/burkina.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, db=db, debug=True)
+#automap('testmaps/ghana_rel_1983.jpg', db=db, debug=True)
 #automap('testmaps/tunisia_pol_1990.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)

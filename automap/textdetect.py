@@ -18,6 +18,7 @@ def run_ocr(im, bbox=None, mode=11):
         xoff,yoff = bbox[:2]
         im = im.crop(bbox)
     data = pytesseract.image_to_data(im, lang='eng+fra', config='--psm {}'.format(mode)) # +equ
+    #data = pytesseract.image_to_data(im, lang='eng+fra', config='--psm {} --tessdata-dir "{}"'.format(mode, r'C:\Users\kimok\Desktop\tessdata_fast')) # +equ
     drows = [[v for v in row.split('\t')] for row in data.split('\n')]
     dfields = drows.pop(0)
     drows = [dict(zip(dfields,row)) for row in drows]

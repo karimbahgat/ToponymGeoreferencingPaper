@@ -264,19 +264,26 @@ def estimate_transform(gcps_matched_info, warp_order, residual_type):
     forward.fit(cols,rows,xs,ys)
     backward = trans.copy()
     backward.fit(cols,rows,xs,ys, invert=True)
+    # predicted points and residuals
+    xs_pred,ys_pred = forward.predict(cols, rows)
+    resids_xy = accuracy.distances(xs, ys, xs_pred, ys_pred, 'geodesic')
+    cols_pred,rows_pred = backward.predict(xs, ys)
+    resids_colrow = accuracy.distances(cols, rows, cols_pred, rows_pred, 'eucledian')
 
     # store metadata
 
     # first gcps
     gcps_final_info = {'type': 'FeatureCollection', 'features': []}
-    for ocoord,mcoord,res in zip(pixels,coords,resids):
+    for col,col_pred,row,row_pred,x,x_pred,y,y_pred,res_colrow,res_xy in zip(cols,cols_pred,rows,rows_pred,xs,xs_pred,ys,ys_pred,resids_colrow,resids_xy):
+        ocoord = (col,row)
+        mcoord = (x,y)
         i = list(zip(origcoords, matchcoords)).index((ocoord,mcoord))
         oname = orignames[i]
         mname = matchnames[i]
         geoj = {'type':'Point', 'coordinates':mcoord}
-        props = {'origname':oname, 'origx':ocoord[0], 'origy':ocoord[1],
-                 'matchname':mname, 'matchx':mcoord[0], 'matchy':mcoord[1],
-                 'residual':res, 'residual_type':residual_type}
+        props = {'origname':oname, 'origx':ocoord[0], 'origy':ocoord[1], 'origx_pred':col_pred, 'origy_pred':row_pred,
+                 'matchname':mname, 'matchx':mcoord[0], 'matchy':mcoord[1], 'matchx_pred':x_pred, 'matchy_pred':y_pred,
+                 'origresidual':res_colrow, 'matchresidual':res_xy}
         feat = {'type':'Feature', 'geometry':geoj, 'properties':props}
         gcps_final_info['features'].append(feat)
 
