@@ -305,8 +305,8 @@ class Projection(object):
     @staticmethod
     def from_json(js):
         init = {}
-        init['fromcrs'] = js['fromcrs']
-        init['tocrs'] = js['tocrs']
+        init['fromcrs'] = js['data']['fromcrs']
+        init['tocrs'] = js['data']['tocrs']
         trans = Projection(**init)
         return trans
 

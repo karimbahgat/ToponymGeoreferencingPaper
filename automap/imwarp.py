@@ -4,10 +4,7 @@ import PIL, PIL.Image
 import math
 
 
-def warp(im, transform, invtransform, resample='nearest'):
-    if not im.mode == 'RGBA':
-        im = im.convert('RGBA')
-
+def imbounds(width, height, transform):
     # calc output bounds based on transforming source image pixel edges and diagonal distance, ala GDAL
     # TODO: alternatively based on internal grid or just all the pixels
     # see https://github.com/OSGeo/gdal/blob/60d8a9ca09c466225508cb82e30a64aefa899a41/gdal/alg/gdaltransformer.cpp#L135
@@ -16,14 +13,12 @@ def warp(im, transform, invtransform, resample='nearest'):
     # but for polynomial order >1 backward transform is reestimated on the points (inverse doesnt work)
     # and can be noticably different than the forward transform, thus miscalculating the bounds
     # TODO: maybe need a fix somehow...
-    
-    print 'calculating coordinate bounds'
-    pixels = []
-    imw,imh = im.size
 
-    # get all pixels
-    for row in range(0, imh+1): #, imh//10):
-        for col in range(0, imw+1): #, imw//10):
+    # get sample pixels at intervals
+    pixels = []
+    imw,imh = width, height
+    for row in range(0, imh+1):#, imh//10):
+        for col in range(0, imw+1):#, imw//10):
             pixels.append((col,row))
     
 ##    # get top and bottom edges
@@ -44,10 +39,32 @@ def warp(im, transform, invtransform, resample='nearest'):
     predy = predy[~np.isnan(predy)]
     xmin,ymin,xmax,ymax = predx.min(), predy.min(), predx.max(), predy.max()
 
+    # (TEMP GET WGS84 BOUNDS TOO)
+##    transform.transforms.pop(-1)
+##    predx,predy = transform.predict(cols, rows)
+##    predx = predx[~np.isnan(predx)]
+##    predy = predy[~np.isnan(predy)]
+##    raise Exception(str((predx.min(), predy.min(), predx.max(), predy.max())))
+
     # TODO: maybe walk along output edges and backwards transform
     # to make sure covers max possible of source img
     # in case forward/backward transform is slightly mismatched
     # ...
+
+    return xmin,ymin,xmax,ymax
+
+def warp(im, transform, invtransform, resample='nearest'):
+    if not im.mode == 'RGBA':
+        im = im.convert('RGBA')
+
+
+    # get output bounds
+    print 'calculating coordinate bounds'
+    imw,imh = im.size
+    xmin,ymin,xmax,ymax = imbounds(imw, imh, transform)
+    print(xmin,ymin,xmax,ymax)
+
+    
 
     # calc diagonal dist and output dims
     dx,dy = xmax-xmin, ymax-ymin
@@ -64,7 +81,7 @@ def warp(im, transform, invtransform, resample='nearest'):
     # set affine
     xoff,yoff = xmin,ymin
     xscale = yscale = xyscale 
-    if predy[0] > predy[-1]:
+    if True: #predy[0] > predy[-1]:    # WARNING: HACKY ASSUMES FLIPPED Y AXIS FOR NOW...
         yoff = ymax
         yscale *= -1
     affine = [xscale,0,xoff, 0,yscale,yoff]
