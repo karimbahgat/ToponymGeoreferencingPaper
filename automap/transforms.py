@@ -130,99 +130,96 @@ class Polynomial(object):
                 A = np.linalg.inv(A)
             
         elif self.order == 2:
-            # get inverse transform by switching the from and to coords (warning, not an exact inverse bc different lstsq estimation)
+            
             if invert:
-                inx,iny,outx,outy = outx,outy,inx,iny
-##            if exact:
-##                inx = inx[:6]
-##                iny = iny[:6]
-##                outx = outx[:6]
-##                outy = outy[:6]
-            # terms
-            x = inx
-            y = iny
-            xx = x*x
-            xy = x*y
-            yy = y*y
-            ones = np.ones(x.shape)
-            # u consists of each term in equation, with each term being array if want to transform multiple
-            u = np.array([xx,xy,yy,x,y,ones]).transpose()
-            # x and y coeffs
-##            if exact:
-##                # lstsq has numerical issues, use exact arg to use .solve since we know the exact to and from?
-##                # https://stackoverflow.com/questions/34170618/normal-equation-and-numpy-least-squares-solve-methods-difference-in-regress
-##                # in and out are supposed to have exact solution (no residuals?)
-##                # ACTUALLY: seems like backward transform can only exactly reverse at the gcps
-##                # (which are limited to fit in square matrix)
-##                # errors increase further away
-##                # hmmm...
-##                #print 'exact'
-##                #print zip(outx,outy)
-##                xcoeffs = np.linalg.solve(u, outx) 
-##                ycoeffs = np.linalg.solve(u, outy) 
-##                A = np.eye(6)
-##                A[0,:] = xcoeffs
-##                A[1,:] = ycoeffs
-##                #print zip(*A.dot(u.transpose())[:2])
-##            else:
-##                # find best coefficients for all equivalent points using least squares
-##                xcoeffs,xres,xrank,xsing = np.linalg.lstsq(u, outx, rcond=-1) 
-##                ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
-            # find best coefficients for all equivalent points using least squares
-            xcoeffs,xres,xrank,xsing = np.linalg.lstsq(u, outx, rcond=-1) 
-            ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
-            # A matrix
-            A = np.eye(6)
-            # two first rows of the A matrix are equations for the x and y coordinates, respectively
-            A[0,:] = xcoeffs
-            A[1,:] = ycoeffs
+                # fit the forward transform
+                forward = self.copy()
+                forward.fit(inx, iny, outx, outy)
+                
+                # forward predict regularly spaced sample points across the range of the inpoints
+                xmin,ymin,xmax,ymax = inx.min(), iny.min(), inx.max(), iny.max()
+                x = np.linspace(xmin, xmax, 100)
+                y = np.linspace(ymin, ymax, 100)
+                x,y = np.meshgrid(x, y)
+                x,y = x.flatten(), y.flatten()
+                x_pred,y_pred = forward.predict(x, y)
 
-##            # inverse
-##            if invert:
-##                # simply predict the forward coords
-##                # then estimate a new transform from the forward coords to the input coords
-##                # which should be a perfect match (0 residuals) since these are derived from same transform
-##                # ax^2 + bx + c = x'   (input x, coeffs a,b,c estimated, x' predicted)
-##                # rx'^2 + sx' + t = x    (using the predicted x' and known input x, estimate inverse coeffs r,s,t)
-##                u = u.transpose()
-##                predx,predy = A.dot(u)[:2]
-##                #print 'inverse'
-##                #print zip(outx,outy)
-##                print zip(predx,predy)
-##                print zip(inx,iny)
-##
-##                # reuse code by calling same func and reversing args
-##                trans = Polynomial(self.order)
-##                trans.fit(predx, predy, inx, iny) #, exact=True)
-##                A = trans.A
+                # get backward transform by fitting the forward predicted sample points to the sample points
+                # should be a near perfect match (~0 residuals) since these are derived from the same transform
+                backward = self.copy()
+                backward.fit(x_pred, y_pred, x, y)
+                A = backward.A
+
+##                import accuracy
+##                x_backpred,y_backpred = backward.predict(x_pred, y_pred)
+##                dists = accuracy.distances(x, y, x_backpred, y_backpred)
+##                print('!!! max resid', dists.max())
+##                print('!!! resid rmse', accuracy.RMSE(dists))
+
+            else:
+                # terms
+                x = inx
+                y = iny
+                xx = x*x
+                xy = x*y
+                yy = y*y
+                ones = np.ones(x.shape)
+                # u consists of each term in equation, with each term being array if want to transform multiple
+                u = np.array([xx,xy,yy,x,y,ones]).transpose()
+                # find best coefficients for all equivalent points using least squares
+                xcoeffs,xres,xrank,xsing = np.linalg.lstsq(u, outx, rcond=-1) 
+                ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
+                # A matrix
+                A = np.eye(6)
+                # two first rows of the A matrix are equations for the x and y coordinates, respectively
+                A[0,:] = xcoeffs
+                A[1,:] = ycoeffs
 
         elif self.order == 3:
-            # get inverse transform by switching the from and to coords (warning, not an exact inverse bc different lstsq estimation)
+            
             if invert:
-                inx,iny,outx,outy = outx,outy,inx,iny
-            # terms
-            #X = a0 + a1x + a2y + a3xy + a4x^2 + a5y^2 + a6x^3 + a7x^2y + a8xy^2 + a9y^3
-            #Y = b0 + b1x + b2y + b3xy + b4x^2 + b5y^2 + b6x^3 + b7x^2y + b8xy^2 + b9y^3
-            x = inx
-            y = iny
-            xx = x*x
-            xy = x*y
-            yy = y*y
-            xxx = xx*x
-            xxy = xx*y
-            xyy = x*yy
-            yyy = yy*y
-            ones = np.ones(x.shape)
-            # u consists of each term in equation, with each term being array if want to transform multiple
-            u = np.array([xxx,xxy,xyy,yyy, xx,xy,yy, x,y,ones]).transpose()
-            # x and y coeffs
-            xcoeffs,xres,xrank,xsing = np.linalg.lstsq(u, outx, rcond=-1) 
-            ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
-            # A matrix
-            A = np.eye(10)
-            # two first rows of the A matrix are equations for the x and y coordinates, respectively
-            A[0,:] = xcoeffs
-            A[1,:] = ycoeffs
+                # fit the forward transform
+                forward = self.copy()
+                forward.fit(inx, iny, outx, outy)
+                
+                # forward predict regularly spaced sample points across the range of the inpoints
+                xmin,ymin,xmax,ymax = inx.min(), iny.min(), inx.max(), iny.max()
+                x = np.linspace(xmin, xmax, 100)
+                y = np.linspace(ymin, ymax, 100)
+                x,y = np.meshgrid(x, y)
+                x,y = x.flatten(), y.flatten()
+                x_pred,y_pred = forward.predict(x, y)
+
+                # get backward transform by fitting the forward predicted sample points to the sample points
+                # should be a near perfect match (~0 residuals) since these are derived from the same transform
+                backward = self.copy()
+                backward.fit(x_pred, y_pred, x, y)
+                A = backward.A
+
+            else:
+                # terms
+                #X = a0 + a1x + a2y + a3xy + a4x^2 + a5y^2 + a6x^3 + a7x^2y + a8xy^2 + a9y^3
+                #Y = b0 + b1x + b2y + b3xy + b4x^2 + b5y^2 + b6x^3 + b7x^2y + b8xy^2 + b9y^3
+                x = inx
+                y = iny
+                xx = x*x
+                xy = x*y
+                yy = y*y
+                xxx = xx*x
+                xxy = xx*y
+                xyy = x*yy
+                yyy = yy*y
+                ones = np.ones(x.shape)
+                # u consists of each term in equation, with each term being array if want to transform multiple
+                u = np.array([xxx,xxy,xyy,yyy, xx,xy,yy, x,y,ones]).transpose()
+                # x and y coeffs
+                xcoeffs,xres,xrank,xsing = np.linalg.lstsq(u, outx, rcond=-1) 
+                ycoeffs,yres,yrank,ysing = np.linalg.lstsq(u, outy, rcond=-1)
+                # A matrix
+                A = np.eye(10)
+                # two first rows of the A matrix are equations for the x and y coordinates, respectively
+                A[0,:] = xcoeffs
+                A[1,:] = ycoeffs
 
         self.A = A
         return self
