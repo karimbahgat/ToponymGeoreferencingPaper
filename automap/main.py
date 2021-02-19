@@ -14,6 +14,7 @@ from . import imwarp
 import pythongis as pg
 
 import PIL, PIL.Image
+import numpy as np
 
 import datetime
 import time
@@ -191,7 +192,7 @@ def match_control_points(toponyminfo, matchthresh, db, source, **kwargs):
 
     return gcps_matched_info
 
-def estimate_transform(gcps_matched_info, warp_order, residual_type):
+def estimate_transform(imageinfo, gcps_matched_info, warp_order, residual_type):
     #################
     # Transform Estimation
 
@@ -258,12 +259,46 @@ def estimate_transform(gcps_matched_info, warp_order, residual_type):
         tiepoints = zip(pixels, coords)
         print '{} points, RMSE: {}'.format(len(pixels), err)
 
-    # estimate final forward and backward transforms for image warping
+    # estimate final forward transform for image warping
     (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
     forward = trans.copy()
     forward.fit(cols,rows,xs,ys)
+    
+    # and backward
+
+    # ALT1: standard inverse
     backward = trans.copy()
     backward.fit(cols,rows,xs,ys, invert=True)
+    
+    # ALT2: estimate slightly differently based on the bounds of the image
+##    # - first get sample points at regular intervals across the image space
+##    imw,imh = imageinfo['width'],imageinfo['height'] 
+##    _cols = np.linspace(0, imw-1, imw) #100)
+##    _rows = np.linspace(0, imh-1, imh) #100)
+##    _cols,_rows = np.meshgrid(_cols, _rows)
+##    _cols,_rows = _cols.flatten(), _rows.flatten()
+##    # - forward predict the sample points
+##    _predx,_predy = forward.predict(_cols, _rows)
+##    # - then get backward transform by fitting the forward predicted sample points to the sample points
+##    backward = trans.copy()
+##    backward.fit(_predx, _predy, _cols, _rows)
+    
+    # - temporary debug: test forward vs backward resampling accuracy at regular intervals across image...
+##    imw,imh = imageinfo['width'],imageinfo['height'] 
+##    _cols = np.linspace(0, imw-1, imw) #100)
+##    _rows = np.linspace(0, imh-1, imh) #100)
+##    _cols,_rows = np.meshgrid(_cols, _rows)
+##    _cols,_rows = _cols.flatten(), _rows.flatten()
+##    _predx,_predy = forward.predict(_cols, _rows)
+##    _cols_backpred,_rows_backpred = backward.predict(_predx, _predy)
+##    print(_cols_backpred)
+##    print(_rows_backpred)
+##    dists = accuracy.distances(_cols, _rows, _cols_backpred, _rows_backpred)
+##    print('!!! image pixel bounds', _cols.min(), _cols.max(), _rows.min(), _rows.max())
+##    print('!!! image backsamp pixel bounds', _cols_backpred.min(), _cols_backpred.max(), _rows_backpred.min(), _rows_backpred.max())
+##    print('!!! image backsamp max resid', dists.max())
+##    print('!!! image backsamp rmse resid', accuracy.RMSE(dists))
+    
     # predicted points and residuals
     xs_pred,ys_pred = forward.predict(cols, rows)
     resids_xy = accuracy.distances(xs, ys, xs_pred, ys_pred, 'geodesic')
@@ -607,7 +642,7 @@ def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, t
         # already given
         pass
     else:
-        transinfo,gcps_final_info = estimate_transform(gcps_matched_info, warp_order, residual_type)
+        transinfo,gcps_final_info = estimate_transform(imageinfo, gcps_matched_info, warp_order, residual_type)
 
     # store timing
     elaps = time.time() - t

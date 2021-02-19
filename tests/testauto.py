@@ -38,7 +38,7 @@ print 'beginning'
 #automap('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[2000,2500,4000,4500])
 #automap('testmaps/gmaps.png', textcolor=(80,80,80), colorthresh=25, textconf=60)
 #automap('testmaps/brazil_pol_1981.gif', textcolor=(0,0,0), colorthresh=25, textconf=60, max_residual=0.4)
-automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, db=db, debug=True)#, max_residual=0.4)
+automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, db=db, debug=True, warp_order=3)#, max_residual=0.4)
 
 #automap('testmaps/vietnam_pol92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
 #automap('testmaps/vietnam_admin92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
@@ -62,7 +62,7 @@ automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), colorthresh=25, textconf=
 #automap('testmaps/egypt_admn97.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
 #automap('testmaps/devils tower small.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, maxiter=3000, mintrials=1000)
 #automap('testmaps/brazil_army_amazon_1999.jpg', textcolor=(50,50,50), colorthresh=35, textconf=60, maxiter=30000, mintrials=1000, max_residual=0.5)
-#automap('testmaps/egypt_pol_1979.jpg', textcolor=(0,0,0), colorthresh=40, textconf=30, db=db, warp_order=2)#, max_residual=0.005)
+#automap('testmaps/egypt_pol_1979.jpg', textcolor=(0,0,0), colorthresh=40, textconf=30, db=db, warp_order=3)#, max_residual=0.005)
 #automap('testmaps/CHHJ5246_Updated_areasOfConflict_Map_0217_V2.png', textcolor=(0,0,0), colorthresh=40, textconf=60)
 #automap('testmaps/korean_war_april_1951.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
 

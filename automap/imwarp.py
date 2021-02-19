@@ -15,23 +15,27 @@ def imbounds(width, height, transform):
     # TODO: maybe need a fix somehow...
 
     # get sample pixels at intervals
-    pixels = []
-    imw,imh = width, height
-    for row in range(0, imh+1):#, imh//10):
-        for col in range(0, imw+1):#, imw//10):
-            pixels.append((col,row))
-    
-##    # get top and bottom edges
-##    for row in [0, imh+1]: # +1 to incl bottom of last row
-##        for col in range(0, imw+1, imw//20): # +1 to incl right of last column, ca 20 points along
-##            pixels.append((col,row))
-##
-##    # get left and right edges
-##    for col in [0, imw+1]: # +1 to incl right of last column
-##        for row in range(0, imh+1, imh//20): # +1 to incl bottom of last row, ca 20 points along
-##            pixels.append((col,row))
+    imw,imh = width,height
+    cols = np.linspace(0, imw-1, 100)
+    rows = np.linspace(0, imh-1, 100)
+    cols,rows = np.meshgrid(cols, rows)
+    cols,rows = cols.flatten(), rows.flatten()
 
-    cols,rows = zip(*pixels)
+    # ensure we get every pixel along edges
+    allxs = np.linspace(0, imw-1, imw)
+    allys = np.linspace(0, imh-1, imh)
+    # top
+    cols = np.append(cols, allxs)
+    rows = np.append(rows, np.zeros(allxs.shape))
+    # bottom
+    cols = np.append(cols, allxs)
+    rows = np.append(rows, np.zeros(allxs.shape)*imh)
+    # left
+    cols = np.append(cols, np.zeros(allys.shape))
+    rows = np.append(rows, allys)
+    # right
+    cols = np.append(cols, np.zeros(allys.shape)*imw)
+    rows = np.append(rows, allys)
 
     # transform and get bounds
     predx,predy = transform.predict(cols, rows)
@@ -88,6 +92,30 @@ def warp(im, transform, invtransform, resample='nearest'):
 
     # resampling
     if resample == 'nearest':
+
+##        print 'experimental forward resampling'
+##        # this shows where forward mapping would put each pixel, and defines the output bounds
+##        # but the actual backward resampling for poly2/3 is often widely different (compare to see)
+##        pixels = []
+##        for row in range(imh):
+##            for col in range(imw):
+##                pixels.append((col,row))
+##        cols,rows = zip(*pixels)
+##        xs,ys = transform.predict(cols, rows)
+##        _A = np.eye(3)
+##        _A[0,:] = affine[:3]
+##        _A[1,:] = affine[3:6]
+##        _Ainv = np.linalg.inv(_A)
+##        terms = np.array([xs, ys, np.ones(xs.shape)])
+##        cols2,rows2 = _Ainv.dot(terms)[:2]
+##        cols2,rows2 = np.floor(cols2).astype(int), np.floor(rows2).astype(int)
+##        cols2,rows2 = np.clip(cols2, 0, w-1), np.clip(rows2, 0, h-1)
+##        # write
+##        outarr = np.zeros((h, w, 4), dtype=np.uint8)
+##        inarr = np.array(im)
+##        outarr[rows2,cols2,:] = inarr[rows,cols,:]
+##
+##        PIL.Image.fromarray(outarr).show()
     
         print 'backwards mapping and resampling'
         coords = []

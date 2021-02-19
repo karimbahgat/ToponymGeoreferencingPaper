@@ -132,29 +132,43 @@ class Polynomial(object):
         elif self.order == 2:
             
             if invert:
-                # fit the forward transform
-                forward = self.copy()
-                forward.fit(inx, iny, outx, outy)
-                
-                # forward predict regularly spaced sample points across the range of the inpoints
-                xmin,ymin,xmax,ymax = inx.min(), iny.min(), inx.max(), iny.max()
-                x = np.linspace(xmin, xmax, 100)
-                y = np.linspace(ymin, ymax, 100)
-                x,y = np.meshgrid(x, y)
-                x,y = x.flatten(), y.flatten()
-                x_pred,y_pred = forward.predict(x, y)
-
-                # get backward transform by fitting the forward predicted sample points to the sample points
-                # should be a near perfect match (~0 residuals) since these are derived from the same transform
+                # ALT1
+                # standard switch the points
                 backward = self.copy()
-                backward.fit(x_pred, y_pred, x, y)
+                backward.fit(outx, outy, inx, iny)
                 A = backward.A
 
-##                import accuracy
-##                x_backpred,y_backpred = backward.predict(x_pred, y_pred)
-##                dists = accuracy.distances(x, y, x_backpred, y_backpred)
-##                print('!!! max resid', dists.max())
-##                print('!!! resid rmse', accuracy.RMSE(dists))
+                # ALT2
+                # fit the forward transform
+##                forward = self.copy()
+##                forward.fit(inx, iny, outx, outy)
+##                
+##                # forward predict the gcps
+##                x_pred,y_pred = forward.predict(inx, iny)
+##
+##                # get backward transform by fitting the forward predicted gcps to the input gcps
+##                backward = self.copy()
+##                backward.fit(x_pred, y_pred, inx, iny)
+##                A = backward.A
+
+                # ALT3
+##                # fit the forward transform
+##                forward = self.copy()
+##                forward.fit(inx, iny, outx, outy)
+##                
+##                # forward predict regularly spaced sample points across the range of the inpoints
+##                xmin,ymin,xmax,ymax = inx.min(), iny.min(), inx.max(), iny.max()
+##                x = np.linspace(xmin, xmax, 100)
+##                y = np.linspace(ymin, ymax, 100)
+##                x,y = np.meshgrid(x, y)
+##                x,y = x.flatten(), y.flatten()
+##                x_pred,y_pred = forward.predict(x, y)
+##
+##                # get backward transform by fitting the forward predicted sample points to the sample points
+##                # should be a near perfect match (~0 residuals) since these are derived from the same transform
+##                backward = self.copy()
+##                backward.fit(x_pred, y_pred, x, y)
+##                A = backward.A
 
             else:
                 # terms
@@ -178,23 +192,43 @@ class Polynomial(object):
         elif self.order == 3:
             
             if invert:
-                # fit the forward transform
-                forward = self.copy()
-                forward.fit(inx, iny, outx, outy)
-                
-                # forward predict regularly spaced sample points across the range of the inpoints
-                xmin,ymin,xmax,ymax = inx.min(), iny.min(), inx.max(), iny.max()
-                x = np.linspace(xmin, xmax, 100)
-                y = np.linspace(ymin, ymax, 100)
-                x,y = np.meshgrid(x, y)
-                x,y = x.flatten(), y.flatten()
-                x_pred,y_pred = forward.predict(x, y)
-
-                # get backward transform by fitting the forward predicted sample points to the sample points
-                # should be a near perfect match (~0 residuals) since these are derived from the same transform
+                # ALT1
+                # standard switch the points
                 backward = self.copy()
-                backward.fit(x_pred, y_pred, x, y)
+                backward.fit(outx, outy, inx, iny)
                 A = backward.A
+
+                # ALT2
+##                # fit the forward transform
+##                forward = self.copy()
+##                forward.fit(inx, iny, outx, outy)
+##                
+##                # forward predict the gcps
+##                x_pred,y_pred = forward.predict(inx, iny)
+##
+##                # get backward transform by fitting the forward predicted gcps to the input gcps
+##                backward = self.copy()
+##                backward.fit(x_pred, y_pred, inx, iny)
+##                A = backward.A
+
+                # ALT3
+##                # fit the forward transform
+##                forward = self.copy()
+##                forward.fit(inx, iny, outx, outy)
+##                
+##                # forward predict regularly spaced sample points across the range of the inpoints
+##                xmin,ymin,xmax,ymax = inx.min(), iny.min(), inx.max(), iny.max()
+##                x = np.linspace(xmin, xmax, 100)
+##                y = np.linspace(ymin, ymax, 100)
+##                x,y = np.meshgrid(x, y)
+##                x,y = x.flatten(), y.flatten()
+##                x_pred,y_pred = forward.predict(x, y)
+##
+##                # get backward transform by fitting the forward predicted sample points to the sample points
+##                # should be a near perfect match (~0 residuals) since these are derived from the same transform
+##                backward = self.copy()
+##                backward.fit(x_pred, y_pred, x, y)
+##                A = backward.A
 
             else:
                 # terms
