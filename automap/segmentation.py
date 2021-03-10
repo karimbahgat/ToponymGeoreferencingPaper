@@ -42,8 +42,8 @@ def color_difference(im, color):
     #diffs = [pairdiffs[tuple(sorted([target,oth]))] for oth in colors if oth != target]
 
     target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
-    #counts,colors = zip(*im.getcolors(256))
-    colors,counts = np.unique(im_arr.reshape(-1, 3), return_counts=True, axis=0)
+    counts,colors = zip(*im.getcolors(256)) # somehow much faster than numpy... 
+    #colors,counts = np.unique(im_arr.reshape(-1, 3), return_counts=True, axis=0)
     colors,counts = map(tuple,colors), map(int,counts)
     colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
                   for col in colors]
