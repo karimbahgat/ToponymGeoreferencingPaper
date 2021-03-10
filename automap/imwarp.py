@@ -118,13 +118,22 @@ def warp(im, transform, invtransform, resample='nearest'):
 ##        PIL.Image.fromarray(outarr).show()
     
         print 'backwards mapping and resampling'
-        coords = []
-        for row in range(h):
-            y = yoff + row*yscale
-            for col in range(w):
-                x = xoff + col*xscale
-                coords.append((x,y))
-        xs,ys = zip(*coords)
+##        coords = []
+##        for row in range(h):
+##            y = yoff + row*yscale
+##            for col in range(w):
+##                x = xoff + col*xscale
+##                coords.append((x,y))
+##        xs,ys = zip(*coords)
+##        backpredx,backpredy = invtransform.predict(xs, ys)
+##        backpred = np.column_stack((backpredx, backpredy))
+##        backpred = backpred.reshape((h,w,2))
+        cols = np.linspace(0, w-1, w)
+        rows = np.linspace(0, h-1, h)
+        cols,rows = np.meshgrid(cols, rows)
+        cols,rows = cols.flatten(), rows.flatten()
+        xs = xoff + (cols * xscale)
+        ys = yoff + (rows * yscale)
         backpredx,backpredy = invtransform.predict(xs, ys)
         backpred = np.column_stack((backpredx, backpredy))
         backpred = backpred.reshape((h,w,2))
@@ -133,18 +142,34 @@ def warp(im, transform, invtransform, resample='nearest'):
         # slow, can prob optimize even more by using direct numpy indexing
         # 4 bands, fourth is the alpha, invisible for pixels that were not sampled
         # currently assumes input image is RGBA only... 
+##        outarr = np.zeros((h, w, 4), dtype=np.uint8)
+##        imload = im.load()
+##        for row in range(h):
+##            for col in range(w):
+##                origcol,origrow = backpred[row,col]
+##                if math.isnan(origcol) or math.isnan(origrow):
+##                    continue
+##                origcol,origrow = int(math.floor(origcol)), int(math.floor(origrow))
+##                if 0 <= origcol < imw and 0 <= origrow < imh:
+##                    rgba = list(imload[origcol,origrow])
+##                    #rgba[-1] = 255 # fully visible
+##                    outarr[row,col,:] = rgba
+
+        # faster numpy version
+        inarr = np.array(im)
         outarr = np.zeros((h, w, 4), dtype=np.uint8)
-        imload = im.load()
-        for row in range(h):
-            for col in range(w):
-                origcol,origrow = backpred[row,col]
-                if math.isnan(origcol) or math.isnan(origrow):
-                    continue
-                origcol,origrow = int(math.floor(origcol)), int(math.floor(origrow))
-                if 0 <= origcol < imw and 0 <= origrow < imh:
-                    rgba = list(imload[origcol,origrow])
-                    #rgba[-1] = 255 # fully visible
-                    outarr[row,col,:] = rgba
+        backpred_cols = backpred[:,:,0]
+        backpred_rows = backpred[:,:,1]
+        # valid
+        backpred_valid = ~(np.isnan(backpred_cols) | np.isnan(backpred_rows))
+        # nearest pixel rounding
+        backpred_cols = np.around(backpred_cols, 0).astype(int)
+        backpred_rows = np.around(backpred_rows, 0).astype(int)
+        # define image bounds
+        backpred_inbounds = (backpred_cols >= 0) & (backpred_cols < imw) & (backpred_rows >= 0) & (backpred_rows < imh)
+        # do the sampling
+        mask = (backpred_valid & backpred_inbounds)
+        outarr[mask] = inarr[backpred_rows[mask], backpred_cols[mask], :]
 
     else:
         raise ValueError('Unknown resample arg: {}'.format(resample))
