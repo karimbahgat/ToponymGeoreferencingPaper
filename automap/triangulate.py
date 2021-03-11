@@ -180,7 +180,7 @@ def triang(coder, test, matchcandidates=None):
         #viewmatch(positions, f)
     return matches
 
-def find_matches(test, thresh=0.1, minpoints=8, mintrials=8, maxiter=500, maxcandidates=10, n_combi=3, db=None, source='gns', debug=False):
+def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxcandidates=None, n_combi=3, db=None, source='best', debug=False):
     # filter to those that can be geocoded
     print 'geocode and filter'
     coder = geocode.OptimizedCoder(db)

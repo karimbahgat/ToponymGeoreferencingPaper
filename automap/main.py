@@ -382,7 +382,7 @@ def warp_image(mapp_im, transinfo):
 
 ### MAIN FUNC
 
-def automap(im, outpath=True, matchthresh=0.1, textcolor=None, colorthresh=25, textconf=60, sample=False, parallel=False, max_procs=None, db=None, source='gns', warp=True, warp_order=None, residual_type='pixels', max_residual=None, debug=False, priors=None, **kwargs):
+def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, textconf=60, sample=False, parallel=False, max_procs=None, db=None, source='best', warp=True, warp_order=None, residual_type='pixels', max_residual=None, debug=False, priors=None, **kwargs):
     info = dict()
     priors = priors or dict()
     start = time.time()

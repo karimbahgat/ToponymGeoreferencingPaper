@@ -58,9 +58,11 @@ class OptimizedCoder(object):
         self.path = path or 'resources/gazetteers.db'
         self.db = sqlite3.connect(self.path)
 
-    def geocode(self, name, limit=10):
+    def geocode(self, name, limit=None):
         # NOT CORRRECT QUERY, RETURNS DUPLICATES
-        results = self.db.cursor().execute("SELECT locs.data, locs.id, GROUP_CONCAT(names.name, '|'), locs.geom FROM locs, names, (SELECT data,id FROM names WHERE name = ?) AS m WHERE locs.id=m.id AND locs.data=m.data and names.id=m.id and names.data=m.data GROUP BY m.data,m.id", (name,))
+        if limit:
+            raise NotImplemented("Geocode results 'limit' not yet implemented")
+        results = self.db.cursor().execute("SELECT locs.data, locs.id, GROUP_CONCAT(names.name, '|'), locs.geom FROM locs, names, (SELECT data,id FROM names WHERE name = ? COLLATE NOCASE) AS m WHERE locs.id=m.id AND locs.data=m.data and names.id=m.id and names.data=m.data GROUP BY m.data,m.id", (name,))
         results = ({'type': 'Feature',
                    'properties': {'data':data,
                                   'id':ID,
