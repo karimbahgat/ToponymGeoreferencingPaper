@@ -709,8 +709,9 @@ def extract_texts(im, textcolors, threshold=25, textconf=60, bbox=None):
                 alphachars = [ch for ch in text['text_clean'] if ch.isalpha()]
                 text['text_alphas'] = ''.join(alphachars)
 
-                # maybe must have at least one alphanumeric to be considered text (ie just junk symbols)?
-                # ... 
+                # must have at least three alphanumeric to be considered text (otherwise likely just junk symbols)?
+                if len(text['text_alphas']) <= 2:
+                    continue
                 
                 # record info
                 text['color'] = col

@@ -1,3 +1,5 @@
+# OLD VERSION, NO LONGER USED
+# see instead patternmatch.py
 
 import shapely, shapely.geometry
 
