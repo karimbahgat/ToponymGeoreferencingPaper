@@ -7,23 +7,23 @@ db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
 
 print 'beginning'
 
-automap('testmaps/wackymap_nkorea.png', textcolor=(0,0,0), db=db, debug=True)
+#automap('testmaps/wackymap_nkorea.png', textcolor=(0,0,0), db=db, debug=True)
 #automap('testmaps/burkina.jpg', textcolor=(40,30,20), sample=False, db=db, debug=True)
 #automap('testmaps/tunisia_pol_1990.jpg', textcolor=None, db=db)
 #automap('testmaps/belgium.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-#automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), db=db)
+automap('testmaps/nepal_pol90.jpg', textcolor=(0,0,0), db=db)
 #automap('testmaps/cameroon_pol98.jpg', textcolor=None, db=db, debug=True)
 #automap('testmaps/cameroon.jpg', textcolor=(0,0,0), db=db, debug=True)
-#automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=None, colorthresh=25, sample=False, textconf=60, db=db)
+#automap('testmaps/israel-and-palestine-travel-reference-map-[2]-1234-p.jpg', textcolor=(0,0,0), colorthresh=25, sample=False, textconf=60, db=db)
 
-#automap('testmaps/repcongo.png', textcolor=None, db=db) #(120,120,120))
+#automap('testmaps/repcongo.png', textcolor=(120,120,120), db=db, debug=True) #(120,120,120))
 #automap('testmaps/txu-pclmaps-oclc-22834566_k-2c.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60, bbox=[2000,2500,4000,4500])
 #automap('testmaps/gmaps.png', textcolor=(80,80,80), colorthresh=25, textconf=60)
-#automap('testmaps/brazil_pol_1981.gif', textcolor=None, db=db, debug=True)
-#automap('testmaps/china_pol96.jpg', textcolor=None, db=db, debug=True)
+#automap('testmaps/brazil_pol_1981.gif', textcolor=(0,0,0), db=db, debug=True)
+#automap('testmaps/china_pol96.jpg', textcolor=(0,0,0), db=db, debug=True, outpath='testmaps/china_pol96_georeferenced_voting.tif')
 
 #automap('testmaps/vietnam_pol92.jpg', textcolor=(50,50,50), db=db, debug=True)
-#automap('testmaps/vietnam_admin92.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60)
+#automap('testmaps/vietnam_admin92.jpg', textcolor=(50,50,50), db=db, debug=True)
 #automap('testmaps/nigeria_econ_1979.jpg', textcolor=(50,50,50), colorthresh=25, textconf=60, max_residual=0.5)
 #automap('testmaps/nigeria_crops.jpg', textcolor=None, db=db)
 #automap('testmaps/nigeria_linguistic_1979.jpg', textcolor=(50,50,50), colorthresh=35, textconf=60, max_residual=0.5)
@@ -31,7 +31,7 @@ automap('testmaps/wackymap_nkorea.png', textcolor=(0,0,0), db=db, debug=True)
 #automap('testmaps/namibia_homelands_78.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 #automap('testmaps/namibia_pol90.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
-#automap('testmaps/washington_baltimore.jpg', textcolor=(50,50,50), colorthresh=35, textconf=60)
+#automap('testmaps/washington_baltimore.jpg', textcolor=(50,50,50), colorthresh=35, db=db, debug=True)
 
 
 
@@ -49,8 +49,8 @@ automap('testmaps/wackymap_nkorea.png', textcolor=(0,0,0), db=db, debug=True)
 #automap('testmaps/korean_war_april_1951.jpg', textcolor=(0,0,0), colorthresh=40, textconf=60)
 
 #automap('testmaps/zaire_map.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-#automap('testmaps/russia_autonomous92.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
-#automap('testmaps/algeria_rel79.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
+#automap('testmaps/russia_autonomous92.jpg', textcolor=(0,0,0), colorthresh=25, db=db, debug=True)
+#automap('testmaps/algeria_rel79.jpg', textcolor=(0,0,0), colorthresh=25, db=db, debug=True)
 #automap('testmaps/france_admin91.jpg', textcolor=(0,0,0), colorthresh=25, textconf=60)
 
 

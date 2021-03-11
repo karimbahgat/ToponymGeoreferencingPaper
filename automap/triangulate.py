@@ -4,21 +4,27 @@
 import itertools
 
 from . import shapematch
+from . import patternmatch
 from . import geocode
 
 
-def triangulate(coder, names, positions, matchcandidates=None):
+def triangulate(coder, names, positions, matchcandidates=None, flipy=False):
     assert len(names) == len(positions)
     assert len(names) >= 3
 
+    # reverse ys due to flipped image coordsys
+    if flipy:
+        maxy = max((y for x,y in positions))
+        positions = [(x,maxy-y) for x,y in positions]
+
     # define input names/positions as a polygon feature
-    findpoly = {'type': 'Feature',
-               'properties': {'combination': names,
-                              },
-               'geometry': {'type': 'Polygon',
-                            'coordinates': [positions]
-                            },
-               }
+    findpattern = {'type': 'Feature',
+                   'properties': {'combination': names,
+                                  },
+                   'geometry': {'type': 'MultiPoint',
+                                'coordinates': positions
+                                },
+                   }
 
     # find matches for each name
     #print 'finding matches', names
@@ -40,77 +46,29 @@ def triangulate(coder, names, positions, matchcandidates=None):
     # find unique combinations of all possible candidates
     #print 'combining'
     combis = list(itertools.product(*matchcandidates))
-    combipolys = []
+    combipatterns = []
     for combi in combis:
         #print '--->', combi
         # make into polygon feature
         combinames = [f['properties']['name'] for f in combi]
         combipositions = [f['geometry']['coordinates'] for f in combi]
-        combipoly = {'type': 'Feature',
-                   'properties': {'combination': combinames,
-                                  },
-                   'geometry': {'type': 'Polygon',
-                                'coordinates': [combipositions]
-                                },
-                   }
-        combipolys.append(combipoly)
+        combipattern = {'type': 'Feature',
+                       'properties': {'combination': combinames,
+                                      },
+                       'geometry': {'type': 'MultiPoint',
+                                    'coordinates': combipositions
+                                    },
+                       }
+        combipatterns.append(combipattern)
 
     # prep/normalize combipolys
     #print 'prepping'
-    combipolys = shapematch.prep_pool(combipolys)
+    combipatterns = patternmatch.prep_pool(combipatterns)
 
     # find closest match
     #print 'finding'
-    matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
+    matches = patternmatch.find_best_matches(findpattern, combipatterns)
     return matches
-
-##def triangulate_add(existing, add):
-##    
-##    fjdkslfjldsjfkljsdkjfklsj
-##    
-##    names,positions = existing
-##    addname,addpos = add
-##
-##    # define input names/positions as a polygon feature
-##    findpoly = {'type': 'Feature',
-##               'properties': {'combination': list(names) + [addname],
-##                              },
-##               'geometry': {'type': 'Polygon',
-##                            'coordinates': [positions + [addpos]]
-##                            },
-##               }
-##
-##    # find candidates for the added name
-##    matches = geocode(name)
-##
-##    # create possible polygons after adding
-##    combipolys = []
-##    for m in matches:
-##        #print '--->', combi
-##        # make into polygon feature
-##        combinames = [f['properties']['name'] for f in combi]
-##        combipositions = [f['geometry']['coordinates'] for f in combi]
-##        combipoly = {'type': 'Feature',
-##                   'properties': {'combination': list(names) + [m.address],
-##                                  },
-##                   'geometry': {'type': 'Polygon',
-##                                'coordinates': [positions + [(m.longitude,m.latitude)]]
-##                                },
-##                   }
-##        combipolys.append(combipoly)
-##
-##    
-##    added = {'type': 'Feature',
-##               'properties': {'combination': list(names) + [addname],
-##                              },
-##               'geometry': {'type': 'Polygon',
-##                            'coordinates': [positions + [addpos]]
-##                            },
-##               }
-##
-##    added = shapematch.prep_pool(added)
-##    matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
-##    return matches[0]
 
 def triangulate_add(coder, origs, matches, add, addcandidates=None):
     orignames, origpositions = zip(*origs)
@@ -118,14 +76,14 @@ def triangulate_add(coder, origs, matches, add, addcandidates=None):
 
     addname,addpos = add
 
-    # define input names/positions as a polygon feature
-    findpoly = {'type': 'Feature',
-               'properties': {'combination': list(orignames) + [addname],
-                              },
-               'geometry': {'type': 'Polygon',
-                            'coordinates': [list(origpositions) + [addpos]]
-                            },
-               }
+    # define input names/positions as a multipoint feature
+    findpattern = {'type': 'Feature',
+                   'properties': {'combination': list(orignames) + [addname],
+                                  },
+                   'geometry': {'type': 'MultiPoint',
+                                'coordinates': list(origpositions) + [addpos]
+                                },
+                   }
 
     # find matches for each name
     #print 'finding matches', addname
@@ -140,44 +98,28 @@ def triangulate_add(coder, origs, matches, add, addcandidates=None):
 
     # find unique combinations of all possible candidates
     #print 'combining'
-    combipolys = []
+    combipatterns = []
     for m in match:
         #print '--->', combi
         # make into polygon feature
         combinames = list(matchnames) + [m['properties']['name']]
         combipositions = list(matchpositions) + [m['geometry']['coordinates']]
-        combipoly = {'type': 'Feature',
-                   'properties': {'combination': combinames,
-                                  },
-                   'geometry': {'type': 'Polygon',
-                                'coordinates': [combipositions]
-                                },
-                   }
-        combipolys.append(combipoly)
+        combipattern = {'type': 'Feature',
+                       'properties': {'combination': combinames,
+                                      },
+                       'geometry': {'type': 'MultiPoint',
+                                    'coordinates': combipositions
+                                    },
+                       }
+        combipatterns.append(combipattern)
 
-    # prep/normalize combipolys
+    # prep/normalize combipatterns
     #print 'prepping'
-    combipolys = shapematch.prep_pool(combipolys)
+    combipatterns = patternmatch.prep_pool(combipatterns)
 
     # find closest match
     #print 'finding'
-    matches = shapematch.find_exact_match_prepped(findpoly, combipolys)
-    return matches
-
-def triang(coder, test, matchcandidates=None):
-    # TODO: maybe superfluous, maybe just integrate right into "triangulate"?? 
-    names,positions = zip(*test)
-    # reverse ys due to flipped image coordsys
-    maxy = max((y for x,y in positions))
-    positions = [(x,maxy-y) for x,y in positions]
-    # triangulate
-    #print 99,names,positions
-    matches = triangulate(coder, names, positions, matchcandidates)
-    #for f,diff,diffs in matches[:1]:
-        #print 'error:', round(diff,6)
-        #for c in f['properties']['combination']:
-        #    print c
-        #viewmatch(positions, f)
+    matches = patternmatch.find_best_matches(findpattern, combipatterns)
     return matches
 
 def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxcandidates=None, n_combi=3, db=None, source='best', debug=False):
@@ -189,7 +131,6 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
         mintrials = 30
         maxiter = 10000
     
-    import time
     testres = []
     for nxtname,nxtpos in test:
         print 'geocoding',nxtname
@@ -249,13 +190,13 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
     # find all triangles from all possible 3-point combinations
     combis = itertools.combinations(testres, n_combi)
     # sort randomly to avoid local minima
-    from random import uniform
-    combis = sorted(combis, key=lambda x: uniform(0,1))
+    #from random import uniform
+    #combis = sorted(combis, key=lambda x: uniform(0,1))
     # sort by length of possible geocodings, ie try most unique first --> faster+accurate
     combis = sorted(combis, key=lambda gr: sum((len(res) for nxtname,nxtpos,res in gr)))
 
     print '\n'+'finding all possible triangles of {} possible combinations'.format(len(combis))
-    triangles = []
+    resultsets = []
     for i,tri in enumerate(combis):
         if debug:
             print '-----'
@@ -263,9 +204,12 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
             print '\n'.join([repr((tr[0],len(tr[2]))) for tr in tri])
         # try triang
         best = None
-        try: best = triang(coder,
-                           [tr[:2] for tr in tri],
-                           matchcandidates=[tr[2] for tr in tri])
+        names,positions,candidates = zip(*tri)
+        try: best = triangulate(coder,
+                                names,
+                                positions,
+                                candidates,
+                                flipy=True)
         except Exception as err: print 'EXCEPTION RAISED:',err
         if best:
             f,diff,diffs = best[0]
@@ -275,18 +219,20 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
             if diff < thresh:
                 if debug:
                     print 'TRIANGLE FOUND'
-                valid = [tr[:2] for tr in tri]
+                resultset = [tr[:2] for tr in tri]
 
-                # ...
-                for nxtname,nxtpos,res in testres:
+                # incrementally add remaining points
+                for nxtname,nxtpos,candidates in testres:
                     if debug:
                         print 'trying to add incrementally:',nxtname,nxtpos
-                    orignames,origcoords = zip(*valid)
+                    orignames,origcoords = zip(*resultset)
                     orignames,origcoords = list(orignames),list(origcoords)
                     matchnames = list(f['properties']['combination'])
-                    matchcoords = list(f['geometry']['coordinates'][0])
+                    matchcoords = list(f['geometry']['coordinates'])
                     
-                    if nxtpos in origcoords: continue
+                    if nxtpos in origcoords:
+                        # already in the pointset
+                        continue
                     maxy = max((y for x,y in origcoords))
                     maxy = max(maxy,nxtpos[1])
                     nxtposflip = (nxtpos[0],maxy-nxtpos[1])
@@ -295,47 +241,100 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
                                            zip(orignames,origcoordsflip),
                                            zip(matchnames,matchcoords),
                                            (nxtname,nxtposflip),
-                                           res)
-                    if not best: continue
+                                           candidates)
+                    if not best:
+                        # ...? 
+                        continue
                     mf,mdiff,mdiffs = best[0]
                     if mdiff < thresh:
                         if debug:
                             print 'ADDING'
-                        valid.append((nxtname,nxtpos))
+                        resultset.append((nxtname,nxtpos))
                         f = mf
                 
                 print '\n'+'MATCHES FOUND (error=%r)' % round(diff,6)
-                print '>>>', repr([n for n,p in valid]),'-->',[n[:15] for n in f['properties']['combination']]
+                print '>>>', repr([n for n,p in resultset]),'-->',[n[:15] for n in f['properties']['combination']]
 
-                triangles.append((valid,f,diff))
+                resultsets.append((resultset,f,diff))
                 
         if debug:
-            print '%s triangles so far:' % len(triangles)
+            print '%s resultsets so far:' % len(resultsets)
         
         #print '\n>>>'.join([repr((round(tr[2],6),[n for n,p in tr[0]],'-->',[n[:15] for n in tr[1]['properties']['combination']]))
         #                 for tr in triangles])
         
-        if len(triangles) >= mintrials and max((len(v) for v,f,d in triangles)) >= minpoints:
+        if len(resultsets) >= mintrials and max((len(r) for r,f,d in resultsets)) >= minpoints:
             break
 
         if i >= maxiter:
             break
 
-    # of all the trial triangles, choose only the one with lowest diff and longest chain of points
-    triangles = sorted(triangles, key=lambda(v,f,d): (d,-len(v)) )
+    # debug trial match counts
+##    print '\n'+'Debug matchset counts across trials'
+##    resultsets = sorted(resultsets, key=lambda(v,f,d): (d,-len(v)) )
+##    bestset,bestf,bestdiff = resultsets[0]
+##    import traceback
+##    try:
+##        origpointsets,matchpointsets,diffs = zip(*resultsets)
+##        matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
+##        for origname,origpos,_ in testres:
+##            print origname
+##            matches = []
+##            for origpointset,matchpointset in zip(origpointsets, matchpointsets):
+##                for origpoint,matchpoint in zip(origpointset, matchpointset):
+##                    if origpoint == (origname,origpos):
+##                        matches.append(matchpoint)
+##            matchpointcounts = [(matchpoint,len(list(group)))
+##                                for matchpoint,group in itertools.groupby(sorted(matches))]
+##            for (matchname,matchcoord),count in sorted(matchpointcounts, key=lambda x: -x[1]):
+##                included = (matchname,matchcoord) in zip(bestf['properties']['combination'], bestf['geometry']['coordinates'])
+##                print '  ', included, count, matchname[:100], matchcoord
+##    except:
+##        traceback.print_exc()
+
+    # produce final (choose best match across all trials)
+    print '\n'+'Final matchset (across trials):'
     orignames,origcoords = [],[]
     matchnames,matchcoords = [],[]
-    print '\n'+'Final matchset:'
-    for tri,f,diff in triangles[:1]: # only the first best triangle is used
-        for (n,c),(mn,mc) in zip(tri, zip(f['properties']['combination'], f['geometry']['coordinates'][0])):
-            print 'final',n,c,mn,mc
-            if c in origcoords or mc in matchcoords: continue
-            orignames.append(n)
-            origcoords.append(c)
-            matchnames.append(mn)
-            matchcoords.append(mc)
+    origpointsets,matchpointsets,diffs = zip(*resultsets)
+    matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
+    # loop each input point
+    for n,c,_ in testres:
+        # find all matches
+        matches = []
+        for origpointset,matchpointset in zip(origpointsets, matchpointsets):
+            for origpoint,matchpoint in zip(origpointset, matchpointset):
+                if origpoint == (n,c):
+                    matches.append(matchpoint)
+        # choose most frequent match
+        matchpointcounts = [(matchpoint,len(list(group)))
+                            for matchpoint,group in itertools.groupby(sorted(matches))]
+        for (mn,mc),count in sorted(matchpointcounts, key=lambda x: -x[1]):
+            break 
+        # final control point
+        orignames.append(n)
+        origcoords.append(c)
+        matchnames.append(mn)
+        matchcoords.append(mc)
+        print 'final',n,c,mn[:100],mc,'(count {})'.format(count)
 
-    print 'final diff', diff
+    # produce final (lowest diff)
+##    print '\n'+'Final matchset (lowest diff):'
+##    orignames,origcoords = [],[]
+##    matchnames,matchcoords = [],[]
+##    resultsets = sorted(resultsets, key=lambda(v,f,d): (d,-len(v)) )
+##    bestset,bestf,bestdiff = resultsets[0]
+##    for resultset,f,diff in resultsets[:1]: # only the first best triangle is used
+##        for (n,c),(mn,mc) in zip(resultset, zip(f['properties']['combination'], f['geometry']['coordinates']) ):
+##            print 'final',n,c,mn[:100],mc
+##            if c in origcoords or mc in matchcoords:
+##                # ...? 
+##                continue
+##            orignames.append(n)
+##            origcoords.append(c)
+##            matchnames.append(mn)
+##            matchcoords.append(mc)
+##    print 'final diff', diff
             
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
