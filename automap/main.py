@@ -175,7 +175,8 @@ def match_control_points(toponyminfo, matchthresh, db, source, **kwargs):
     points = [(f['properties']['name'],f['geometry']['coordinates']) for f in toponyminfo['features']]
 
     # find matches
-    origs,matches = triangulate.find_matches(points, matchthresh, db=db, source=source, **kwargs)
+    matchsets = triangulate.find_matchsets(points, matchthresh, db=db, source=source, **kwargs)
+    origs,matches = triangulate.best_matchset(matchsets)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
     tiepoints = zip(origcoords, matchcoords)
@@ -606,8 +607,10 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
         pass
     else:
         try:
+            import traceback
             gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
-        except Exception as err:
+        except:
+            err = traceback.format_exc()
             warnings.warn('Georeferencing failed - unable to find matching control points: {}.'.format(err))
             return info
 

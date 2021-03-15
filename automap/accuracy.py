@@ -103,7 +103,7 @@ def loo_residuals(transform, inpoints, outpoints, invert=False, distance='eucled
 
 
 # accuracy
-def model_accuracy(trans, inpoints, outpoints, leave_one_out=False, invert=False, distance=None, accuracy='rmse'):
+def model_accuracy(trans, inpoints, outpoints, leave_one_out=False, invert=False, distance='eucledian', accuracy='rmse'):
     # convenience function
     resfunc = loo_residuals if leave_one_out else residuals
     resids = resfunc(trans, inpoints, outpoints, invert, distance) 
@@ -159,6 +159,7 @@ def auto_drop_models(trans, inpoints, outpoints, improvement_ratio=0.10, minpoin
     err,resids = model_accuracy(trans, _inpoints, _outpoints,
                                 leave_one_out, invert, distance, accuracy)
     seq.append((trans, _inpoints, _outpoints, err, resids))
+    print trans
     print 'init error',err
 
     # auto refine improvement threshold or minpoints
@@ -187,15 +188,20 @@ def auto_drop_models(trans, inpoints, outpoints, improvement_ratio=0.10, minpoin
 
     return _trans, _inpoints, _outpoints, _err, _resids
 
-def auto_choose_model(inpoints, outpoints, transforms, improvement_ratio=0.10, minpoints=None, invert=False, distance=None, accuracy='rmse'):
+def auto_choose_model(inpoints, outpoints, transforms, refine_outliers=True, **kwargs):
     # compare and choose optimal among a set of transforms
     inpoints = list(inpoints)
     outpoints = list(outpoints)
 
     results = []
     for trans in transforms:
-        print trans
-        res = auto_drop_models(trans, inpoints, outpoints, improvement_ratio=improvement_ratio, minpoints=minpoints, leave_one_out=True, invert=invert, distance=distance, accuracy=accuracy)
+        #print trans
+        # note that leave_one_out is hardcoded in order to compare across models
+        if refine_outliers:
+            res = auto_drop_models(trans, inpoints, outpoints, leave_one_out=True, **kwargs)
+        else:
+            err,resids = model_accuracy(trans, inpoints, outpoints, leave_one_out=True, **kwargs)
+            res = trans, inpoints, outpoints, err, resids
         results.append(res)
 
     best = sorted(results, key=lambda res: res[-2])

@@ -5,6 +5,8 @@ import itertools
 
 from . import patternmatch
 from . import geocode
+from . import transforms
+from . import accuracy
 
 
 def triangulate(coder, names, positions, matchcandidates=None, flipy=False):
@@ -121,7 +123,7 @@ def triangulate_add(coder, origs, matches, add, addcandidates=None):
     matches = patternmatch.find_best_matches(findpattern, combipatterns)
     return matches
 
-def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxcandidates=None, n_combi=3, db=None, source='best', debug=False):
+def find_matchsets(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxcandidates=None, n_combi=3, db=None, source='best', debug=False):
     # filter to those that can be geocoded
     print 'geocode and filter'
     coder = geocode.OptimizedCoder(db)
@@ -251,7 +253,7 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
                         resultset.append((nxtname,nxtpos))
                         f = mf
                 
-                print '\n'+'MATCHES FOUND (error=%r)' % round(diff,6)
+                print '\n'+'MATCHES FOUND (point pattern error=%r)' % round(diff,6)
                 print '>>>', repr([n for n,p in resultset]),'-->',[n[:15] for n in f['properties']['combination']]
 
                 resultsets.append((resultset,f,diff))
@@ -268,7 +270,15 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
         if i >= maxiter:
             break
 
-    # collect all corresponding point pairs and match stats across sets with extra info? 
+    return resultsets
+
+def best_matchset(matchsets):
+    resultsets = matchsets # rename for internal use
+
+    ######
+    # BASIC COMPARISONS
+    
+    # hmmm, collect all corresponding point pairs and match stats across sets with extra info? 
     # (this is just used for easier and more stable lookup later)
     # first list all orig-match point pairs
 ##    pointpairs = []
@@ -396,24 +406,60 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
 ##    print 'final length', len(bestset), 'diff', diff
 
     # produce final (longest and lowest diff) NEW
-    print '\n'+'Final matchset (longest and lowest diff):'
-    orignames,origcoords = [],[]
-    matchnames,matchcoords = [],[]
+##    print '\n'+'Final matchset (longest and lowest diff):'
+##    orignames,origcoords = [],[]
+##    matchnames,matchcoords = [],[]
+##    origpointsets,matchpointsets,diffs = zip(*resultsets)
+##    matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
+##    # get final set
+##    sortby = lambda(origpointset,matchpointset,setdiff): (-len(origpointset),setdiff)
+##    best_origpointset,best_matchpointset,best_setdiff = sorted(zip(origpointsets,matchpointsets,diffs), key=sortby)[0]
+##    for (n,c),(mn,mc) in zip(best_origpointset,best_matchpointset):
+##        print 'final',n,c,mn[:50],mc
+##        if (n,c) in zip(orignames,origcoords) or (mn,mc) in zip(matchnames,matchcoords):
+##            # in case of duplicates? 
+##            continue
+##        orignames.append(n)
+##        origcoords.append(c)
+##        matchnames.append(mn)
+##        matchcoords.append(mc)
+##    print 'final length', len(best_origpointset), 'diff', best_setdiff
+
+
+
+
+    ######
+    # FULL MODEL EST COMPARISONS
+
+    # prep lists
+    print '\n'+'Comparing matchsets (full model comparison):'
     origpointsets,matchpointsets,diffs = zip(*resultsets)
     matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
-    # get final set
-    sortby = lambda(origpointset,matchpointset,setdiff): (-len(origpointset),setdiff)
-    best_origpointset,best_matchpointset,best_setdiff = sorted(zip(origpointsets,matchpointsets,diffs), key=sortby)[0]
-    for (n,c),(mn,mc) in zip(best_origpointset,best_matchpointset):
+
+    # for each set, estimate the optimal polynomial model
+    trytrans = [transforms.Polynomial(order=1), transforms.Polynomial(order=2), transforms.Polynomial(order=3)]
+    results = []
+    for i,(origpointset,matchpointset) in enumerate(zip(origpointsets,matchpointsets)):
+        origpointnames,origpointcoords = zip(*origpointset)
+        matchpointnames,matchpointcoords = zip(*matchpointset)
+        res = accuracy.auto_choose_model(origpointcoords, matchpointcoords, trytrans, refine_outliers=False)
+        print 'matchset', i, 'length', len(origpointset), 'model', res[0], 'error', res[-2]
+        results.append((i,res))
+
+    # get the set with the lowest model error
+    print '\n'+'Final matchset (full model comparison):'
+    #sortby = lambda(i,res): (-len(res[1]),res[-2]) # sort by setlength and then model error
+    sortby = lambda(i,res): res[-2] # sort by model error only
+    best = sorted(results, key=sortby)[0] 
+    best_i,(trans, inpoints, outpoints, err, resids) = best
+    print 'chosen matchset num', best_i, 'model type', trans, 'model error', err
+    orignames,origcoords = zip(*origpointsets[best_i])
+    matchnames,matchcoords = zip(*matchpointsets[best_i])
+    for n,c,mn,mc in zip(orignames,origcoords,matchnames,matchcoords):
         print 'final',n,c,mn[:50],mc
-        if (n,c) in zip(orignames,origcoords) or (mn,mc) in zip(matchnames,matchcoords):
-            # in case of duplicates? 
-            continue
-        orignames.append(n)
-        origcoords.append(c)
-        matchnames.append(mn)
-        matchcoords.append(mc)
-    print 'final length', len(best_origpointset), 'diff', best_setdiff
+
+
+
 
     ######
     # DEBUG
