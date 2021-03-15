@@ -4,7 +4,6 @@ from . import textdetect
 from . import textgroup
 from . import toponyms
 
-from . import shapematch
 from . import triangulate
 
 from . import transforms

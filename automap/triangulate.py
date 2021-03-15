@@ -3,7 +3,6 @@
 
 import itertools
 
-from . import shapematch
 from . import patternmatch
 from . import geocode
 
@@ -269,16 +268,182 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
         if i >= maxiter:
             break
 
-    # debug trial match counts
-##    print '\n'+'Debug matchset counts across trials'
-##    resultsets = sorted(resultsets, key=lambda(v,f,d): (d,-len(v)) )
-##    bestset,bestf,bestdiff = resultsets[0]
+    # collect all corresponding point pairs and match stats across sets with extra info? 
+    # (this is just used for easier and more stable lookup later)
+    # first list all orig-match point pairs
+##    pointpairs = []
+##    for origpointset,matchpointset,setdiff in zip(origpointsets, matchpointsets, diffs):
+##        for origpoint,matchpoint in zip(origpointset, matchpointset):
+##            pointpairs.append((origpoint,matchpoint,origpointset,matchpointset,setdiff))
+##    # then create dict of match stats for each matchpoint
+##    matchpoint_stats = {}
+##    groupby = lambda x: x[1]
+##    for matchpoint,group in itertools.groupby(sorted(pointpairs, key=groupby), key=groupby):
+##        group = list(group)
+##        setlength,setdiff = group[-2:]
+##        matchfreq = len(group)
+##        matchpoint_stats[matchpoint] = (setlength,setdiff,matchfreq)
+##    # collect some global trial stats
+##    allorigpoints,allmatchpoints,allsetlengths,allsetdiffs = zip(*pointpairs)
+##    avgsetdiff = sum(allsetdiffs)/float(len(allsetdiffs))
+##    avgsetlength = sum(allsetlengths)/float(len(allsetlengths))
+##    medsetlength = min(allsetlengths) + (max(allsetlengths)-min(allsetlengths))/2.0 #sorted(allsetlengths)[len(allsetlengths)//2]
+##    print 'avgsetdiff:',avgsetdiff,'avgsetlength:',avgsetlength,'medsetlength:',medsetlength
+
+    # produce final (choose best match across all trials)
+    # v1: look at all, choose most frequent for each
+##    print '\n'+'Final matchset (across trials):'
+##    orignames,origcoords = [],[]
+##    matchnames,matchcoords = [],[]
+##    origpointsets,matchpointsets,diffs = zip(*resultsets)
+##    matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
+##    # loop each input point
+##    for n,c,_ in testres:
+##        # find all matches
+##        matches = []
+##        for origpointset,matchpointset in zip(origpointsets, matchpointsets):
+##            for origpoint,matchpoint in zip(origpointset, matchpointset):
+##                if origpoint == (n,c):
+##                    matches.append(matchpoint)
+##        # choose most frequent match
+##        matchpointcounts = [(matchpoint,len(list(group)))
+##                            for matchpoint,group in itertools.groupby(sorted(matches))]
+##        for (mn,mc),count in sorted(matchpointcounts, key=lambda x: -x[1]):
+##            break 
+##        # final control point
+##        if 1:#(count / float(len(resultsets))) >= 0.5:
+##            # only points that show up in over half of all trials
+##            orignames.append(n)
+##            origcoords.append(c)
+##            matchnames.append(mn)
+##            matchcoords.append(mc)
+##            print 'final',n,c,mn[:100],mc,'(count {})'.format(count)
+
+    # produce final (choose best match across all trials)
+    # v2: choose ones belonging to longest set (above say avg) and lowest diff
+##    print '\n'+'Final matchset (across trials):'
+##    orignames,origcoords = [],[]
+##    matchnames,matchcoords = [],[]
+##    origpointsets,matchpointsets,diffs = zip(*resultsets)
+##    matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
+##    # collect all corresponding point pairs across sets with extra info
+##    pointpairs = []
+##    for origpointset,matchpointset,setdiff in zip(origpointsets, matchpointsets, diffs):
+##        for origpoint,matchpoint in zip(origpointset, matchpointset):
+##            setlength = len(origpointset)
+##            pointpairs.append((origpoint,matchpoint,setlength,setdiff))
+##    # collect some stats
+##    allorigpoints,allmatchpoints,allsetlengths,allsetdiffs = zip(*pointpairs)
+##    avgsetdiff = sum(allsetdiffs)/float(len(allsetdiffs))
+##    avgsetlength = sum(allsetlengths)/float(len(allsetlengths))
+##    medsetlength = min(allsetlengths) + (max(allsetlengths)-min(allsetlengths))/2.0 #sorted(allsetlengths)[len(allsetlengths)//2]
+##    print 'avgsetdiff:',avgsetdiff,'avgsetlength:',avgsetlength,'medsetlength:',medsetlength
+##    # count match frequency for each matchpoint
+##    matchpoint_counts = {}
+##    groupby = lambda x: x[1]
+##    for matchpoint,group in itertools.groupby(sorted(pointpairs, key=groupby), key=groupby):
+##        matchpoint_counts[matchpoint] = len(list(group))
+##    # group all possible matchpoints with each origpoint
+##    groupby = lambda x: x[0] # origpoint
+##    for origpoint,group in itertools.groupby(sorted(pointpairs, key=groupby), key=groupby):
+##        print '>>>', origpoint[0], origpoint[1]
+##        group = list(group)
+##        # add in match frequency
+##        group = [(origpoint,matchpoint,setlength,matchpoint_counts[matchpoint],setdiff)
+##                 for origpoint,matchpoint,setlength,setdiff in group]
+##        # sort by setlength then matchfreq then setdiff
+##        sortby = lambda x: (-x[-3], -x[-2], x[-1])
+##        for i,(origpoint,matchpoint,setlength,matchfreq,setdiff) in enumerate(sorted(group, key=sortby)):
+##            n,c = origpoint
+##            mn,mc = matchpoint
+##            included = False
+##            if i == 0:
+##                # condition
+##                if setlength >= medsetlength: #and avgsetdiff >= avgsetdiff:
+##                    # add to result
+##                    included = True
+##                    orignames.append(n)
+##                    origcoords.append(c)
+##                    matchnames.append(mn)
+##                    matchcoords.append(mc)
+##            if included:
+##                print '  ',included,mn[:50],mc,'(setlength {}, matchfreq {}, setdiff {})'.format(setlength, matchfreq, setdiff)
+
+    # additional checks:
+    #add only if setlength above avg?
+    #try adding to set and keep only if doesn't worsen set diff too much
+    #find central point and drop stdev distance outliers (away from central cluster)
+    # alteernatively:
+    #maybe take the best match as the starting point and incrementally add from all possible matches?
+    # then later on:
+    #run LOO autodrop until the end and choose the global optimal (but will this lead to small sample)
+    
+    # produce final (longest and lowest diff) OLD
+##    print '\n'+'Final matchset (longest and lowest diff):'
+##    orignames,origcoords = [],[]
+##    matchnames,matchcoords = [],[]
+##    resultsets = sorted(resultsets, key=lambda(v,f,d): (-len(v),d) )
+##    bestset,bestf,bestdiff = resultsets[0] # only the first best triangle is used
+##    for (n,c),(mn,mc) in zip(bestset, zip(bestf['properties']['combination'], bestf['geometry']['coordinates']) ):
+##        print 'final',n,c,mn[:50],mc
+##        if c in origcoords or mc in matchcoords:
+##            # in case of duplicates? 
+##            continue
+##        orignames.append(n)
+##        origcoords.append(c)
+##        matchnames.append(mn)
+##        matchcoords.append(mc)
+##    print 'final length', len(bestset), 'diff', diff
+
+    # produce final (longest and lowest diff) NEW
+    print '\n'+'Final matchset (longest and lowest diff):'
+    orignames,origcoords = [],[]
+    matchnames,matchcoords = [],[]
+    origpointsets,matchpointsets,diffs = zip(*resultsets)
+    matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
+    # get final set
+    sortby = lambda(origpointset,matchpointset,setdiff): (-len(origpointset),setdiff)
+    best_origpointset,best_matchpointset,best_setdiff = sorted(zip(origpointsets,matchpointsets,diffs), key=sortby)[0]
+    for (n,c),(mn,mc) in zip(best_origpointset,best_matchpointset):
+        print 'final',n,c,mn[:50],mc
+        if (n,c) in zip(orignames,origcoords) or (mn,mc) in zip(matchnames,matchcoords):
+            # in case of duplicates? 
+            continue
+        orignames.append(n)
+        origcoords.append(c)
+        matchnames.append(mn)
+        matchcoords.append(mc)
+    print 'final length', len(best_origpointset), 'diff', best_setdiff
+
+    ######
+    # DEBUG
+
+    # debug trial matchsets by visualizing on map
 ##    import traceback
 ##    try:
+##        import pythongis as pg
+##        m = pg.renderer.Map()
+##        m.add_layer(r"C:\Users\kimok\Desktop\BIGDATA\priocountries\priocountries.shp")
+##        for origpointset,matchpointset,diff in resultsets:
+##            f = matchpointset
+##            matchpointset = zip(f['properties']['combination'], f['geometry']['coordinates'])
+##            d = pg.VectorData(fields=['matchname','setdiff'])
+##            for mn,mc in matchpointset:
+##                d.add_feature([mn,diff], {'type':'Point', 'coordinates':mc})
+##            m.add_layer(d, fillsize={'key':'setdiff','breaks':[0,0.05,0.1,0.26]}, fillopacity=0.5)
+##        m.view()
+##    except:
+##        traceback.print_exc()
+
+    # debug trial match counts OLD
+##    print '\n'+'Debug matchset counts across trials'
+##    import traceback
+##    try:
+##        final_origpointset,final_matchpointset,final_setdiff = best_origpointset,best_matchpointset,best_setdiff # varnames may need to be changed for the other methods
 ##        origpointsets,matchpointsets,diffs = zip(*resultsets)
 ##        matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
 ##        for origname,origpos,_ in testres:
-##            print origname
+##            print '>>>', origname, origpos
 ##            matches = []
 ##            for origpointset,matchpointset in zip(origpointsets, matchpointsets):
 ##                for origpoint,matchpoint in zip(origpointset, matchpointset):
@@ -286,56 +451,79 @@ def find_matches(test, thresh=0.25, minpoints=8, mintrials=8, maxiter=500, maxca
 ##                        matches.append(matchpoint)
 ##            matchpointcounts = [(matchpoint,len(list(group)))
 ##                                for matchpoint,group in itertools.groupby(sorted(matches))]
-##            for (matchname,matchcoord),count in sorted(matchpointcounts, key=lambda x: -x[1]):
-##                included = (matchname,matchcoord) in zip(bestf['properties']['combination'], bestf['geometry']['coordinates'])
-##                print '  ', included, count, matchname[:100], matchcoord
+##            for i,((matchname,matchcoord),count) in enumerate(sorted(matchpointcounts, key=lambda x: -x[1])):
+##                included = (matchname,matchcoord) in final_matchpointset
+##                print '  ', included, 'count', count, matchname[:100], matchcoord, 'diff', diffs[i], 'setlength', len(matchpointsets[i])
 ##    except:
 ##        traceback.print_exc()
 
-    # produce final (choose best match across all trials)
-    print '\n'+'Final matchset (across trials):'
-    orignames,origcoords = [],[]
-    matchnames,matchcoords = [],[]
-    origpointsets,matchpointsets,diffs = zip(*resultsets)
-    matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
-    # loop each input point
-    for n,c,_ in testres:
-        # find all matches
-        matches = []
-        for origpointset,matchpointset in zip(origpointsets, matchpointsets):
-            for origpoint,matchpoint in zip(origpointset, matchpointset):
-                if origpoint == (n,c):
-                    matches.append(matchpoint)
-        # choose most frequent match
-        matchpointcounts = [(matchpoint,len(list(group)))
-                            for matchpoint,group in itertools.groupby(sorted(matches))]
-        for (mn,mc),count in sorted(matchpointcounts, key=lambda x: -x[1]):
-            break 
-        # final control point
-        orignames.append(n)
-        origcoords.append(c)
-        matchnames.append(mn)
-        matchcoords.append(mc)
-        print 'final',n,c,mn[:100],mc,'(count {})'.format(count)
+    # debug trial match counts NEW
+##    print '\n'+'Debug matchset counts across trials'
+##    import traceback
+##    try:
+##        origpointsets,matchpointsets,diffs = zip(*resultsets)
+##        matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
+##        # collect all corresponding point pairs across sets with extra info
+##        pointpairs = []
+##        for origpointset,matchpointset,setdiff in zip(origpointsets, matchpointsets, diffs):
+##            for origpoint,matchpoint in zip(origpointset, matchpointset):
+##                setlength = len(origpointset)
+##                pointpairs.append((origpoint,matchpoint,setlength,setdiff))
+##        # collect some stats
+##        allorigpoints,allmatchpoints,allsetlengths,allsetdiffs = zip(*pointpairs)
+##        avgsetdiff = sum(allsetdiffs)/float(len(allsetdiffs))
+##        avgsetlength = sum(allsetlengths)/float(len(allsetlengths))
+##        medsetlength = min(allsetlengths) + (max(allsetlengths)-min(allsetlengths))/2.0 #sorted(allsetlengths)[len(allsetlengths)//2]
+##        print 'avgsetdiff:',avgsetdiff,'avgsetlength:',avgsetlength,'medsetlength:',medsetlength
+##        # count match frequency for each matchpoint
+##        matchpoint_counts = {}
+##        groupby = lambda x: x[1]
+##        for matchpoint,group in itertools.groupby(sorted(pointpairs, key=groupby), key=groupby):
+##            matchpoint_counts[matchpoint] = len(list(group))
+##        # group all possible matchpoints with each origpoint
+##        groupby = lambda x: x[0] # origpoint
+##        for origpoint,group in itertools.groupby(sorted(pointpairs, key=groupby), key=groupby):
+##            print '>>>', origpoint[0], origpoint[1]
+##            group = list(group)
+##            # add in match frequency
+##            group = [(origpoint,matchpoint,setlength,matchpoint_counts[matchpoint],setdiff)
+##                     for origpoint,matchpoint,setlength,setdiff in group]
+##            # sort by setlength then setdiff
+##            sortby = lambda x: (-x[-3], x[-1])
+##            for i,(origpoint,matchpoint,setlength,matchfreq,setdiff) in enumerate(sorted(group, key=sortby)):
+##                n,c = origpoint
+##                mn,mc = matchpoint
+##                included = matchpoint in zip(matchnames,matchcoords)
+##                print '  ',included,mn[:50],mc,'(setlength {}, matchfreq {}, setdiff {})'.format(setlength, matchfreq, setdiff)
+##    except:
+##        traceback.print_exc()
 
-    # produce final (lowest diff)
-##    print '\n'+'Final matchset (lowest diff):'
-##    orignames,origcoords = [],[]
-##    matchnames,matchcoords = [],[]
-##    resultsets = sorted(resultsets, key=lambda(v,f,d): (d,-len(v)) )
-##    bestset,bestf,bestdiff = resultsets[0]
-##    for resultset,f,diff in resultsets[:1]: # only the first best triangle is used
-##        for (n,c),(mn,mc) in zip(resultset, zip(f['properties']['combination'], f['geometry']['coordinates']) ):
-##            print 'final',n,c,mn[:100],mc
-##            if c in origcoords or mc in matchcoords:
-##                # ...? 
-##                continue
-##            orignames.append(n)
-##            origcoords.append(c)
-##            matchnames.append(mn)
-##            matchcoords.append(mc)
-##    print 'final diff', diff
-            
+    # debug trial match counts NEW 2 (NOT FINISHED)
+##    print '\n'+'Debug matchset counts across trials'
+##    import traceback
+##    try:
+##        final_origpointset,final_matchpointset,final_setdiff = best_origpointset,best_matchpointset,best_setdiff # varnames may need to be changed for the other methods
+##        origpointsets,matchpointsets,diffs = zip(*resultsets)
+##        matchpointsets = [zip(f['properties']['combination'], f['geometry']['coordinates']) for f in matchpointsets]
+##        for origname,origpos,_ in testres:
+##            print '>>>', origname, origpos
+##            info = []
+##            for origpointset,matchpointset,setdiff in zip(origpointsets, matchpointsets, diffs):
+##                for origpoint,matchpoint in zip(origpointset, matchpointset):
+##                    if origpoint == (origname,origpos):
+##                        matchfreq = len([1 for mset in matchpointsets if matchpoint in mset])
+##                        info.append((matchpoint,origpointset,matchpointset,setdiff))
+##            groupedinfo = 
+##            sortby = lambda(matchpoint,origpointset,matchpointset,setdiff): (-len(matchpointset),setdiff)
+##            for matchpoint,origpointset,matchpointset,setdiff in sorted(info, key=sortby):
+##                count = '???'
+##                setlength = len(matchpointset)
+##                included = matchpoint in final_matchpointset
+##                matchname,matchcoord = matchpoint
+##                print '  ', included, matchname[:100], matchcoord, 'setlength', setlength, 'count', count, 'diff', setdiff
+##    except:
+##        traceback.print_exc()
+
     return zip(orignames, origcoords), zip(matchnames, matchcoords)
 
 
