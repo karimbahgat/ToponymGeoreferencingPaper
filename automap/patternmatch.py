@@ -14,7 +14,7 @@ def normalize(pointset):
         
     xs = [(x-xmin)/float(scale) for x in xs]
     ys = [(y-ymin)/float(scale) for y in ys]
-    pointset = np.array( zip(xs,ys) )
+    pointset = np.array( list(zip(xs,ys)) )
 
     # numpy calc
 ##    pointset = np.array(pointset)

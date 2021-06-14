@@ -28,7 +28,7 @@ class Chain(object):
 
     @staticmethod
     def from_json(js):
-        print 'chain fromjs', js
+        print('chain fromjs', js)
         init = {}
         transforms = [from_json(transdict) for transdict in js['data']['transforms']]
         init['transforms'] = transforms
@@ -390,7 +390,7 @@ class TIN(object):
 
         import shapely
 
-        inpoints = zip(inx,iny)
+        inpoints = list(zip(inx,iny))
         inpoints = shapely.geometry.MultiPoint(inpoints)
         intris = shapely.ops.triangulate(inpoints)
 
@@ -400,7 +400,7 @@ class TIN(object):
             intri_x,intri_y = zip(*intri_points)
             outtri_x = [outx[inx==_x][0] for _x in intri_x]
             outtri_y = [outy[iny==_y][0] for _y in intri_y]
-            outtri_points = zip(outtri_x, outtri_y)
+            outtri_points = list(zip(outtri_x, outtri_y))
             if invert:
                 trans = Polynomial(1)
                 trans.fit(intri_x, intri_y, outtri_x, outtri_y, invert=True)

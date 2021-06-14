@@ -134,7 +134,7 @@ def drop_worst_model(trans, inpoints, outpoints, leave_one_out=False, invert=Fal
         errs.append((inp,outp,err,resids))
 
     # drop the gcp leading to lowest error if dropped
-    inp,outp,err,resids = sorted(errs, key=lambda(i,o,e,r): e)[0] 
+    inp,outp,err,resids = sorted(errs, key=lambda i_o_e_r: i_o_e_r[2])[0] 
     inpoints.remove(inp)
     outpoints.remove(outp)
 
@@ -159,15 +159,15 @@ def auto_drop_models(trans, inpoints, outpoints, improvement_ratio=0.10, minpoin
     err,resids = model_accuracy(trans, _inpoints, _outpoints,
                                 leave_one_out, invert, distance, accuracy)
     seq.append((trans, _inpoints, _outpoints, err, resids))
-    print trans
-    print 'init error',err
+    print(trans)
+    print('init error',err)
 
     # auto refine improvement threshold or minpoints
     while len(_inpoints) > minpoints: #for _ in range(len(inpoints)-trans.minpoints):
-        print len(_inpoints)
+        print(len(_inpoints))
         _trans,_inpoints,_outpoints,_err,_resids = drop_worst_model(trans, _inpoints, _outpoints,
                                                                     leave_one_out, invert, distance, accuracy)
-        print 'new error',_err
+        print('new error',_err)
         
         _preverr = seq[-1][-2]
         impr = (_err-_preverr)/float(_preverr)

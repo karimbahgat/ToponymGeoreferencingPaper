@@ -149,7 +149,7 @@ def detect_text_anchor_distance(textimg, textdata, debug=False):
     #########
     if debug:
         import pyagg
-        print 'text',textdata['text'],w,h,fh,textimg.shape
+        print('text',textdata['text'],w,h,fh,textimg.shape)
         c = pyagg.canvas.from_image(PIL.Image.fromarray(textimg_orig))
         c.custom_space(x1-buff-edge, y1-buff-edge, x2+buff+edge, y2+buff+edge)
         c.draw_box(bbox=[x1,y1,x2,y2], fillcolor=None, outlinecolor='green', outlinewidth='1px')
@@ -158,7 +158,7 @@ def detect_text_anchor_distance(textimg, textdata, debug=False):
     dist_im_arr = cv2.distanceTransform(textimg, cv2.DIST_L2, 3)
     dist_im_arr = dist_im_arr[edge:-edge, edge:-edge] # remove edge !!!! 
     if debug:
-        print 'raw dists',dist_im_arr.max()
+        print('raw dists',dist_im_arr.max())
         PIL.Image.fromarray(dist_im_arr*50).show()
     
     # only find actual anchors of significant size
@@ -169,7 +169,7 @@ def detect_text_anchor_distance(textimg, textdata, debug=False):
     dist_im_arr[dist_im_arr < ch_lower] = 0
     dist_im_arr[dist_im_arr > ch_upper] = 0
     if debug:
-        print 'limit to dist range', ch_lower, ch_upper
+        print('limit to dist range', ch_lower, ch_upper)
 
     # get highest value ie centerpoints in neighbourhood of size fontheight
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (fh,fh))
@@ -184,16 +184,16 @@ def detect_text_anchor_distance(textimg, textdata, debug=False):
     centers = [(pt[1],pt[0]) for pt in np.transpose(centers)]
     centers = [(x1-buff+cx, y1-buff+cy) for cx,cy in centers] # offset to total img coords
     if debug:
-        print 'final dists',dist_im_arr.max(),sorted(centervals, reverse=True)
+        print('final dists',dist_im_arr.max(),sorted(centervals, reverse=True))
 
     # choose the highest value pixel (most concentrated)
     if centers: 
         maxpt = max(centers, key=lambda pt: centervals[centers.index(pt)])
-        maxpt = map(int, maxpt)
+        maxpt = list(map(int, maxpt))
         textdata['anchor'] = maxpt
 
         if debug:
-            print 'found', maxpt, max(centervals)
+            print('found', maxpt, max(centervals))
             for n in centers:
                 c.draw_circle(xy=n, fillsize=centervals[centers.index(n)], fillcolor=None, outlinecolor=(0,0,255), outlinewidth='0.5px')
             c.draw_circle(xy=maxpt, fillsize='3px', fillcolor=None, outlinecolor=(255,0,0), outlinewidth='0.5px')
@@ -238,7 +238,7 @@ def detect_text_anchor_contour(textimg, textdata, debug=False):
     #########
     if debug:
         import pyagg
-        print 'text',r['text'],w,h,fh,textimg.shape
+        print('text',textdata['text'],w,h,fh,textimg.shape)
         c = pyagg.canvas.from_image(PIL.Image.fromarray(textimg_orig))
         c.custom_space(x1-buff-edge, y1-buff-edge, x2+buff+edge, y2+buff+edge)
         c.draw_box(bbox=[x1,y1,x2,y2], fillcolor=None, outlinecolor='green', outlinewidth='1px')
@@ -251,13 +251,13 @@ def detect_text_anchor_contour(textimg, textdata, debug=False):
     ch_lower = fh/4.0
     ch_upper = fh*1.5
     if debug:
-        print 'limit to dist range', ch_lower, ch_upper
+        print('limit to dist range', ch_lower, ch_upper)
     candidates = []
     for cnt in contours:
         # make sure significant size and roughly rectangular shape bbox
         x,y,w,h = cv2.boundingRect(cnt)
         if debug:
-            print 'size', (w,h)
+            print('size', (w,h))
         if not (ch_lower <= w <= ch_upper and ch_lower <= h <= ch_upper and min(w,h)/float(max(w,h))) >= 0.75:
             continue
     
@@ -265,14 +265,14 @@ def detect_text_anchor_contour(textimg, textdata, debug=False):
         area = cv2.contourArea(cnt)
         fillrate = area / float(w*h)
         if debug:
-            print 'area', area, fillrate
+            print('area', area, fillrate)
         if not fillrate >= 0.20:
             continue
 
         # get shape center
         pt = x+w/2.0, y+h/2.0
         pt = x1-buff-edge+pt[0], y1-buff-edge+pt[1] # offset to total img coords
-        pt = map(int, pt)
+        pt = list(map(int, pt))
 
         # ensure within pure buffer
         if not (x1-buff <= pt[0] <= x2+buff and y1-buff <= pt[1] <= y2+buff):
@@ -283,16 +283,16 @@ def detect_text_anchor_contour(textimg, textdata, debug=False):
             continue
 
         if debug:
-            print 'candidate anchor at',pt
+            print('candidate anchor at',pt)
         candidates.append((cnt,pt))
 
     if candidates:
         # choose the largest contour as anchor
-        cnt,pt = sorted(candidates, key=lambda(cnt,pt): cv2.contourArea(cnt))[-1]
+        cnt,pt = sorted(candidates, key=lambda cnt_pt: cv2.contourArea(cnt_pt[0]))[-1]
         textdata['anchor'] = pt
 
         if debug:
-            print 'final anchor at', pt
+            print('final anchor at', pt)
             for _cnt,_pt in candidates:
                 c.draw_circle(xy=_pt, fillsize='3px', fillcolor=None, outlinecolor=(0,0,255), outlinewidth='0.5px')
             c.draw_circle(xy=pt, fillsize='5px', fillcolor=None, outlinecolor=(255,0,0), outlinewidth='1px')

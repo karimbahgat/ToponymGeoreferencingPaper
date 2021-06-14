@@ -11,7 +11,7 @@ import automap as mapfit
 
 def render_image_output(imagepath, georefpath):
     # load image
-    print 'loading'
+    print('loading')
     im = Image.open(imagepath)
     imagedata = pg.RasterData(image=im)
     
@@ -88,7 +88,7 @@ def render_georeferencing_output(georefpath):
                      legend=False)
 
     # load georeferenced image
-    print 'loading'
+    print('loading')
     georefdata = pg.RasterData(georefpath)
     georefdata.mask = georefdata.bands[-1].compute('255-val').img # use alpha band as mask
     render.add_layer(georefdata, transparency=0.3,
@@ -501,12 +501,12 @@ def render_image_errors(georef_fil, truth_fil, error_type):
 
     # original/simulated map
     truth = pg.RasterData(truth_fil)
-    print truth.affine
+    print(truth.affine)
     
     # georeferenced/transformed map
     georef = pg.RasterData(georef_fil)
     georef.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
-    print georef.affine
+    print(georef.affine)
 
     # calc error surface
     with open('{}_transform.json'.format(georef_root), 'r') as fobj:
@@ -523,12 +523,12 @@ def render_georeferencing_errors(georef_fil, truth_fil, error_type, errors=True,
 
     # original/simulated map
     truth = pg.RasterData(truth_fil)
-    print truth.affine
+    print(truth.affine)
     
     # georeferenced/transformed map
     georef = pg.RasterData(georef_fil)
     georef.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
-    print georef.affine
+    print(georef.affine)
 
     # calc error sampling trans
     if errors or arrows:

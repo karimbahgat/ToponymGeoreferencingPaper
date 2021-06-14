@@ -63,7 +63,7 @@ def warp(im, transform, invtransform, resample='nearest'):
 
 
     # get output bounds
-    print 'calculating coordinate bounds'
+    print('calculating coordinate bounds')
     imw,imh = im.size
     xmin,ymin,xmax,ymax = imbounds(imw, imh, transform)
     print(xmin,ymin,xmax,ymax)
@@ -117,7 +117,7 @@ def warp(im, transform, invtransform, resample='nearest'):
 ##
 ##        PIL.Image.fromarray(outarr).show()
     
-        print 'backwards mapping and resampling'
+        print('backwards mapping and resampling')
 ##        coords = []
 ##        for row in range(h):
 ##            y = yoff + row*yscale
@@ -138,7 +138,7 @@ def warp(im, transform, invtransform, resample='nearest'):
         backpred = np.column_stack((backpredx, backpredy))
         backpred = backpred.reshape((h,w,2))
         
-        print 'writing to output'
+        print('writing to output')
         # slow, can prob optimize even more by using direct numpy indexing
         # 4 bands, fourth is the alpha, invisible for pixels that were not sampled
         # currently assumes input image is RGBA only... 

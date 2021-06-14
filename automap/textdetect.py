@@ -9,8 +9,14 @@ import re
 
 import pytesseract
 
+try:
+    basestring
+except:
+    basestring = (bytes,str)
+
 
 #pytesseract.pytesseract.tesseract_cmd = '/home/cdsw/conda/bin/tesseract'
+pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract'
 
 
 def run_ocr(im, bbox=None, mode=11):
@@ -21,7 +27,9 @@ def run_ocr(im, bbox=None, mode=11):
     #data = pytesseract.image_to_data(im, lang='eng+fra', config='--psm {} --tessdata-dir "{}"'.format(mode, r'C:\Users\kimok\Desktop\tessdata_fast')) # +equ
     drows = [[v for v in row.split('\t')] for row in data.split('\n')]
     dfields = drows.pop(0)
-    drows = [dict(zip(dfields,row)) for row in drows]
+    drows = [dict(zip(dfields,row)) 
+            for row in drows
+            if len(row) == len(dfields)]
     
     # some standardizations
     for d in drows:
@@ -84,7 +92,7 @@ def refine_textbox(im_arr, textdata):
             ystart = y
             break
     yend = textdata['top'] + textdata['height']
-    for y,ycount in reversed(zip(ys,horiz)):
+    for y,ycount in reversed(list(zip(ys,horiz))):
         if ycount >= histthresh:
             yend = y
             break
@@ -116,7 +124,7 @@ def refine_textbox(im_arr, textdata):
             xstart = x
             break
     xend = textdata['left'] + textdata['width']
-    for x,xcount in reversed(zip(xs,vertic)):
+    for x,xcount in reversed(list(zip(xs,vertic))):
         if xcount >= histthresh:
             xend = x
             break
@@ -136,9 +144,9 @@ def refine_textbox(im_arr, textdata):
     y1change = (ystart-textdata['top']) / float(textdata['height'])
     y2change = (yend-(textdata['top']+textdata['height'])) / float(textdata['height'])
     if debug:
-        print 'text', textdata['text'], (textdata['width'],textdata['height']), 'was at x1,x2,y1,y2', textdata['left'], textdata['left']+textdata['width'], textdata['top'], textdata['top']+textdata['height']
-        print 'refined to x1,x2,y1,y2', xstart, xend, ystart, yend
-        print 'as percent', x1change, x2change, y1change, y2change
+        print('text', textdata['text'], (textdata['width'],textdata['height']), 'was at x1,x2,y1,y2', textdata['left'], textdata['left']+textdata['width'], textdata['top'], textdata['top']+textdata['height'])
+        print('refined to x1,x2,y1,y2', xstart, xend, ystart, yend)
+        print('as percent', x1change, x2change, y1change, y2change)
 
     # only change boundaries that change beyond threshold
     xchangethresh = 1.5 # left right moved by >1.5x font height
@@ -218,13 +226,13 @@ def sniff_text_colors(im, seginfo=None, min_samples=4, max_samples=4+4**2, max_t
             xs,ys = zip(*[p for p in mapregion['coordinates'][0]])
             xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
     bbox = [xmin,ymin,xmax,ymax]
-    print 'sniffing inside', bbox
+    print('sniffing inside', bbox)
 
     sw,sh = 300,300
     
     texts = []
     for i,q in enumerate(segmentation.sample_quads(bbox, (sw,sh))):
-        print '# sample',i,q
+        print('# sample',i,q)
 
         # crop sample of image
         x1,y1,x2,y2 = q.bbox()
@@ -336,7 +344,7 @@ def sniff_text_colors(im, seginfo=None, min_samples=4, max_samples=4+4**2, max_t
     textcolors = [t[1] for t in texts]
     coldiffs = [t[2] for t in texts]
     colorgroups = segmentation.group_colors(textcolors, 15)
-    print 'textcolors detected',[(col,len(cols)) for col,cols in colorgroups.items()]
+    print('textcolors detected',[(col,len(cols)) for col,cols in colorgroups.items()])
     #segmentation.view_colors(textcolors)
     
     # pair each group color member with their coldiff
@@ -529,10 +537,10 @@ def extract_texts_parallel(im, textcolors, threshold=25, textconf=60, max_procs=
 
         # initiate processes stepwise
         for i,box in enumerate(boxes):
-            print 'processing img tile', box, i+1, 'of', len(boxes)
+            print('processing img tile', box, i+1, 'of', len(boxes))
             
             for textcolor,thresh in zip(textcolors, threshold):
-                print 'color',textcolor
+                print('color',textcolor)
                 
                 # manual procs
                 p = pool.apply_async(extract_texts,
@@ -636,7 +644,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60, bbox=None):
     texts = []
     
     # upscale
-    print 'upscaling'
+    print('upscaling')
     upscale = im.resize((im.size[0]*2,im.size[1]*2), PIL.Image.LANCZOS)
     #lab = segmentation.rgb_to_lab(upscale)
     #l,a,b = lab.split()
@@ -650,7 +658,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60, bbox=None):
     
     for col,colthresh in zip(textcolors,threshold):
         # calculate color difference
-        print 'isolating color', col, colthresh
+        print('isolating color', col, colthresh)
         diff = segmentation.color_difference(upscale, col)
 
         # mask based on color difference threshold
@@ -685,9 +693,9 @@ def extract_texts(im, textcolors, threshold=25, textconf=60, bbox=None):
         #PIL.Image.fromarray(imarr).show()
         
         # detect text
-        print 'running ocr'
+        print('running ocr')
         data = run_ocr(lmaskim)
-        print 'processing text'
+        print('processing text')
         for text in data:
             
             # process text
@@ -738,7 +746,7 @@ def extract_texts(im, textcolors, threshold=25, textconf=60, bbox=None):
 
 def auto_detect_text(im, textcolors=None, colorthresh=25, textconf=60, parallel=False, sample=False, seginfo=None, max_procs=None, max_samples=8, max_texts=10, max_sniff_samples=4+4**2, max_sniff_texts=3):
     if not textcolors:
-        print 'sniffing text colors'
+        print('sniffing text colors')
         colorgroups = sniff_text_colors(im, seginfo=seginfo, max_samples=max_sniff_samples, max_texts=max_sniff_texts)
 
         # colors as color groupings

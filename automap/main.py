@@ -23,6 +23,12 @@ import json
 import itertools
 import warnings
 
+# PY3 Fix
+try: 
+    basestring
+except:
+    basestring = (bytes,str)
+
 
 ### FUNCS FOR DIFFERENT STAGES
 
@@ -70,7 +76,7 @@ def text_detection(text_im, textcolor, colorthresh, textconf, parallel, sample, 
     # Text detection
     
     # detect text
-    print '(detecting text)'
+    print('(detecting text)')
     if textcolor and not isinstance(textcolor, list):
         textcolor = [textcolor]
     texts = textdetect.auto_detect_text(text_im, textcolors=textcolor, colorthresh=colorthresh, textconf=textconf, parallel=parallel, sample=sample, seginfo=seginfo, max_procs=max_procs)
@@ -79,13 +85,13 @@ def text_detection(text_im, textcolor, colorthresh, textconf, parallel, sample, 
     # deduplicate overlapping texts from different colors
     # very brute force...
     if len(toponym_colors) > 1:
-        print '(deduplicating texts of different colors)'
-        print 'textlen',len(texts)
+        print('(deduplicating texts of different colors)')
+        print('textlen',len(texts))
         # for every combination of text colors
         for col,col2 in itertools.combinations(toponym_colors, 2):
             coltexts = [r for r in texts if r['color'] == col]
             coltexts2 = [r for r in texts if r['color'] == col2]
-            print 'comparing textcolor',map(int,col),len(coltexts),'with',map(int,col2),len(coltexts2)
+            print('comparing textcolor',map(int,col),len(coltexts),'with',map(int,col2),len(coltexts2))
             # we got two different colored groups of text
             for r in coltexts:
                 for r2 in coltexts2:
@@ -100,15 +106,15 @@ def text_detection(text_im, textcolor, colorthresh, textconf, parallel, sample, 
                         #text_im.crop((r2['left'], r2['top'], r2['left']+r2['width'], r2['top']+r2['height'])).show()
                         if r2['color_match'] > r['color_match'] and not math.isnan(r2['color_match']):
                             r2['drop'] = True
-                            print u'found duplicate texts of different colors, keeping "{}" (color match={:.2f}), dropping "{}" (color match={:.2f})'.format(r['text_clean'],r['color_match'],r2['text_clean'],r2['color_match'])
+                            print(u'found duplicate texts of different colors, keeping "{}" (color match={:.2f}), dropping "{}" (color match={:.2f})'.format(r['text_clean'],r['color_match'],r2['text_clean'],r2['color_match']))
                         else:
                             r['drop'] = True
-                            print u'found duplicate texts of different colors, keeping "{}" (color match={:.2f}), dropping "{}" (color match={:.2f})'.format(r2['text_clean'],r2['color_match'],r['text_clean'],r['color_match'])
+                            print(u'found duplicate texts of different colors, keeping "{}" (color match={:.2f}), dropping "{}" (color match={:.2f})'.format(r2['text_clean'],r2['color_match'],r['text_clean'],r['color_match']))
         texts = [r for r in texts if not r.get('drop')]
-        print 'textlen deduplicated',len(texts)
+        print('textlen deduplicated',len(texts))
 
     # connect texts
-    print '(connecting texts)'
+    print('(connecting texts)')
     grouped = []
     # connect each color texts separately
     for col in toponym_colors:
@@ -149,11 +155,11 @@ def toponym_selection(im, textinfo, seginfo):
     texts = [f['properties'] for f in textinfo['features']]
 
     # filter toponym candidates
-    print 'filtering toponym candidates'
+    print('filtering toponym candidates')
     topotexts = toponyms.filter_toponym_candidates(texts, seginfo)
 
     # text anchor points
-    print 'determening toponym anchors'
+    print('determening toponym anchors')
     topotexts = toponyms.detect_toponym_anchors(im, texts, topotexts)
 
     # create control points from toponyms
@@ -179,7 +185,7 @@ def match_control_points(toponyminfo, matchthresh, db, source, **kwargs):
     origs,matches = triangulate.best_matchset(matchsets)
     orignames,origcoords = zip(*origs)
     matchnames,matchcoords = zip(*matches)
-    tiepoints = zip(origcoords, matchcoords)
+    tiepoints = list(zip(origcoords, matchcoords))
 
     # store metadata
     gcps_matched_info = {'type': 'FeatureCollection', 'features': []}
@@ -200,7 +206,7 @@ def estimate_transform(imageinfo, gcps_matched_info, warp_order, residual_type):
     matchnames = [f['properties']['matchname'] for f in gcps_matched_info['features']]
     origcoords = [(f['properties']['origx'],f['properties']['origy']) for f in gcps_matched_info['features']]
     matchcoords = [(f['properties']['matchx'],f['properties']['matchy']) for f in gcps_matched_info['features']]
-    tiepoints = zip(origcoords, matchcoords)
+    tiepoints = list(zip(origcoords, matchcoords))
 
     if warp_order:
         # setup
@@ -220,21 +226,21 @@ def estimate_transform(imageinfo, gcps_matched_info, warp_order, residual_type):
                                              leave_one_out=True,
                                              invert=invert, distance=distance,
                                              accuracy='rmse')
-        print '{} points, RMSE: {}'.format(len(pixels), err)
+        print('{} points, RMSE: {}'.format(len(pixels), err))
 
         # enforce some minimum residual? 
         # ... 
 
         # auto drop points that best improve model
-        print 'dropping points to improve model'
+        print('dropping points to improve model')
         trans, pixels, coords, err, resids = accuracy.auto_drop_models(trans, pixels, coords,
                                                                      improvement_ratio=0.10,
                                                                      minpoints=None,
                                                                      leave_one_out=True,
                                                                      invert=invert, distance=distance,
                                                                      accuracy='rmse')
-        tiepoints = zip(pixels, coords)
-        print '{} points, RMSE: {}'.format(len(pixels), err)
+        tiepoints = list(zip(pixels, coords))
+        print('{} points, RMSE: {}'.format(len(pixels), err))
 
     else:
         # setup
@@ -250,14 +256,14 @@ def estimate_transform(imageinfo, gcps_matched_info, warp_order, residual_type):
         pixels,coords = zip(*tiepoints)
 
         # initial points
-        print '{} points'.format(len(pixels))
+        print('{} points'.format(len(pixels)))
 
         # auto get optimal transform
-        print 'autodetecting optimal transform'
+        print('autodetecting optimal transform')
         # TODO: maybe allow improvement_ratio and minpoints params
         trans, pixels, coords, err, resids = accuracy.auto_choose_model(pixels, coords, trytrans, invert=invert, distance=distance, accuracy='rmse')
-        tiepoints = zip(pixels, coords)
-        print '{} points, RMSE: {}'.format(len(pixels), err)
+        tiepoints = list(zip(pixels, coords))
+        print('{} points, RMSE: {}'.format(len(pixels), err))
 
     # estimate final forward transform for image warping
     (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
@@ -459,7 +465,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
 
 
     # determine input image
-    print '\n' + 'loading image', im
+    print('\n' + 'loading image', im)
     if inpath:
         # load from path
         im = PIL.Image.open(inpath)
@@ -487,7 +493,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
 
     ################
     # Image partitioning
-    print '\n' + 'image segmentation'
+    print('\n' + 'image segmentation')
 
     # remove unwanted parts of image? 
     text_im = im
@@ -518,7 +524,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
         with open(pth, 'w') as writer:
             json.dump(info['segmentation'], writer)
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    print('\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start))
     
 
 
@@ -527,7 +533,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     # Text detection
     
     # detect text
-    print '\n' + 'detecting text'
+    print('\n' + 'detecting text')
     t = time.time()
     textinfo = priors.get('text_recognition', None)
     if textinfo:
@@ -552,7 +558,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
         with open(pth, 'w') as writer:
             json.dump(info['text_recognition'], writer)
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    print('\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start))
 
 
 
@@ -561,7 +567,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     # Toponym selection
 
     # text anchor points
-    print '\n' + 'seleting toponyms with anchor points'
+    print('\n' + 'seleting toponyms with anchor points')
     t = time.time()
     toponyminfo = priors.get('toponym_candidates', None)
     if toponyminfo:
@@ -586,7 +592,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
         with open(pth, 'w') as writer:
             json.dump(info['toponym_candidates'], writer)
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    print('\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start))
 
     
 
@@ -595,7 +601,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     # Control point matching
 
     # find matches
-    print '\n' + 'finding matches'
+    print('\n' + 'finding matches')
     t = time.time()
     #gcps_matched_info = match_control_points(toponyminfo, matchthresh, db, source, **kwargs)
     gcps_matched_info = priors.get('gcps_matched', None)
@@ -627,7 +633,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
         with open(pth, 'w') as writer:
             json.dump(info['gcps_matched'], writer)
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    print('\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start))
 
 
 
@@ -636,7 +642,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     # Transform Estimation
 
     # estimate the transform and return final gcps
-    print '\n' + 'estimating transformation'
+    print('\n' + 'estimating transformation')
     t = time.time()
     transinfo = priors.get('transform_estimation', None)
     gcps_final_info = priors.get('gcps_final', None)
@@ -654,7 +660,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     info['gcps_final'] = gcps_final_info
     info['transform_estimation'] = transinfo
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    print('\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start))
 
 
 
@@ -664,7 +670,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     # Calculate model errors
 
     # estimate the model errors and return info
-    print '\n' + 'calculating errors'
+    print('\n' + 'calculating errors')
     t = time.time()
     errinfo = calculate_errors(imageinfo, gcps_final_info)
 
@@ -675,7 +681,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     # store metadata
     info['error_calculation'] = errinfo
 
-    print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+    print('\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start))
     
 
 
@@ -699,8 +705,8 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     #################
     # Warping
     if warp:
-        print '\n' + 'warping'
-        print '{} points, warp_method={}'.format(len(gcps_final_info['features']), transinfo['forward'])
+        print('\n' + 'warping')
+        print('{} points, warp_method={}'.format(len(gcps_final_info['features']), transinfo['forward']))
 
         # mask the image before warping
         mapp_im = im
@@ -718,7 +724,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
         # store metadata
         info['warping'] = warp_info
 
-        print '\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start)
+        print('\n'+'time so far: {:.1f} seconds \n'.format(time.time() - start))
 
 
 
@@ -730,8 +736,8 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     timinginfo['total'] = total_time
     info['timings'] = timinginfo
     
-    print '\n'+'finished!'
-    print 'total runtime: {:.1f} seconds \n'.format(total_time)
+    print('\n'+'finished!')
+    print('total runtime: {:.1f} seconds \n'.format(total_time))
 
 
 
@@ -740,7 +746,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
     # Save output?
 
     if outpath:
-        print '\n' + 'saving output'
+        print('\n' + 'saving output')
         
         # warped image
         if warp:
@@ -764,7 +770,7 @@ def automap(im, outpath=True, matchthresh=0.25, textcolor=None, colorthresh=25, 
             json.dump(info['error_calculation'], writer)
 
     if outpath and debug:
-        print '\n' + 'saving final debug data'
+        print('\n' + 'saving final debug data')
 
         # timings
         pth = os.path.join(outfold, outfil+'_debug_timings.json')

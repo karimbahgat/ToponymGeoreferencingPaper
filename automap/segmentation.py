@@ -44,7 +44,7 @@ def color_difference(im, color):
     target = convert_color(sRGBColor(*color, is_upscaled=True), LabColor).get_value_tuple()
     counts,colors = zip(*im.getcolors(256)) # somehow much faster than numpy... 
     #colors,counts = np.unique(im_arr.reshape(-1, 3), return_counts=True, axis=0)
-    colors,counts = map(tuple,colors), map(int,counts)
+    colors,counts = list(map(tuple,colors)), list(map(int,counts))
     colors_lab = [convert_color(sRGBColor(*col, is_upscaled=True), LabColor).get_value_tuple()
                   for col in colors]
     diffs = delta_e_cie2000(target, np.array(colors_lab))
@@ -98,7 +98,7 @@ def group_colors(colors, thresh=10, categories=None):
             diffgroups[nearest].append(c) 
             # update that group key as the new central color (lowest avg dist to group members)
             gdists = [(gc1,[pairdiffs[tuple(sorted([c,gc]))] for gc2 in diffgroups[nearest]]) for gc1 in diffgroups[nearest]]
-            central = sorted(gdists, key=lambda(gc,gds): sum(gds)/float(len(gds)))[0][0]
+            central = sorted(gdists, key=lambda gc_gds: sum(gc_gds[1])/float(len(gc_gds[1])))[0][0]
             diffgroups[central] = diffgroups.pop(nearest)
         else:
             # create new group
@@ -118,7 +118,7 @@ def view_colors(colors):
     c.percent_space()
     x = 2
     for i,g in enumerate(colors):
-        print i, g
+        print(i, g)
         x += 2
         c.draw_line([(x,0),(x,100)], fillcolor=g, fillsize=2)
     c.get_image().show()
