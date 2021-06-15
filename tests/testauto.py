@@ -5,7 +5,7 @@ from automap import automap
 #from automap.main import debug_warped
 
 #db = r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db"
-db = r"P:\(Temp Backup)\gazetteer data\optim\gazetteers.db"
+db = r"C:\Users\kimok\Downloads\gazetteers.db"
 
 print('beginning')
 

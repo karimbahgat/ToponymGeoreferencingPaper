@@ -16,7 +16,7 @@ except:
 
 
 #pytesseract.pytesseract.tesseract_cmd = '/home/cdsw/conda/bin/tesseract'
-pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract'
+#pytesseract.pytesseract.tesseract_cmd = 'C:/Program Files/Tesseract-OCR/tesseract'
 
 
 def run_ocr(im, bbox=None, mode=11):
