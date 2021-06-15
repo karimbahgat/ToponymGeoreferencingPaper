@@ -10,7 +10,7 @@ setup(	long_description="Automated map georeferencing", #open("README.rst").read
 	version="""0.2.0""",
 	keywords="""map georeferencing""",
 	packages=['automap'],
-    install_requires=['Pillow', 'numpy', 'opencv-python', 'colormath', 'pytesseract'],
+    install_requires=['Pillow', 'numpy', 'opencv-python', 'colormath', 'pytesseract',
 					'PythonGIS @ git+https://github.com/karimbahgat/PythonGis'],
 	#dependency_links=['http://github.com/karimbahgat/PythonGis/tarball/master#egg=PythonGIS-0.3.0'],
 	classifiers=['License :: OSI Approved', 'Programming Language :: Python', 'Development Status :: 4 - Beta', 'Intended Audience :: Developers', 'Intended Audience :: Science/Research', 'Intended Audience :: End Users/Desktop'],
