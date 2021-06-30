@@ -1,36 +1,30 @@
-# AutoMap
+# Toponym Georeferencing Paper - Replication Code
 
-This repository contains the algorithm and simulation code for the paper "A Toponym-Based Approach to the Automated Georeferencing of Physically Mapped Documents: The TAAG Algorithm", by Karim Bahgat and Dan Runfola (2020). 
-
-For any subsequent updates or bug fixes, go to the GitHub repository at https://github.com/karimbahgat/AutoMap. 
+This repository contains the algorithm and simulation code for the paper "Toponym-assisted map georeferencing: Evaluating the use of toponyms for the digitization of map collections", by Karim Bahgat and Dan Runfola (2021). 
 
 ## Installation
 
-The code and packages in this repository only works on Python 2.7. 
+The code and packages in this repository works on Python 2.7 and 3.x. 
 
-The main package for map georeferencing is contained in the "automap" package folder. Note that this version of the package is intended solely for replicating the results of the article -- a more user-friendly standalone georeferencing package will be announced at a later point, see https://github.com/karimbahgat/AutoMap for updates. 
+The main package for map georeferencing is contained in the "automap" package folder. Note that this package is intended solely for replicating the implementation and results used in the article -- a more user-friendly standalone georeferencing package may be announced at a later point. 
 
-To install the "automap" package on your machine, write the following from the commandline:
+To install this package and all the necessary dependencies on your machine, write the following from the commandline:
 
 ```
-pip install git+https://github.com/karimbahgat/AutoMap
+pip install git+https://github.com/karimbahgat/ToponymGeoreferencingPaper
 ``` 
 
 ### Tesseract
 
-The text recognition part requires that you have Tesseract installed on your machine. This can be done via Anaconda, by typing:
-
-```
-conda install -y -c conda-forge tesseract
-```
+The text recognition part requires that you have Tesseract installed on your machine. For information on how to install Tesseract, see https://tesseract-ocr.github.io/tessdoc/Installation.html. 
 
 ## Simulation replication
 
-Once the "automap" package is installed, the "simulations" folder of this repository contains the scripts necessary to replicate the results for the automated map georeferencing parts of the article. Start by downloading and extracting the "simulations" folder to your local computer. 
+The "simulations" folder of this repository contains the scripts necessary to replicate the results for the automated map georeferencing parts of the article. 
 
 ### Data dependencies
 
-The simulation scripts are dependent on several external data files. These data dependencies are not included in this repository due to file size restrictions, but instead have to be downloaded as a zipfile from [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3894607.svg)](https://doi.org/10.5281/zenodo.3894607). The contents of the zipfile should be extracted to the "simulations/data" folder. 
+The simulation scripts are dependent on several external data files. These data dependencies are not included in this repository due to file size restrictions, but instead have to be downloaded as a zipfile from URL-TO-BE-ADDED-LATER. The contents of the zipfile should be extracted to the "simulations/data" folder. 
 
 ### Replicating the results
 

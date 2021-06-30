@@ -263,7 +263,7 @@ def estimate_transform(imageinfo, gcps_matched_info, warp_order, residual_type):
         # TODO: maybe allow improvement_ratio and minpoints params
         trans, pixels, coords, err, resids = accuracy.auto_choose_model(pixels, coords, trytrans, invert=invert, distance=distance, accuracy='rmse')
         tiepoints = list(zip(pixels, coords))
-        print('{} points, RMSE: {}'.format(len(pixels), err))
+        print('final {} points, RMSE: {}'.format(len(pixels), err))
 
     # estimate final forward transform for image warping
     (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)

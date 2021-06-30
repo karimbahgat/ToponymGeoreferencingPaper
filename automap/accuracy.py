@@ -198,7 +198,12 @@ def auto_choose_model(inpoints, outpoints, transforms, refine_outliers=True, **k
         #print trans
         # note that leave_one_out is hardcoded in order to compare across models
         if refine_outliers:
+            # Drop outliers based on LOO resids (slower)
             res = auto_drop_models(trans, inpoints, outpoints, leave_one_out=True, **kwargs)
+            # Drop outliers based on normal resids (much faster)
+            #trans, inpoints, outpoints, err, resids = auto_drop_models(trans, inpoints, outpoints, leave_one_out=False, **kwargs)
+            #err,resids = model_accuracy(trans, inpoints, outpoints, leave_one_out=True, **kwargs)
+            #res = trans, inpoints, outpoints, err, resids
         else:
             err,resids = model_accuracy(trans, inpoints, outpoints, leave_one_out=True, **kwargs)
             res = trans, inpoints, outpoints, err, resids
