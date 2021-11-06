@@ -90,7 +90,7 @@ if __name__ == '__main__':
                        args=[georeference_auto],
                        kwargs=dict(fil='maps/{}'.format(fil),
                                    outfil='output/{}_georeferenced_auto.tif'.format(fil_root),
-                                   db="data/gazetteers.db",
+                                   db="../data/gazetteers.db",
                                    source='best',
                                    textcolor=TEXTCOLOR,
                                    warp_order=WARPORDER,

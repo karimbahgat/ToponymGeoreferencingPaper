@@ -153,12 +153,12 @@ def run_error_assessment(georef_fil, truth_fil):
 
     # original/simulated map
     truth = pg.RasterData('maps/{}'.format(truth_fil))
-    print truth.affine
+    print(truth.affine)
     
     # georeferenced/transformed map
     georef = pg.RasterData('output/{}'.format(georef_fil))
     georef.mask = georef.bands[-1].compute('255-val').img # use alpha band as mask
-    print georef.affine
+    print(georef.affine)
 
     # calc error surface
     with open('output/{}_transform.json'.format(georef_root), 'r') as fobj:

@@ -224,7 +224,7 @@ w.add_feature([], geoj)
 m.add_layer(w, fillcolor=(0,118,190), fillopacity=0.3)
 
 # countries
-m.add_layer('data/ne_10m_admin_0_countries.shp',
+m.add_layer('../data/ne_10m_admin_0_countries.shp',
            fillcolor=(72,191,145))
 
 # footprints

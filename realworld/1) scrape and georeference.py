@@ -12,7 +12,7 @@ import automap as mapfit
 
 print(os.getcwd())
 try:
-    os.chdir('simulations')
+    os.chdir('realworld')
 except:
     pass
 
@@ -197,7 +197,7 @@ def map_georef(img): #url):
     print(img)
   
     # set params
-    params = dict(db='data/gazetteers.db', 
+    params = dict(db='../data/gazetteers.db', 
                   source='best', 
                   textcolor=(0,0,0),
                   warp=False)

@@ -13,7 +13,7 @@ import automap as mapfit
 
 print(os.getcwd())
 try:
-    os.chdir('simulations')
+    os.chdir('realworld')
 except:
     pass
 
@@ -51,7 +51,7 @@ if True:
     #  cur.execute('insert into data values ({})'.format(qs), vals)
     #db.commit()
 
-print out
+print(out)
 
 # drop weird maps from the automatic scraping process 
 # (pure islands, no toponyms, non-maps)
@@ -256,11 +256,11 @@ if 1:
     import urllib
     print('dl east')
     urllib.urlretrieve('https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57752/land_shallow_topo_west.tif',
-                       'data/land_shallow_topo_west.tif'
+                       '../data/land_shallow_topo_west.tif'
                       )
     print('dl west')
     urllib.urlretrieve('https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57752/land_shallow_topo_east.tif',
-                       'data/land_shallow_topo_east.tif'
+                       '../data/land_shallow_topo_east.tif'
                       )
     
 print('open global sats')
@@ -270,11 +270,11 @@ PIL.Image.MAX_IMAGE_PIXELS = 466560000*2
 scale = 180.0/21600
 affine = [scale,0,-180,
          0,-scale,90]
-sat_west = pg.RasterData('data/land_shallow_topo_west.tif', affine=affine)
+sat_west = pg.RasterData('../data/land_shallow_topo_west.tif', affine=affine)
 sat_west.set_geotransform(affine=affine)
 affine = [scale,0,0,
          0,-scale,90]
-sat_east = pg.RasterData('data/land_shallow_topo_east.tif', affine=affine)
+sat_east = pg.RasterData('../data/land_shallow_topo_east.tif', affine=affine)
 sat_east.set_geotransform(affine=affine)
 def get_sat(bbox, padding=0):
     if padding:
@@ -322,15 +322,15 @@ def view_georef(f):
             b.compute('min(val+50, 255)')
         m.add_layer(sat)
         
-    #rivers = pg.VectorData('data/ne_10m_rivers_lake_centerlines.shp')
+    #rivers = pg.VectorData('../data/ne_10m_rivers_lake_centerlines.shp')
     #m.add_layer(rivers, fillcolor=(54,115,159,200))
     
-    roads = pg.VectorData('data/ne_10m_roads.shp')
+    roads = pg.VectorData('../data/ne_10m_roads.shp')
     roads = roads.select(lambda f: not 'Ferry' in f['type'])
     m.add_layer(roads, fillcolor=(0,0,0,255), fillsize='7px')
     m.add_layer(roads, fillcolor=(255,255,0,255), fillsize='5px')
     
-    countries = pg.VectorData('data/ne_10m_admin_0_countries.shp')
+    countries = pg.VectorData('../data/ne_10m_admin_0_countries.shp')
     m.add_layer(countries, fillcolor=None, outlinecolor=(255,255,255,200), outlinewidth='5px') #(255,222,173))
     
     m.add_layer(georef, transparency=0.4)
@@ -400,7 +400,7 @@ import math
 
 def create_map(feats):
   #m = pg.renderer.Map(width=4000,height=2000,background=(91,181,200))
-  #world = pg.VectorData('data/ne_10m_admin_0_countries.shp',
+  #world = pg.VectorData('../data/ne_10m_admin_0_countries.shp',
   #                     )
   #m.add_layer(world, fillcolor=(255,222,173), outlinewidth='2px')
   #m.zoom_bbox(-19,-39,53,42)
@@ -421,7 +421,7 @@ def create_map(feats):
   m.add_layer(w, fillcolor=(91,181,200))
 
   # countries
-  m.add_layer('data/ne_10m_admin_0_countries.shp',
+  m.add_layer('../data/ne_10m_admin_0_countries.shp',
              fillcolor=(255,222,173),
              outlinewidth='3px')
   for i,f in enumerate(feats):
@@ -897,12 +897,12 @@ def table(error_type='max'):
         row = f.row + [cumul]
         row[-2:] = [round(v,1) for v in row[-2:]]
         latexrow = ' & '.join(map(str,row)) + ' \\\\'
-        print latexrow
+        print(latexrow)
         
     #print ['failed', len(stats)-len(success), (len(stats)-len(success))/float(len(stats))*100, 'NA']
     row = ['total', len(stats), 100.0, 100.0]
     latexrow = ' & '.join(map(str,row)) + ' \\\\'
-    print latexrow
+    print(latexrow)
 
 table('max')
 
@@ -945,7 +945,7 @@ def table():
         
         #print row
         latexrow = ' & '.join(map(str,row)) + ' \\\\'
-        print latexrow
+        print(latexrow)
 
 table()
 
@@ -986,12 +986,12 @@ def table():
         row = f.row + [cumul]
         row[-2:] = ['{:.1f}\%'.format(v) for v in row[-2:]]
         latexrow = ' & '.join(map(str,row)) + ' \\\\'
-        print latexrow
+        print(latexrow)
         
     #print ['failed', len(stats)-len(success), (len(stats)-len(success))/float(len(stats))*100, 'NA']
     row = ['total', len(sub), 100.0, 100.0]
     latexrow = ' & '.join(map(str,row)) + ' \\\\'
-    print latexrow
+    print(latexrow)
 
 table()
 
@@ -1048,15 +1048,15 @@ paramlabels = dict(extents='mapExtent (km)',
 def printstats(errors):
     import numpy as np
     errors = np.array(errors)
-    print '-> count', len(errors)
+    print('-> count', len(errors))
     if not len(errors):
         return
-    print '-> median', np.median(errors)
-    print '-> mean', errors.mean()
-    print '-> max', errors.max()
+    print('-> median', np.median(errors))
+    print('-> mean', errors.mean())
+    print('-> max', errors.max())
 
 def boxplot_stats(ax, param, vals, xlabel=True, **baselinevals):
-    print param
+    print(param)
     #ax.set_title(param)
     if xlabel:
         paramlabel = paramlabels[param]
@@ -1081,7 +1081,7 @@ def boxplot_stats(ax, param, vals, xlabel=True, **baselinevals):
         sub = stats.select(lambda f: f['rendopts'] and f['accuracy'] and is_param_baseline(f) and paramkeys[param](f) == val)
         errors = [f['accuracy']['max_georeferenced']['percent']*100 for f in sub]
         errors = [e for e in errors if not math.isnan(e)]
-        print 'stats for {}={} (n={})'.format(param, val, len(errors))
+        print('stats for {}={} (n={})'.format(param, val, len(errors)))
         printstats(errors)
         valerrors.append(errors)
     if param in 'extents uncertainties':
@@ -1201,7 +1201,7 @@ import numpy as np
 
 # bargraphs for each param value
 def outcomeplot_stats(ax, param, vals, xlabel=True, **baselinevals):
-    print param
+    print(param)
     #ax.set_title(param)
     if xlabel:
         paramlabel = paramlabels[param]
@@ -1232,8 +1232,8 @@ def outcomeplot_stats(ax, param, vals, xlabel=True, **baselinevals):
         rate1 = (outcomes<1.0).mean() * 100 # usable
         #rate2 = (outcomes<0.2).mean() * 100 # no fixing
         rate2 = (outcomes<0.05).mean() * 100 # human-equivalent
-        print 'stats for {}={} (n={})'.format(param, val, len(outcomes))
-        print rate1,rate2 #,rate3
+        print('stats for {}={} (n={})'.format(param, val, len(outcomes)))
+        print(rate1,rate2) #,rate3
         rates1.append(rate1)
         rates2.append(rate2)
         #rates3.append(rate3)
@@ -1354,7 +1354,7 @@ def table():
             return 6
     sub = stats.select(lambda f: f['rendopts'])
     sub.compute('errclass', classfunc)
-    print sub
+    print(sub)
     agg = sub.aggregate(key=['errclass'],
                     fieldmapping=[('count',lambda f: 1,'count'),
                                   ('extent',lambda f: f['rendopts']['regionopts']['extent']*100,'avg'),
@@ -1390,7 +1390,7 @@ for f in []: #table():
                                                                                                                                   metanoise=f['metanoise'],
                                                                                                                                   formatnoise=f['formatnoise'],
                                                                                                                                   )
-    print latexrow
+    print(latexrow)
     
 aggrows = []
 for f in table():
@@ -1423,7 +1423,7 @@ errlabels = ['',
 import numpy as np
 for i,row in enumerate(np.transpose(aggrows)):
     row = [errlabels[i]] + list(row)
-    print ' & '.join(row) + ' \\\\'
+    print(' & '.join(row) + ' \\\\')
     
 # table of linear regression results
 import numpy as np
@@ -1452,7 +1452,7 @@ ynames = ['Max Error (%)']
 
 x = sm.add_constant(x)
 results = sm.OLS(y, x, missing='drop').fit()
-print results.summary(yname=ynames, xname=xnames).as_latex()
+print(results.summary(yname=ynames, xname=xnames).as_latex())
 
 
 # table of logistic regression results
@@ -1491,7 +1491,7 @@ ynames = 'Success'
 
 x = sm.add_constant(x)
 results = sm.Logit(y, x, missing='drop').fit()
-print results.summary(yname=ynames, xname=xnames).as_latex()
+print(results.summary(yname=ynames, xname=xnames).as_latex())
     
     
     

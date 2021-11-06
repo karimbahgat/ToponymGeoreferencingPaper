@@ -75,7 +75,7 @@ def _sampleplaces(projbox, projection, extent, n, distribution):
     print('sampling places within',projbox,bbox)
     #hits = list(places.quick_overlap(bbox))
     hits = pg.VectorData(fields=['name'], crs=projection)
-    db = sqlite3.connect('data/gns.db')
+    db = sqlite3.connect('../data/gns.db')
     x1,y1,x2,y2 = bbox
     projx1,projy1,projx2,projy2 = projbox
     projxmin,projymin,projxmax,projymax = min(projx1,projx2),min(projy1,projy2),max(projx1,projx2),max(projy1,projy2)
@@ -224,7 +224,7 @@ def get_crs_transformer(fromcrs, tocrs):
     return _project
 
 def project_bbox(bbox, fromcrs, tocrs, sampling_freq=10):
-    print 'projecting bbox', bbox, fromcrs, tocrs
+    print('projecting bbox', bbox, fromcrs, tocrs)
     transformer = get_crs_transformer(fromcrs, tocrs)
     if not transformer:
         return bbox
@@ -237,12 +237,12 @@ def project_bbox(bbox, fromcrs, tocrs, sampling_freq=10):
                    for ix in range(sampling_freq+1)]
     gridsamples = transformer(gridsamples)
     if not gridsamples:
-        print 'no valid gridsamples'
+        print('no valid gridsamples')
         return None
     xs,ys = zip(*gridsamples)
     xmin,ymin,xmax,ymax = min(xs),min(ys),max(xs),max(ys)
     bbox = [xmin,ymin,xmax,ymax] 
-    print '-->',bbox
+    print('-->',bbox)
     return bbox
 
 
@@ -343,7 +343,7 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
             horiz = [(_bbox[0]+bw/20.0*gxi, gy) for gxi in range(20+1)]
             geoj = {'type':'LineString', 'coordinates':horiz}
             gridlines.add_feature([], geoj)
-        print 'gridlines',gridlines
+        print('gridlines',gridlines)
         m.add_layer(gridlines, fillcolor=(62,88,130), fillsize=0.15/2.0, legend=False)
 
     # legend
@@ -440,6 +440,8 @@ def getscene(extent, quantity, projection):
         if extent > 1:
             center = (uniform(-170,170),uniform(-70,70))
         else:
+            # if map extent is smaller than 10km
+            # limit scene to a randomly selected large city
             idx = randrange(1, len(bigcities)+1)
             city = bigcities[idx]
             center = city.geometry['coordinates']
@@ -466,7 +468,7 @@ def getscene(extent, quantity, projection):
                               lat_0=center[1],
                               lat_ts=center[1])
             proj = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_ts={lat_ts}'.format(**projparams)
-        print proj
+        print(proj)
 
         # get map projected bbox
         if proj:
@@ -535,6 +537,8 @@ def iterscenes():
             if extent > 1:
                 center = (uniform(-170,170),uniform(-70,70))
             else:
+                # if map extent is smaller than 10km
+                # limit scene to a randomly selected large city
                 idx = randrange(1, len(bigcities)+1)
                 city = bigcities[idx]
                 center = city.geometry['coordinates']
@@ -561,7 +565,7 @@ def iterscenes():
                                   lat_0=center[1],
                                   lat_ts=center[1])
                 proj = projection + ' +lon_0={lon_0} +lat_0={lat_0} +lat_ts={lat_ts}'.format(**projparams)
-            print proj
+            print(proj)
 
             # get map projected bbox
             if proj:
@@ -762,18 +766,18 @@ pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
 
 # load data (all processes)
 print('loading data')
-countries = pg.VectorData("data/ne_10m_admin_0_countries.shp")
+countries = pg.VectorData("../data/ne_10m_admin_0_countries.shp")
 countries.create_spatial_index()
-bigcities = pg.VectorData("data/ne_10m_populated_places.shp")
+bigcities = pg.VectorData("../data/ne_10m_populated_places.shp")
 bigcities.rename_field('NAME', 'name')
-#places = pg.VectorData("data/global_settlement_points_v1.01.shp", encoding='latin')
+#places = pg.VectorData("../data/global_settlement_points_v1.01.shp", encoding='latin')
 #places.rename_field('Name1', 'name')
 #places.create_spatial_index()
-rivers = pg.VectorData("data/ne_10m_rivers_lake_centerlines.shp") 
+rivers = pg.VectorData("../data/ne_10m_rivers_lake_centerlines.shp") 
 rivers.create_spatial_index()
-urban = pg.VectorData("data/ne_10m_urban_areas.shp") 
+urban = pg.VectorData("../data/ne_10m_urban_areas.shp") 
 urban.create_spatial_index()
-roads = pg.VectorData("data/ne_10m_roads.shp") 
+roads = pg.VectorData("../data/ne_10m_roads.shp") 
 roads.create_spatial_index()
 
 # options, NEW
