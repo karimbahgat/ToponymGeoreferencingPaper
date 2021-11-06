@@ -2,6 +2,8 @@
 
 This repository contains the algorithm and simulation code for the paper "Toponym-assisted map georeferencing: Evaluating the use of toponyms for the digitization of map collections", by Karim Bahgat and Dan Runfola (2021). 
 
+The exact version that was used in the original article, is located at: https://github.com/karimbahgat/ToponymGeoreferencingPaper/releases/tag/0.1.0. 
+
 For the latest version including possible fixes to these replication scripts, go to: https://github.com/karimbahgat/ToponymGeoreferencingPaper. 
 
 ## Installation
@@ -41,10 +43,12 @@ Be forewarned that the simulations generates very large volumes of map image dat
 
 ### Real-world maps
 
-The "realworld" folder of this repository contains the scripts necessary to replicate the results for the automated map georeferencing of real-world maps presented in the article. 
+The "realworld" folder of this repository contains the scripts necessary to replicate the results for the automated map georeferencing of real-world maps presented in the article. The metadata for which exact maps were used in the article and their georeferencing results are included as JSON files in the `realworld/scrape` folder. 
 
-To replicate the results of the real-world maps, the scripts should be run in the following order: 
+The results for the real-world maps can be reproduced by running the following scripts (though possibly with different results if the website has changed): 
 
 - `1) scrape and georeference.py` (scrapes the top two maps for each country page on the University of Texas at Austin's Perry-Castaneda Library (PCL) Map Collection, georeferences them, and outputs the source information and georeferencing results to JSON files in `realworld/scrape`).
 - `2) error analyze.py` (collects all the information about the real-world maps, georeferencing results and errors from the JSON files produced in the previous script, and generates some but not all of the article figures in `realworld/analyze/figures`).
+
+
 
