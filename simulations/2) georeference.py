@@ -24,9 +24,9 @@ except:
 
 ###################
 # PARAMS
-TEXTCOLOR = None # rgb color tuple of map text, or None for autodetect
+TEXTCOLOR = (0,0,0) # rgb color tuple of map text, or None for autodetect
 WARPORDER = None # polynomial warp order, or None for detecting optimal order
-MAXPROCS = 2 # number of available cpu cores / parallel processes
+MAXPROCS = 20 # number of available cpu cores / parallel processes
 
 
 ###################
@@ -49,46 +49,6 @@ def georeference_auto(fil, outfil, db, source, textcolor, warp_order, priors=Non
                    debug=True,
                    priors=priors,
                    )
-
-def georeference_exact(fil, outfil, warp_order):
-    # OR use the actual coordinates for the rendered placenames (should be approx 0 error...)
-    # TODO: NEEDS MORE FIXING, eg load transform from json, dont reestimate... 
-    # ...
-    fil_root = os.path.splitext(fil)[0]
-    outfil_root = os.path.splitext(outfil)[0]
-    
-    print('exact georeferencing based on original placename coordinates')
-    t=time()
-    im = PIL.Image.open(fil)
-    
-    places = pg.VectorData('{}_placenames.geojson'.format(fil_root))
-    tiepoints = [((f['col'],f['row']),(f['x'],f['y'])) for f in places]
-    # maybe transform the xy placename coordinates to the map crs (by mistake saved as wgs84)
-    # ... 
-    pixels,coords = zip(*tiepoints)
-    (cols,rows),(xs,ys) = zip(*pixels),zip(*coords)
-    trans = mapfit.transforms.Polynomial(order=warp_order)
-    forward = trans.copy()
-    forward.fit(cols,rows,xs,ys)
-    backward = trans.copy()
-    backward.fit(cols,rows,xs,ys, invert=True)
-
-    wim,aff = mapfit.imwarp.warp(im, forward, backward) # warp
-    warped = pg.RasterData(image=wim, affine=aff) # to geodata
-    warped.save(outfil)
-    
-    #warped = mapfit.main.warp(im, '{}_georeferenced_exact.tif'.format(fil_root), tiepoints, order=warp_order)
-    #gcps = [('',oc,'',mc,[]) for oc,mc in tiepoints]
-    #mapfit.main.debug_warped('maps/test_georeferenced.tif', 'maps/test_debug_warp.png', gcps)
-
-    places.rename_field('name', 'origname')
-    places.rename_field('col', 'origx')
-    places.rename_field('row', 'origy')
-    places.rename_field('x', 'matchx')
-    places.rename_field('y', 'matchy')
-    places.save('{}_controlpoints.geojson'.format(outfil_root))
-
-    print('finished exact georeferencing', time()-t)
 
 def process_logger(func, **kwargs):
     fil = kwargs.get('fil')
@@ -117,45 +77,10 @@ if __name__ == '__main__':
     for fil in mapfiles():
         print(fil)
         fil_root = os.path.splitext(fil)[0].replace('_image', '')
-
-        # Local testing
-
-        ## auto
-##        georeference_auto(fil='maps/{}'.format(fil),
-##                          outfil='output/{}_georeferenced_auto.tif'.format(fil_root),
-##                           db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db",
-##                           source='best',
-##                           textcolor=TEXTCOLOR,
-##                           warp_order=WARPORDER,)
-
-        ## auto, assuming known placenames
-
-        # create toponyminfo from rendered placenames
-##        placenames = pg.VectorData('maps/{}_placenames.geojson'.format(fil_root))
-##        toponyminfo = {'type':'FeatureCollection', 'features':[]}
-##        for f in placenames:
-##            geoj = {'type': 'Feature',
-##                    'properties': {'name':f['name']},
-##                    'geometry': {'type':'Point',
-##                                 'coordinates':(f['col'],f['row'])}
-##                    }
-##            toponyminfo['features'].append(geoj)
-##
-##        georeference_auto(fil='maps/{}'.format(fil),
-##                          outfil='output/{}_georeferenced_known_places.tif'.format(fil_root),
-##                           db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db",
-##                           source='best',
-##                           textcolor=TEXTCOLOR,
-##                           warp_order=WARPORDER,
-##                           priors={'toponyminfo':toponyminfo}
-##                          )
-
-        ## exact
-##        georeference_exact(fil='maps/{}'.format(fil),
-##                       warp_order=ORDER,)
-
-##        continue
-
+        
+        #if fil_root < 'sim_9_5_':
+        #    continue
+        
 
 
         # Begin process
@@ -174,42 +99,6 @@ if __name__ == '__main__':
         p.start()
         procs.append((p,time()))
 
-        ## auto, assuming known placenames
-
-        # create toponyminfo from rendered placenames
-##        placenames = pg.VectorData('maps/{}_placenames.geojson'.format(fil_root))
-##        toponyminfo = {'type':'FeatureCollection', 'features':[]}
-##        for f in placenames:
-##            geoj = {'type': 'Feature',
-##                    'properties': {'name':f['name']},
-##                    'geometry': {'type':'Point',
-##                                 'coordinates':(f['col'],f['row'])}
-##                    }
-##            toponyminfo['features'].append(geoj)
-##            
-##        p = mp.Process(target=process_logger,
-##                       args=[georeference_auto],
-##                       kwargs=dict(fil='maps/{}'.format(fil),
-##                                   outfil='output/{}_georeferenced_known_places.tif'.format(fil_root),
-##                                   db=r"C:\Users\kimok\Desktop\BIGDATA\gazetteer data\optim\gazetteers.db", #"data/gazetteers.db",
-##                                   source='best',
-##                                   textcolor=TEXTCOLOR,
-##                                   warp_order=WARPORDER,
-##                                   priors={'toponyminfo':toponyminfo}
-##                                   ),
-##                       )
-##        p.start()
-##        procs.append((p,time()))
-
-        ## exact
-##        p = mp.Process(target=process_logger,
-##                       args=[georeference_exact],
-##                       kwargs=dict(fil='maps/{}'.format(fil),
-##                                   outfil='output/{}_georeferenced_exact.tif'.format(fil_root),
-##                                   warp_order=WARPORDER,),
-##                       )
-##        p.start()
-##        procs.append((p,time()))
 
         # Wait in line
         while len(procs) >= maxprocs:
@@ -220,6 +109,7 @@ if __name__ == '__main__':
                     p.terminate()
                     procs.remove((p,t))
 
+                    
     # waiting for last ones
     for p,t in procs:
         p.join()

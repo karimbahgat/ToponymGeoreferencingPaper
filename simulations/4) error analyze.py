@@ -21,72 +21,82 @@ except:
 
 
 # Loop and create table
-if False:
+def collect(proctype):
+    print 'collecting', proctype
     out = pg.VectorData()
-    out.fields = ['sim_id', 'rendopts', 'controlpoints', 'matched', 'segmentation', 'text', 'toponyms', 'transform', 'accuracy', 'timings', 'log']
+    out.fields = ['sim_id', 'rendopts', 'controlpoints', 'matched', 'segmentation', 'text', 'toponyms', 'transform', 'controlpoints_accuracy', 'accuracy', 'timings', 'log']
 
-    roots = set(('_'.join(fil.split('_')[:4]) for fil in os.listdir('maps')))
-
-    for root in roots:
-        print root
-
+    for i,root in enumerate(roots):
         vals = {'sim_id':root}
 
         path = 'maps/{}_opts.json'.format(root)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
+        
+                if not (dat['datas'] and dat['metaopts']['legend']):
+                    # must have datalayers and metadata
+                    continue
+                
                 vals['rendopts'] = dat
                 
-        path = 'output/{}_georeferenced_auto_controlpoints.geojson'.format(root)
+        print(proctype, i, root)
+                
+        path = 'output/{}_{}_controlpoints.geojson'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
                 vals['controlpoints'] = dat
                 
-        path = 'output/{}_georeferenced_auto_debug_gcps_matched.geojson'.format(root)
+        path = 'output/{}_{}_debug_gcps_matched.geojson'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
                 vals['matched'] = dat
                 
-        path = 'output/{}_georeferenced_auto_debug_segmentation.geojson'.format(root)
+        path = 'output/{}_{}_debug_segmentation.geojson'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
                 vals['segmentation'] = dat
                 
-        path = 'output/{}_georeferenced_auto_debug_text.geojson'.format(root)
+        path = 'output/{}_{}_debug_text.geojson'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
                 vals['text'] = dat
                 
-        path = 'output/{}_georeferenced_auto_debug_text_toponyms.geojson'.format(root)
+        path = 'output/{}_{}_debug_text_toponyms.geojson'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
                 vals['toponyms'] = dat
                 
-        path = 'output/{}_georeferenced_auto_transform.json'.format(root)
+        path = 'output/{}_{}_transform.json'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
                 vals['transform'] = dat
 
-        path = 'output/{}_georeferenced_auto_error.json'.format(root)
+        path = 'output/{}_{}_errors.json'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
-                vals['accuracy'] = dat
+                vals['controlpoints_accuracy'] = dat
                 
-        path = 'output/{}_georeferenced_auto_debug_timings.json'.format(root)
+        path = 'output/{}_{}_simulation_errors.json'.format(root, proctype)
+        if os.path.lexists(path):
+            with open(path) as fobj:
+                dat = json.load(fobj)
+                vals['accuracy'] = dat  # true simulation error
+                
+        path = 'output/{}_{}_debug_timings.json'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = json.load(fobj)
                 vals['timings'] = dat
                 
-        path = 'output/{}_georeferenced_auto_log.txt'.format(root)
+        path = 'output/{}_{}_log.txt'.format(root, proctype)
         if os.path.lexists(path):
             with open(path) as fobj:
                 dat = fobj.read()
@@ -95,24 +105,52 @@ if False:
         #print vals
         
         out.add_feature(vals, None)
-
-
+        
+    return out
+  
+def insert_into_db(db, table, data):
+    print 'inserting into db', table
+    cur = db.cursor()
+    
     # encode dicts to json for saving
     print 'json dumping'
-    for fl in out.fields[1:]: # skip sim_id (not json)
-        out.compute(fl, lambda f: json.dumps(f[fl]))
-
-    # save
-    #out.save('analyze/stats.csv')
-    db = sqlite3.connect('analyze/stats.db')
-    cur = db.cursor()
-    fielddef = ','.join(['{} text'.format(fl) for fl in out.fields])
-    cur.execute('create table data ({})'.format(fielddef))
-    for f in out:
-      qs = ','.join('?'*len(out.fields))
-      vals = tuple(f.row)
-      cur.execute('insert into data values ({})'.format(qs), vals)
+    for fl in data.fields[1:]: # skip sim_id (not json)
+        data.compute(fl, lambda f: json.dumps(f[fl]))
+        
+    # create table
+    fielddef = ','.join(['{} text'.format(fl) for fl in data.fields])
+    cur.execute('create table {} ({})'.format(table, fielddef))
+    
+    # insert
+    print 'inserting'
+    for f in data:
+        qs = ','.join('?'*len(data.fields))
+        vals = tuple(f.row)
+        cur.execute('insert into {} values ({})'.format(table, qs), vals)
     db.commit()
+
+if False:
+    # setup db
+    print 'db init'
+    assert not os.path.lexists('analyze/stats_baseline.db')
+    ##os.remove('analyze/stats_baseline.db')
+    db = sqlite3.connect('analyze/stats_baseline.db')
+    roots = set(('_'.join(fil.split('_')[:4]) for fil in os.listdir('maps') if fil.endswith(('.jpg','png')) ))
+  
+    # collect auto
+    proctype = 'georeferenced_auto'
+    data = collect(proctype)
+    insert_into_db(db, 'auto', data)
+    
+    # collect perfect1
+    proctype = 'georeferenced_perfect1_topos'
+    data = collect(proctype)
+    insert_into_db(db, 'perfect1', data)
+    
+    # collect perfect2
+    proctype = 'georeferenced_perfect2_matches'
+    data = collect(proctype)
+    insert_into_db(db, 'perfect2', data)
 
 
 
@@ -120,32 +158,356 @@ if False:
 
 ##############
 
-db = sqlite3.connect('analyze/stats.db')
-stats = pg.VectorData()
-stats.fields = ['sim_id', 'rendopts', 'controlpoints', 'matched', 'segmentation', 'text', 'toponyms', 'transform', 'accuracy', 'timings', 'log']
-for row in db.execute('select * from data'):
-    row = list(row)
-    stats.add_feature(row, None)
+def getstats(proctype):
+    db = sqlite3.connect('analyze/stats_baseline.db')
+    stats = pg.VectorData()
+    stats.fields = ['sim_id', 'rendopts', 'controlpoints', 'matched', 'segmentation', 'text', 'toponyms', 'transform', 'controlpoints_accuracy', 'accuracy', 'timings', 'log']
+    for row in db.execute('select * from {}'.format(proctype)):
+        row = list(row)
+        stats.add_feature(row, None)
 
-# load json
-for fl in stats.fields[1:]: # skip sim_id (not json)
-    stats.compute(fl, lambda f: json.loads(f[fl]))
-stats.compute('log', lambda f: f['log']['text'] if f['log'] else None)
+    # load json
+    for fl in stats.fields[1:]: # skip sim_id (not json)
+        stats.compute(fl, lambda f: json.loads(f[fl]))
+    stats.compute('log', lambda f: f['log']['text'] if f['log'] else None)
 
-# all renderings
-print stats
+    # all renderings
+    stats_all = stats
+    print stats_all
 
-# exclude maps with nonlegible texts (jpg at 1000 pixel resolution)
-stats_all = stats
-stats = stats.select(lambda f: not f['sim_id'].endswith('_6'))
-print stats
+    # begin filtering down
+    stats = stats_all
+
+    # for some reason, log.txt files were also included, exclude these
+    stats = stats.select(lambda f: not f['sim_id'].endswith('log.txt'))
+
+    # exclude maps with nonlegible texts (jpg at 1000 pixel resolution)
+    stats = stats.select(lambda f: not f['sim_id'].endswith('_6'))
+    print stats
+    
+    return stats
+
+stats = getstats('auto')
+stats_p1 = getstats('perfect1')
+stats_p2 = getstats('perfect2')
 
 # scenes
-scenes = set([f['sim_id'][:6] for f in stats])
+scenes = set([f['sim_id'].split('_')[1] for f in stats])
 print len(scenes)
+
+# maps per scene
+for scene in sorted(scenes):
+    count = len(stats.select(lambda f: f['sim_id'].split('_')[1]==scene))
+    print scene, count
+
+fdafa
+
+
+
+
+
+
+
+# visualize simulated scene footprints on global map
+pg.vector.data.DEFAULT_SPATIAL_INDEX = 'quadtree'
+m = pg.renderer.Map(3000,1500,crs='ESRI:54030')
+
+# water
+w = pg.VectorData()
+top = [(x,90) for x in range(-180,180+1,1)]
+bottom = [(x,-90) for x in reversed(range(-180,180+1,1))]
+left = [(-180,y) for y in range(-90,90+1,1)]
+right = [(180,y) for y in reversed(range(-90,90+1,1))]
+geoj = {'type':'Polygon',
+       'coordinates': [top+right+bottom+left]}
+w.add_feature([], geoj)
+m.add_layer(w, fillcolor=(0,118,190), fillopacity=0.3)
+
+# countries
+m.add_layer('data/ne_10m_admin_0_countries.shp',
+           fillcolor=(72,191,145))
+
+# footprints
+d = pg.VectorData(crs=m.crs)
+for scene in scenes:
+    print(scene)
+    r = pg.RasterData('maps/sim_{}_1_5_image.png'.format(scene))
+    x1,y1,x2,y2 = r.bbox
+    rect = [(x1,y1),(x2,y1),(x2,y2),(x1,y2),(x1,y1)]
+    geoj = {'type':'Polygon',
+           'coordinates':[rect]}
+    _d = pg.VectorData(crs=r.crs)
+    _d.add_feature([], geoj)
+    _d = _d.manage.reproject(d.crs)
+    geoj = _d[1].geometry
+    d.add_feature([], geoj)
+m.add_layer(d, outlinecolor='red', fillcolor='red', fillopacity=0.25)
+
+m.save('analyze/figures/mapsim_footprints.png')
+
+
+
+
+
+
+
+# misc exploration
+import math
+print stats
+print stats.select(lambda f: f['accuracy'])
+print stats.select(lambda f: f['accuracy'] and not math.isnan(f['accuracy']['max_georeferenced']['percent']))
+isnan = stats.select(lambda f: f['accuracy'] and math.isnan(f['accuracy']['max_georeferenced']['percent']))
+
+for f in stats.select(lambda f: f['accuracy']).aggregate(['sim_id'], fieldmapping=[('max',lambda f: f['accuracy']['max_georeferenced']['percent'],'max')]):
+    print(f.row)
   
+for f in stats.select(lambda f: f['sim_id']=='sim_75_12_5'):
+    print f['accuracy']['max_georeferenced']['percent']
   
+import math
+import numpy as np
+acc = [f['accuracy']['max_georeferenced']['percent'] * 100
+       for f in stats.select(lambda f: f['accuracy'] 
+                             #and f['accuracy']['max_georeferenced']['percent']
+                             and not math.isnan(f['accuracy']['max_georeferenced']['percent'])
+                            )]
+for p in [0,50,75,90,95,99,100]:
+    print p, '% -->', np.percentile(acc, p)
+    
+# histograms
+def getacc(stats):
+    acc = [f['accuracy']['max_georeferenced']['percent'] * 100
+        for f in stats.select(lambda f: f['accuracy'] 
+                             #and f['accuracy']['max_georeferenced']['percent']
+                             and not math.isnan(f['accuracy']['max_georeferenced']['percent'])
+                            )]
+    acc = [a if a<100 else 100 for a in acc]
+    return acc
+def allhistos():
+    fig = plt.figure()
+    ax = plt.gca()
+    import numpy as np
+    
+    y,bin_edges = np.histogram(getacc(stats), bins=100, density=True)
+    x = [(x1+x2)/2.0 for x1,x2 in zip(bin_edges[:-1],bin_edges[1:])]
+    ax.plot(x, y, label='auto')#, color='red')
+    
+    y,bin_edges = np.histogram(getacc(stats_p1), bins=100, density=True)
+    x = [(x1+x2)/2.0 for x1,x2 in zip(bin_edges[:-1],bin_edges[1:])]
+    ax.plot(x, y, label='perfect1')#, color='green')
+    
+    y,bin_edges = np.histogram(getacc(stats_p2), bins=100, density=True)
+    x = [(x1+x2)/2.0 for x1,x2 in zip(bin_edges[:-1],bin_edges[1:])]
+    ax.plot(x, y, label='perfect2')#, color='blue')
+    
+    #ax.set_xlim(0, 100000)
+    ax.set_ylim(0, 0.5)
+    ax.set_xlabel('Max pixel error (% of image radius)')
+    ax.set_ylabel('Share')
+    #ax.set_ylabel('Maps')
+    ax.legend()
+    fig.savefig('analyze/figures/test.png')
+allhistos()
+
+# accu categoreis
+def getacc(stats):
+    acc = [f['accuracy']['max_georeferenced']['percent'] * 100
+        for f in stats.select(lambda f: f['accuracy'] 
+                             #and f['accuracy']['max_georeferenced']['percent']
+                             and not math.isnan(f['accuracy']['max_georeferenced']['percent'])
+                            )]
+    return acc
+def getaccgroups(data):
+    import classypie as cp
+    error_type = 'max'
+    def classfunc(f): 
+        if f['accuracy'] and math.isnan(f['accuracy'][error_type+'_georeferenced']['percent']):
+            # nan accuracy (geod dist out-of-this-world)
+            # group with not-usable category
+            return 5
+        elif f['accuracy']:
+            v = f['accuracy'][error_type+'_georeferenced']['percent']
+            return cp.find_class(v, [0, 0.01, 0.05, 0.2, 1, 110000000])[0] if not math.isnan(v) else None
+        else:
+            # no accuracy dict (failed)
+            return 6
+    sub = data.copy()
+    sub.compute('errclass', classfunc)
+    agg = sub.aggregate(key=['errclass'],
+                        fieldmapping=[('count','sim_id','count'),
+                                    ]
+                   )
+    return agg
+def allcats():
+    fig = plt.figure()
+    ax = plt.gca()
+    import numpy as np
+    
+    #bins = [0,1,5,20,100,100000000000000]
+    
+    x,y = zip(*[(f['errclass'],f['count']) for f in getaccgroups(stats)])
+    #y,bin_edges = np.histogram(getacc(stats), bins=bins)#, density=True)
+    print y
+    ytot = sum(y)
+    y = [_y/float(ytot)*100 for _y in y]
+    #y = [sum(y[:i+1]) for i in range(len(y))] # cumulative
+    #x = [1,2,3,4,5]
+    ax.plot(x, y, label='auto')#, color='red')
+    
+    x,y = zip(*[(f['errclass'],f['count']) for f in getaccgroups(stats_p1)])
+    #y,bin_edges = np.histogram(getacc(stats_p1), bins=bins)#, density=True)
+    print y
+    ytot = sum(y)
+    y = [_y/float(ytot)*100 for _y in y]
+    #y = [sum(y[:i+1]) for i in range(len(y))] # cumulative
+    #x = [1,2,3,4,5]
+    ax.plot(x, y, label='perfect1')#, color='green')
+
+    x,y = zip(*[(f['errclass'],f['count']) for f in getaccgroups(stats_p2)])
+    #y,bin_edges = np.histogram(getacc(stats_p2), bins=bins)#, density=True)
+    print y
+    ytot = sum(y)
+    y = [_y/float(ytot)*100 for _y in y]
+    #y = [sum(y[:i+1]) for i in range(len(y))] # cumulative
+    #x = [1,2,3,4,5]
+    ax.plot(x, y, label='perfect2')#, color='blue')
+    
+    #ax.set_xlim(0, 100000)
+    #ax.set_ylim(0, 1)
+    ax.set_xlabel('Accuracy category (% of image radius)')
+    ax.set_ylabel('% of maps')
+    #ax.set_ylabel('Maps')
+    x = [1,2,3,4,5,6]
+    labels = ['0-1%','1-5%','5-20%','20-100%','>100%','Failed']
+    plt.xticks(x, labels)
+    ax.legend()
+    fig.savefig('analyze/figures/test2.png')
+allcats()
   
+# ?
+stats.select(lambda f: f['accuracy'] 
+                       and not math.isnan(f['accuracy']['max_georeferenced']['percent'])
+                      and f['accuracy']['max_georeferenced']['percent'] < 0.2
+                      )
+
+
+
+
+
+
+# NEW rmse loo vs true error
+# farly poor correlation, gcp error can be both much lower and mucher higher than true error
+import math
+def err_gcp(f):
+  if f['accuracy']:
+    w = f['rendopts']['resolution']
+    diag = math.hypot(w,w)
+    perc = max(f['transform']['forward']['residuals']) / float(diag/2.0) * 100
+    return perc
+def err_true(f):
+  if f['accuracy']:
+    w = f['rendopts']['resolution']
+    diag = math.hypot(w,w)
+    perc = f['accuracy']['max_georeferenced']['pixels'] / float(diag/2.0) * 100
+    return perc
+def plot():
+  x = [err_gcp(f) for f in stats]
+  y = [err_true(f) for f in stats]
+  #plt.xlim(0, 1500)#10)#20)#400)#1500)
+  plt.xlabel('gcp % error')
+  #plt.ylim(0, 100000)#1000)#20000)#100000)
+  plt.ylabel('true % error')
+  plt.scatter(x, y)
+plot()
+
+
+
+
+
+# NEW detected toponyms vs total toponyms
+# scatterplot
+alltopos = [f['rendopts']['placeopts']['quantity']
+          for f in stats
+         ]
+topos = [len(f['toponyms']['features'])
+          for f in stats
+         ]
+def plot():
+  #plt.xlim()
+  plt.xlabel('map toponyms')
+  #plt.ylim(0,1000)#200000)
+  plt.ylabel('toponyms detected')
+  plt.scatter(alltopos, topos)
+plot()
+
+def plot(vals):
+    plt.hist(vals, bins=50)
+    plt.xlim(0, 1)
+    
+# detected
+detected = [f['accuracy']['labels_detected']
+            for f in stats
+           if f['accuracy']]
+plot(detected)
+
+# matched
+matched = [len(f['matched']['features']) / float( f['rendopts']['placeopts']['quantity'] )
+            for f in stats
+           if f['matched']]
+plot(matched)
+
+# used
+used = [f['accuracy']['labels_used']
+            for f in stats
+           if f['accuracy']]
+plot(used)
+
+# stats
+print 'detected', sum(detected)/float(len(detected))
+print 'matched', sum(matched)/float(len(matched))
+print 'used', sum(used)/float(len(used))
+
+
+
+
+
+# NEW detected toponyms vs accuracy
+# scatterplot
+# fairly smooth reduction in error as toponyms increase, esp above 40
+errors = [f['accuracy']['max_georeferenced']['percent'] * 100
+          for f in stats
+          if f['accuracy']
+          #and f['accuracy']['max_georeferenced']['percent'] < 1
+         ]
+topos = [len(f['toponyms']['features'])
+          for f in stats
+          if f['accuracy']
+         #and f['accuracy']['max_georeferenced']['percent'] < 1
+         ]
+def plot():
+  #plt.xlim()
+  plt.xlabel('toponyms')
+  plt.ylim(0,1000)#200000)
+  plt.ylabel('max error %')
+  plt.scatter(topos, errors)
+plot()
+# boxplots (prob not necessary, just another way of showing above scatter and paper avg bar graph)
+import classypie as cp
+key = lambda f: f['accuracy']['max_georeferenced']['percent']*100
+for g,items in cp.split('equal', key=key):
+    #....
+    sub = stats.select(lambda f: f['rendopts'] and f['accuracy'] and is_param_baseline(f) and paramkeys[param](f) == val)
+    errors = [f['accuracy']['max_georeferenced']['percent']*100 for f in sub]
+    errors = [e for e in errors if not math.isnan(e)]
+    print 'stats for {}={} (n={})'.format(param, val, len(errors))
+    printstats(errors)
+    valerrors.append(errors)
+if param in 'extents uncertainties':
+    vals = [int(v*100) for v in vals]
+_ = ax.boxplot(valerrors, labels=[str(v)[:12] for v in vals],
+               showcaps=False, showfliers=False, vert=True)
+
+
     
   
     
@@ -154,6 +516,8 @@ print len(scenes)
 
     
 ### JOURNAL ARTICLE
+from IPython.display import display
+import numpy as np
 
 sns.set_style("darkgrid")
 
@@ -169,7 +533,7 @@ def plot(error_type='rmse', range=None, bins=10):
     errors = [e for e in errors if not math.isnan(e)]
     ax = axes[0]
     ax.set_title('5000 km extent')
-    ax.set_yscale('log')
+    #ax.set_yscale('log')
     ax.set_xlabel(error_type+' km error')
     ax.set_ylabel('# maps')
     ax.hist(errors, bins=bins, range=range) #, range=(0,5000))
@@ -180,7 +544,7 @@ def plot(error_type='rmse', range=None, bins=10):
     errors = [e for e in errors if not math.isnan(e)]
     ax = axes[1]
     ax.set_title('1000 km extent')
-    ax.set_yscale('log')
+    #ax.set_yscale('log')
     ax.set_xlabel(error_type+' km error')
     #ax.set_ylabel('# maps')
     ax.hist(errors, bins=bins, range=range) #, range=(0,5000))
@@ -191,18 +555,18 @@ def plot(error_type='rmse', range=None, bins=10):
     errors = [e for e in errors if not math.isnan(e)]
     ax = axes[2]
     ax.set_title('100 km extent')
-    ax.set_yscale('log')
+    #ax.set_yscale('log')
     ax.set_xlabel(error_type+' km error')
     #ax.set_ylabel('# maps')
     ax.hist(errors, bins=bins, range=range) #, range=(0,5000))
     
-    # 0.1deg ie 10km
-    sub = stats.select(lambda f: f['rendopts'] and f['rendopts']['regionopts']['extent']==0.1)
+    # 0.25deg ie 25km
+    sub = stats.select(lambda f: f['rendopts'] and f['rendopts']['regionopts']['extent']==0.25)
     errors = [f['accuracy'][error_type+'_georeferenced']['geographic'] for f in sub if f['accuracy']]
     errors = [e for e in errors if not math.isnan(e)]
     ax = axes[3]
-    ax.set_title('10 km extent')
-    ax.set_yscale('log')
+    ax.set_title('25 km extent')
+    #ax.set_yscale('log')
     ax.set_xlabel(error_type+' km error')
     #ax.set_ylabel('# maps')
     ax.hist(errors, bins=bins, range=range) #, range=(0,5000))
@@ -212,11 +576,6 @@ def plot(error_type='rmse', range=None, bins=10):
     fig.savefig('analyze/figures/error_km_by_extent.png')
     
 plot('max', range=(0,5000))
-
-examps = [f for f in stats if f['accuracy'] and 800 < f['accuracy']['rmse_georeferenced']['geographic'] < 1200]
-for f in examps[0:1]:
-    print f['accuracy']['rmse_georeferenced']
-    display(map_overlay(f['sim_id']))
 
 # perc error histograms, max error vs rmse error
 def plot(range=None, bins=10):
@@ -251,8 +610,179 @@ def plot(range=None, bins=10):
     
 plot(range=(0,200))
 
+
+# ABOVE NOT USED
+
+
+
+
+
+
+
+
+
+# map param stats
+
+# define params
+resolutions = [3000, 2000, 1000]
+extents = [50, 10, 5, 1, 0.25] # ca 5000km, 1000km, 500km, 100km, and 10km
+quantities = [80, 40, 20, 10]
+uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
+distributions = ['random'] 
+projections = ['eqc',
+                'lcc', 
+               'tmerc',
+               ] 
+datas = [False, 
+         True] 
+metas = [False, # nothing
+         True, # text noise + meta boxes (arealabels + title + legend) + gridlines
+         ]
+imformats = ['png','jpg']
+paramvals = dict(extents=extents,
+              toponyms=quantities,
+              #distributions=distributions,
+              uncertainties=uncertainties,
+              projections=projections,
+              resolutions=resolutions,
+              imformats=imformats,
+              #metas=metas,
+              #datas=datas,
+                )
+paramkeys = dict(extents=lambda f: f['rendopts']['regionopts']['extent'],
+              toponyms=lambda f: f['rendopts']['placeopts']['quantity'],
+              #distributions=lambda f: f['rendopts']['placeopts']['distribution'],
+              uncertainties=lambda f: f['rendopts']['placeopts']['uncertainty'],
+              projections=lambda f: f['rendopts']['projection'].split()[0].replace('+proj=',''),
+              resolutions=lambda f: f['rendopts']['noiseopts']['resolution'],
+              imformats=lambda f: f['rendopts']['noiseopts']['format'],
+              #datas=lambda f: len(f['rendopts']['datas'])>1,
+              #metas=lambda f: f['rendopts']['metaopts']['arealabels'],
+                )
+paramlabels = dict(extents='mapExtent (km)',
+              toponyms='numToponyms',
+              #distributions='toponymDispersed',
+              uncertainties='toponymUncertainty (km)',
+              projections='mapProjection',
+              resolutions='imgResolution',
+              imformats='pixelNoise',
+              #metas='metaNoise',
+              #datas='dataNoise',
+                )
+
+# map count per param
+for k,func in paramkeys.items():
+    statscopy = stats.select(lambda f: f['rendopts'])
+    statscopy.compute('group', func)
+    label = paramlabels[k]
+    print(label)
+    agg = statscopy.aggregate(['group'], fieldmapping=[('count','sim_id','count')])
+    for f in agg:
+        row = [''] + map(str, f.row)
+        print ' & '.join(row) + ' \\\\'
+
+
+
+
+
+
+        
+# visualize heatmap with maxerr for each possible combination of param values
+
+import numpy as np
+params = paramvals.keys()
+matsize = len([val for param in params for val in paramvals[param]])
+mat = np.ones((matsize,matsize)) * float('nan')
+errorpairs = []
+goodthresh = 100
+i1 = 0
+for param1 in params:
+    for val1 in paramvals[param1]:
+        print(param1,val1)
+        i2 = 0
+        for param2 in params:
+            for val2 in paramvals[param2]:
+                if param1 != param2:
+                    key1 = paramkeys[param1]
+                    key2 = paramkeys[param2]
+                    sub = stats.select(lambda f: key1(f)==val1 and key2(f)==val2)
+                    errors = [f['accuracy']['percent']['max'] for f in sub 
+                              if f['accuracy']]
+                    errors = [err for err in errors
+                             if not math.isnan(err)]
+                    errors = [err for err in errors
+                             if err<=goodthresh]
+                    if errors:
+                        percgood = (len(errors)/float(len(sub)))*100
+                        mat[i1,i2] = percgood
+                        #print('-->',param2,val2,percgood,len(errors))
+                        errpair = param1,val1,param2,val2,percgood
+                        errorpairs.append(errpair)
+                i2 += 1
+        i1 += 1
+
+# list top worst combos
+
+for errpair in sorted(errorpairs, key=lambda p: p[-1]):
+    print(errpair)
+
+# creat heatmap
+
+def plot():
+    import matplotlib.pyplot as plt
+    plt.imshow(mat, interpolation='nearest')
+    plt.grid(None)
+    colorbar = plt.colorbar()
+    colorbar.set_label('% usable maps')
+    def valuelab(param,val):
+        if param in 'extents uncertainties':
+            return '{}km'.format(int(val*100))
+        else:
+            return str(val)
+          
+    # y labels
+    labels = [str(valuelab(param,val))
+              for param in params 
+              for val in paramvals[param]]
+    tlocs,tlabs = plt.yticks(range(len(labels)), labels)
+    
+    # y categories
+    y = 0.2
+    x = -7
+    fontsize = tlabs[0].get_fontsize()
+    for param in params:
+        plt.annotate(param, (x,y), fontsize=fontsize, annotation_clip=False)
+        y += len(paramvals[param])
+    
+    # x labels
+    plt.gca().xaxis.tick_top()
+    plt.xticks(range(len(labels)), labels, rotation=90)
+    
+    # x categories
+    x = -0.5
+    y = -4
+    fontsize = tlabs[0].get_fontsize()
+    for param in params:
+        _param = {'uncertainties':'uncert.',
+                'imformats':'img',
+                'projections':'proj.',
+                'resolutions':'res.'}.get(param, param)
+        plt.annotate(_param, (x,y), fontsize=fontsize, annotation_clip=False)
+        x += len(paramvals[param])
+    
+    plt.savefig('analyze/figures/errors_parampairs_heatmap.png',
+               bbox_inches='tight', 
+               pad_inches=0.1)
+    
+plot()
+
+        
+        
+
+
+
+
 # example map error, error surface vs map overlay
-from IPython.display import display
 def inspect_georef_errors(georef_fil, truth_fil, error_type):
     # georef errors
     mapp = mapfit.debug.render_georeferencing_errors(georef_fil, truth_fil, error_type)
@@ -318,70 +848,84 @@ def subplot(ax, sim_id, subtitle):
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     ax.imshow(im)
+    
+# ??? 
+#examps = [f for f in stats if f['accuracy'] and 800 < f['accuracy']['rmse_georeferenced']['geographic'] < 1200]
+#for f in examps[0:1]:
+#    print f['accuracy']['rmse_georeferenced']
+#    display(map_overlay(f['sim_id']))
 
 # fig
-fig,axes = plt.subplots(3, 2, 
-                        figsize=(6,10))
+#fig,axes = plt.subplots(3, 2, 
+#                        figsize=(6,10))
+
+metric = 'max'
+
 # out of wack
-examps = [f for f in stats if f['accuracy'] and 2 < f['accuracy']['max_georeferenced']['percent'] < 3]
-for f in examps[8:9]:
-    print f['accuracy']['max_georeferenced']
+examps = [f for f in stats if f['accuracy'] and 300 < f['accuracy']['percent'][metric] < 400]
+for f in examps[5:6]:
+    print f['accuracy']
     maps = map_overlay(f['sim_id'])
     display(maps)
     maps.save('analyze/figures/mapqual_wack.png')
     #plot(f['sim_id'], 'wack')
     #subplot(axes[2,0], f['sim_id'], 'not usable\n'+'>100%')
 # approx but unusable
-examps = [f for f in stats if f['accuracy'] and 0.5 < f['accuracy']['max_georeferenced']['percent'] < 0.6]
-for f in examps[2:3]:
-    print f['accuracy']['max_georeferenced']
+examps = [f for f in stats if f['accuracy'] and 60 < f['accuracy']['percent'][metric] < 70]
+for f in examps[4:5]:
+    print f['accuracy']
     maps = map_overlay(f['sim_id'])
     display(maps)
     maps.save('analyze/figures/mapqual_needsadj.png')
     #plot(f['sim_id'], 'approx_bad')
     #subplot(axes[1,1], f['sim_id'], 'approximate, needs fixing\n'+'>20%')
 # approx
-examps = [f for f in stats if f['accuracy'] and 0.1 < f['accuracy']['max_georeferenced']['percent'] < 0.12]
+examps = [f for f in stats if f['accuracy'] and 10 < f['accuracy']['percent'][metric] < 12]
 for f in examps[:1]:
-    print f['accuracy']['max_georeferenced']
+    print f['accuracy']
     maps = map_overlay(f['sim_id'])
     display(maps)
     maps.save('analyze/figures/mapqual_approx.png')
     #plot(f['sim_id'], 'approx')
     #subplot(axes[1,0], f['sim_id'], 'approximate\n'+'>5%')
 # reasonable
-examps = [f for f in stats if f['accuracy'] and 0.01 < f['accuracy']['max_georeferenced']['percent'] < 0.05]
+examps = [f for f in stats if f['accuracy'] and 3 < f['accuracy']['percent'][metric] < 4]
 for f in examps[:1]:
-    print f['accuracy']['max_georeferenced']
+    print f['accuracy']
     maps = map_overlay(f['sim_id'])
     display(maps)
     maps.save('analyze/figures/mapqual_reasonable.png')
     #plot(f['sim_id'], 'reasonable')
     #subplot(axes[0,1], f['sim_id'], 'reasonable\n'+'>1%')
 # excellent
-examps = [f for f in stats if f['accuracy'] and f['accuracy']['max_georeferenced']['percent'] < 0.01]
+examps = [f for f in stats if f['accuracy'] and f['accuracy']['percent'][metric] < 0.7]
 for f in examps[:1]:
-    print f['accuracy']['max_georeferenced']
+    print f['accuracy']
     maps = map_overlay(f['sim_id'])
     display(maps)
     maps.save('analyze/figures/mapqual_excellent.png')
     #plot(f['sim_id'], 'excellent')
     #subplot(axes[0,0], f['sim_id'], 'excellent\n'+'<1%')
 
-fig.subplots_adjust(left=0.01, bottom=0.01, right=0.99, top=0.95,
-                wspace=0.05) #, hspace=0.05)
-fig.delaxes(axes[2,1])
-fig.savefig('analyze/figures/errors_maps_categories.png')
+#fig.subplots_adjust(left=0.01, bottom=0.01, right=0.99, top=0.95,
+#                wspace=0.05) #, hspace=0.05)
+#fig.delaxes(axes[2,1])
+#fig.savefig('analyze/figures/errors_maps_categories.png')
 
 # table of overall simulation accuracy
-def table(error_type='max'):
+def table(stats, error_type='max'):
     # x different centers
     import classypie as cp
     def classfunc(f): 
-        if f['accuracy']:
-            v = f['accuracy'][error_type+'_georeferenced']['percent']
-            return cp.find_class(v, [0, 0.01, 0.05, 0.2, 1, 110000000])[0] if not math.isnan(v) else None
+        if f['accuracy'] and math.isnan(f['accuracy']['percent'][error_type]):
+            # nan accuracy (geod dist out-of-this-world)
+            # group with not-usable category
+            return 5
+        elif f['accuracy']:
+            v = f['accuracy']['percent'][error_type]
+            return cp.find_class(v, [0, 1, 5, 20, 100, 110000000])[0] if not math.isnan(v) else None
         else:
+            # no accuracy dict (failed)
             return 6
     sub = stats.copy()
     sub.compute('errclass', classfunc)
@@ -403,7 +947,9 @@ def table(error_type='max'):
     latexrow = ' & '.join(map(str,row)) + ' \\\\'
     print latexrow
 
-table('max')
+table(stats, 'max')
+table(stats_p1, 'max')
+table(stats_p2, 'max')
 
 # table of timings
 # cols: total,avg,median
@@ -448,27 +994,128 @@ def table():
 
 table()
 
+
+
+
+
+
+# FINAL: define error funcs
+# either optional custom loo controlpoint error
+'''
+def geterror(f): 
+  # model loo residuals max
+  import automap as mapfit
+  trans = mapfit.transforms.from_json(f['transform']['backward'])
+  inpoints = [(gcp['properties']['origx'],gcp['properties']['origy']) for gcp in f['controlpoints']['features']]
+  outpoints = [(gcp['properties']['matchx'],gcp['properties']['matchy']) for gcp in f['controlpoints']['features']]
+  resids = mapfit.accuracy.loo_residuals(trans, inpoints, outpoints, invert=True)
+  err = max(resids)
+  return err
+def getdiag(f): 
+  w = h = f['rendopts']['resolution']
+  return math.hypot(w,h)
+def getpercerror(f, error_type): 
+  # ignore for now, always do max, see geterror()
+  if f['accuracy']:
+    err = geterror(f)
+    perc = err / float(getdiag(f)/2.0) * 100
+    return perc
+'''
+
+# or use the true surface error
+'''fdfsdfs'''
+
+# or universal geterror func
+def get_gcp_resids(f): 
+  # model loo residuals max
+  import automap as mapfit
+  trans = mapfit.transforms.from_json(f['transform']['backward'])
+  inpoints = [(gcp['properties']['origx'],gcp['properties']['origy']) for gcp in f['controlpoints']['features']]
+  outpoints = [(gcp['properties']['matchx'],gcp['properties']['matchy']) for gcp in f['controlpoints']['features']]
+  resids = mapfit.accuracy.residuals(trans, inpoints, outpoints, invert=True)
+  return resids
+def get_loo_resids(f): 
+  # model loo residuals max
+  import automap as mapfit
+  trans = mapfit.transforms.from_json(f['transform']['backward'])
+  inpoints = [(gcp['properties']['origx'],gcp['properties']['origy']) for gcp in f['controlpoints']['features']]
+  outpoints = [(gcp['properties']['matchx'],gcp['properties']['matchy']) for gcp in f['controlpoints']['features']]
+  resids = mapfit.accuracy.loo_residuals(trans, inpoints, outpoints, invert=True)
+  return resids
+def getdiag(f): 
+  w = h = f['rendopts']['resolution']
+  return math.hypot(w,h)
+def getpercerror(f, error_type):
+  if error_type == 'true_max':
+    if f['accuracy']:
+      return f['accuracy']['percent']['max']
+  elif error_type == 'true_rmse':
+    if f['accuracy']:
+      return f['accuracy']['percent']['rmse']
+  
+  elif error_type == 'loo_max':
+    if f['accuracy']:
+      resids = get_loo_resids(f)
+      err = max(resids)
+      perc = err / float(getdiag(f)/2.0) * 100
+      return perc
+  elif error_type == 'loo_rmse':
+    if f['accuracy']:
+      resids = get_loo_resids(f)
+      import automap as mapfit
+      err = mapfit.accuracy.RMSE(resids)
+      perc = err / float(getdiag(f)/2.0) * 100
+      return perc
+    
+  elif error_type == 'gcp_max':
+    if f['controlpoints_accuracy']:
+      return f['controlpoints_accuracy']['percent']['max']
+  elif error_type == 'gcp_rmse':
+    if f['controlpoints_accuracy']:
+      return f['controlpoints_accuracy']['percent']['rmse']
+
+
+    
+    
+    
+    
+
 # table of accuracy for realistic quality maps
-def table():
+def table(stats, error_type='max'):
     # x different centers
     import classypie as cp
     def classfunc(f): 
-        if f['accuracy']:
-            v = f['accuracy']['max_georeferenced']['percent']
-            return cp.find_class(v, [0, 0.01, 0.05, 0.2, 1, 110000000])[0] if not math.isnan(v) else None
+        v = getpercerror(f,error_type)
+        if f['accuracy'] and math.isnan(v):
+            # nan accuracy (geod dist out-of-this-world)
+            # group with not-usable category
+            return 5
+        elif f['accuracy']:
+            return cp.find_class(v, [0, 1, 5, 20, 100, 110000000])[0] if not math.isnan(v) else None
         else:
             return 6
     sub = stats.copy()
     sub = sub.select(lambda f: f['rendopts'] and \
-                   f['rendopts']['noiseopts']['resolution']>1500 and \
+                   #f['rendopts']['noiseopts']['resolution']>1500 and \
                    #f['rendopts']['noiseopts']['format']=='png' and \
-                   f['rendopts']['placeopts']['quantity']>=40 and \
+                   f['rendopts']['placeopts']['quantity']>=20 and \
                    f['rendopts']['placeopts']['uncertainty']<=0.1 and \
                    #f['rendopts']['placeopts']['distribution']=='random' and \
                    #f['rendopts']['projection']==None and \
-                   #f['rendopts']['metaopts']['arealabels']==False
-                   f['rendopts']['regionopts']['extent']>=1
+                   #f['rendopts']['metaopts']['arealabels']==False and \
+                   f['rendopts']['regionopts']['extent']>=1 and \
+                     True \
                   )
+    sub = sub.select(lambda f: f['rendopts'] and not (\
+                     f['rendopts']['placeopts']['uncertainty']==0.5 and \
+                     f['rendopts']['regionopts']['extent']<=1 \
+                                                     )
+                    )
+    sub = sub.select(lambda f: f['rendopts'] and not (\
+                     f['rendopts']['placeopts']['uncertainty']>=0.1 and \
+                     f['rendopts']['regionopts']['extent']==0.25 \
+                                                     )
+                    )
     sub.compute('errclass', classfunc)
     agg = sub.aggregate(key=['errclass'],
                         fieldmapping=[('count','sim_id','count'),
@@ -488,24 +1135,453 @@ def table():
     latexrow = ' & '.join(map(str,row)) + ' \\\\'
     print latexrow
 
-table()
+table(stats, 'max')
+table(stats_p1, 'max')
+table(stats_p2, 'max')
 
 
 
-# boxplots of good quality maps, adjusting one parameter at a time
+
+
+
+
+
+# FINAL: table of accuracy for multiple types of maps
+
+import numpy as np
+def table(stats, error_type='max'):
+    # x different centers
+    import classypie as cp
+    def classfunc(f): 
+        v = getpercerror(f,error_type)
+        if f['accuracy'] and math.isnan(v):
+            # nan accuracy (geod dist out-of-this-world)
+            # group with not-usable category
+            return 5
+        elif f['accuracy']:
+            return cp.find_class(v, [0, 1, 5, 20, 100, 110000000])[0] if not math.isnan(v) else None
+        else:
+            return 6
+    sub = stats.copy()
+    sub.compute('errclass', classfunc)
+    agg = sub.aggregate(key=['errclass'],
+                        fieldmapping=[('count','sim_id','count'),
+                                    ]
+                   )
+    agg.compute('perc', lambda f: f['count']/float(len(sub))*100)
+    # first rows
+    cumul = 0
+    rows = []
+    for f in agg:
+        cumul += f.row[-1]
+        row = f.row + [cumul]
+        rows.append(row)
+    # then total
+    rows.append(['total', len(sub), 100.0, 100.0])
+    return rows #np.array(rows)
+def tables(stats):
+  # concatenate multiple tables horizontally
+  rows = table(stats, 'true_max')
+  rows = [[row[0]]+row[2:] for row in rows]
+  addrows = table(stats, 'loo_max')
+  for addrow in addrows:
+    for row in rows:
+      if addrow[0] == row[0]:
+        row.extend(addrow[2:])
+        break
+  addrows = table(stats, 'gcp_max')
+  for addrow in addrows:
+    for row in rows:
+      if addrow[0] == row[0]:
+        row.extend(addrow[2:])
+        break
+  
+  # format as latex
+  for row in rows:
+      row[1:] = ['{:.1f}\%'.format(v) for v in row[1:]]
+      latexrow = ' & '.join(map(str,row)) + ' \\\\'
+      print latexrow
+
+# exclude outliers
+sub = stats.copy()
+sub = sub.select(lambda f: f['rendopts'] and not (\
+                     f['rendopts']['placeopts']['uncertainty']==0.5 and \
+                     f['rendopts']['regionopts']['extent']==1 \
+                                                     )
+                    )
+sub = sub.select(lambda f: f['rendopts'] and not (\
+                     f['rendopts']['placeopts']['uncertainty']==0.5 and \
+                     f['rendopts']['regionopts']['extent']==0.25 \
+                                                     )
+                    )
+sub = sub.select(lambda f: f['rendopts'] and not (\
+                     f['rendopts']['placeopts']['uncertainty']==0.1 and \
+                     f['rendopts']['regionopts']['extent']==0.25 \
+                                                     )
+                    )
+
+## 1
+
+# make table for all
+print sub
+tables(sub)
+#table(sub, 'true_max')
+#table(sub, 'loo_max')
+#table(sub, 'gcp_max')
+
+## 2
+
+# select realistic (should actually appear last)
+sub = sub.select(lambda f: f['rendopts'] and \
+               #f['rendopts']['noiseopts']['resolution']>1500 and \
+               #f['rendopts']['noiseopts']['format']=='png' and \
+               f['rendopts']['placeopts']['quantity']>=20 and \
+               f['rendopts']['placeopts']['uncertainty']<=0.1 and \
+               #f['rendopts']['placeopts']['distribution']=='random' and \
+               #f['rendopts']['projection']==None and \
+               #f['rendopts']['metaopts']['arealabels']==False and \
+               #f['rendopts']['regionopts']['extent']>=1 and \
+                 True \
+              )
+
+# make table for realistic
+print sub
+tables(sub)
+#table(sub, 'true_max')
+#table(sub, 'loo_max')
+#table(sub, 'gcp_max')
+
+## 3
+
+# select good-quality
+sub = sub.select(lambda f: f['rendopts'] and \
+               f['rendopts']['noiseopts']['resolution']>1500 and \
+               #f['rendopts']['noiseopts']['format']=='png' and \
+               f['rendopts']['placeopts']['quantity']>=20 and \
+               f['rendopts']['placeopts']['uncertainty']<=0.1 and \
+               #f['rendopts']['placeopts']['distribution']=='random' and \
+               #f['rendopts']['projection']==None and \
+               #f['rendopts']['metaopts']['arealabels']==False and \
+               #f['rendopts']['regionopts']['extent']>=1 and \
+                 True \
+              )
+
+# make table for good-quality
+print sub
+tables(sub)
+#table(sub, 'true_max')
+#table(sub, 'loo_max')
+#table(sub, 'gcp_max')
+
+
+
+
+
+
+
+
+# FINAL: get polynomial stats
+
+## 1 all
+
+sub = stats.select(lambda f: f['transform'])
+key = lambda f: f['transform']['forward']['params']['order']
+agg = sub.aggregate(key=key,
+                        fieldmapping=[('polynomial',key,'first'),
+                                      ('count','sim_id','count'),
+                                      ('avg_max_err',lambda f: getpercerror(f, 'true_max'),'mean'),
+                                    ]
+                   )
+for f in agg:
+    order,count,avgerr = f.row
+    perc = count / float(len(sub)) * 100
+    print(order, count, perc, avgerr)
+    
+## 2
+
+# select realistic (should actually appear last)
+sub = stats.select(lambda f: f['transform'])
+sub = sub.select(lambda f: f['rendopts'] and \
+               #f['rendopts']['noiseopts']['resolution']>1500 and \
+               #f['rendopts']['noiseopts']['format']=='png' and \
+               f['rendopts']['placeopts']['quantity']>=20 and \
+               f['rendopts']['placeopts']['uncertainty']<=0.1 and \
+               #f['rendopts']['placeopts']['distribution']=='random' and \
+               #f['rendopts']['projection']==None and \
+               #f['rendopts']['metaopts']['arealabels']==False and \
+               #f['rendopts']['regionopts']['extent']>=1 and \
+                 True \
+              )
+key = lambda f: f['transform']['forward']['params']['order']
+agg = sub.aggregate(key=key,
+                        fieldmapping=[('polynomial',key,'first'),
+                                      ('count','sim_id','count'),
+                                      ('avg_max_err',lambda f: getpercerror(f, 'true_max'),'mean'),
+                                    ]
+                   )
+for f in agg:
+    order,count,avgerr = f.row
+    perc = count / float(len(sub)) * 100
+    print(order, count, perc, avgerr)
+    
+## 3
+
+# select good-quality
+sub = stats.select(lambda f: f['transform'])
+sub = sub.select(lambda f: f['rendopts'] and \
+               f['rendopts']['noiseopts']['resolution']>1500 and \
+               #f['rendopts']['noiseopts']['format']=='png' and \
+               f['rendopts']['placeopts']['quantity']>=20 and \
+               f['rendopts']['placeopts']['uncertainty']<=0.1 and \
+               #f['rendopts']['placeopts']['distribution']=='random' and \
+               #f['rendopts']['projection']==None and \
+               #f['rendopts']['metaopts']['arealabels']==False and \
+               #f['rendopts']['regionopts']['extent']>=1 and \
+                 True \
+              )
+key = lambda f: f['transform']['forward']['params']['order']
+agg = sub.aggregate(key=key,
+                        fieldmapping=[('polynomial',key,'first'),
+                                      ('count','sim_id','count'),
+                                      ('avg_max_err',lambda f: getpercerror(f, 'true_max'),'mean'),
+                                    ]
+                   )
+for f in agg:
+    order,count,avgerr = f.row
+    perc = count / float(len(sub)) * 100
+    print(order, count, perc, avgerr)
+    
+## AND FINALLY DIVIDED INTO EACH ACCURACY CATEGORY (full sample)
+
+sub = stats.select(lambda f: f['transform'])
+import classypie as cp
+def classfunc(f): 
+    v = getpercerror(f,'true_max')
+    if f['accuracy'] and math.isnan(v):
+        # nan accuracy (geod dist out-of-this-world)
+        # group with not-usable category
+        return 5
+    elif f['accuracy']:
+        return cp.find_class(v, [0, 1, 5, 20, 100, 110000000])[0] if not math.isnan(v) else None
+    else:
+        return 6
+sub.compute('errclass', classfunc)
+
+key = lambda f: f['transform']['forward']['params']['order']
+for order,group in sub.manage.split(key):
+    print(order)
+    
+    agg = group.aggregate(key=[]'errclass'],
+                            fieldmapping=[('count','sim_id','count'),
+                                          ('avg_max_err',lambda f: getpercerror(f, 'true_max'),'mean'),
+                                        ]
+                       )
+    for f in agg:
+        errclass,count,avgerr = f.row
+        perc = count / float(len(group)) * 100
+        print(errclass, count, perc, avgerr)
+    
+
+
+
+
+
+
+
+# FINAL: acc. linegraphs comparing algo stages/assumptions
+import numpy as np
+def table(stats, error_type='max'):
+    # x different centers
+    import classypie as cp
+    def classfunc(f): 
+        v = getpercerror(f,error_type)
+        if f['accuracy'] and math.isnan(v):
+            # nan accuracy (geod dist out-of-this-world)
+            # group with not-usable category
+            return 5
+        elif f['accuracy']:
+            return cp.find_class(v, [0, 1, 5, 20, 100, 110000000])[0] if not math.isnan(v) else None
+        else:
+            return 6
+    sub = stats.copy()
+    sub.compute('errclass', classfunc)
+    agg = sub.aggregate(key=['errclass'],
+                        fieldmapping=[('count','sim_id','count'),
+                                    ]
+                   )
+    agg.compute('perc', lambda f: f['count']/float(len(sub))*100)
+    cumul = 0
+    rows = []
+    for f in agg:
+        cumul += f.row[-1]
+        row = f.row + [cumul]
+        rows.append(row)
+    return rows 
+
+  
+def subset(stats):
+    # exclude outliers
+    sub = stats.copy()
+    sub = sub.select(lambda f: f['rendopts'] and not (\
+                         f['rendopts']['placeopts']['uncertainty']==0.5 and \
+                         f['rendopts']['regionopts']['extent']==1 \
+                                                         )
+                        )
+    sub = sub.select(lambda f: f['rendopts'] and not (\
+                         f['rendopts']['placeopts']['uncertainty']==0.5 and \
+                         f['rendopts']['regionopts']['extent']==0.25 \
+                                                         )
+                        )
+    sub = sub.select(lambda f: f['rendopts'] and not (\
+                         f['rendopts']['placeopts']['uncertainty']==0.1 and \
+                         f['rendopts']['regionopts']['extent']==0.25 \
+                                                         )
+                        )
+
+    # select realistic
+    sub = sub.select(lambda f: f['rendopts'] and \
+                   #f['rendopts']['noiseopts']['resolution']>1500 and \
+                   #f['rendopts']['noiseopts']['format']=='png' and \
+                   f['rendopts']['placeopts']['quantity']>=20 and \
+                   f['rendopts']['placeopts']['uncertainty']<=0.1 and \
+                   #f['rendopts']['placeopts']['distribution']=='random' and \
+                   #f['rendopts']['projection']==None and \
+                   #f['rendopts']['metaopts']['arealabels']==False and \
+                   #f['rendopts']['regionopts']['extent']>=1 and \
+                     True \
+                  )
+
+    return sub
+
+  
+def plot():
+    # full
+    sub = subset(stats)
+    print sub
+    tab = table(sub, 'true_max')
+    y = [row[2] for row in tab]
+    x = [i for i in range(len(y))]
+    plt.plot(x, y,
+           label='Cur. methodology',
+            linewidth=2,
+            marker='o',
+            color='tab:orange',
+           )
+    
+    # perfect toponyms
+    sub = subset(stats_p1)
+    print sub
+    tab = table(sub, 'true_max')
+    y = [row[2] for row in tab]
+    x = [i for i in range(len(y))]
+    plt.plot(x, y,
+           label='Perf. toponyms',
+            linewidth=2,
+            marker='o',
+            color='tab:blue',
+           )
+    
+    # perfect matching
+    sub = subset(stats_p2)
+    print sub
+    tab = table(sub, 'true_max')
+    y = [row[2] for row in tab]
+    x = [i for i in range(len(y))]
+    plt.plot(x, y,
+           label='Perf. matching',
+            linewidth=2,
+            marker='o',
+            color='tab:green',
+           )
+    
+    plt.legend()
+    plt.gca().invert_xaxis()
+    plt.xticks(x, ['Exc.','Reas.','Approx.','Needs.','Not.','Failed'])
+    plt.xlabel('Accuracy category')
+    plt.ylabel('% of maps')
+    
+    plt.savefig('analyze/figures/outcomes_compare_perfect.png')
+  
+plot()
+
+def plot():
+    # full
+    sub = subset(stats)
+    print sub
+    tab = table(sub, 'true_max')
+    y = [row[2] for row in tab]
+    ycum = np.cumsum(y)
+    x = [i for i in range(len(y))]
+    print x
+    plt.plot(x, ycum,
+           label='Cur. methodology',
+            linewidth=2,
+            marker='o',
+            color='tab:orange',
+           )
+    
+    # perfect toponyms
+    sub = subset(stats_p1)
+    print sub
+    tab = table(sub, 'true_max')
+    y = [row[2] for row in tab]
+    ycum = np.cumsum(y)
+    x = [i for i in range(len(y))]
+    plt.plot(x, ycum,
+           label='Perf. toponyms',
+            linewidth=2,
+            marker='o',
+            color='tab:blue',
+           )
+    
+    # perfect matching
+    sub = subset(stats_p2)
+    print sub
+    tab = table(sub, 'true_max')
+    y = [row[2] for row in tab]
+    ycum = np.cumsum(y)
+    x = [i for i in range(len(y))]
+    plt.plot(x, ycum,
+           label='Perf. matching',
+            linewidth=2,
+            marker='o',
+            color='tab:green',
+           )
+    
+    plt.legend()
+    plt.gca().invert_xaxis()
+    plt.xticks(x, ['Exc.','Reas.','Approx.','Needs.','Not.','Failed'])
+    plt.xlabel('Cumul. accuracy category')
+    plt.ylabel('% of maps')
+    plt.ylim(0,105)
+    
+    plt.savefig('analyze/figures/outcomes_compare_perfect_cumul.png')
+  
+plot()
+
+
+
+
+
+
+
+
+
+# boxplots
 # define params
 resolutions = [3000, 2000, 1000]
-extents = [50, 10, 1, 0.1] # ca 5000km, 1000km, 100km, and 10km
+extents = [50, 10, 1, 0.25] # ca 5000km, 1000km, 100km, and 10km
 quantities = [80, 40, 20, 10]
 uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
-distributions = ['dispersed', 'random'] # IMPROVE W NUMERIC
-projections = [None, # lat/lon
-               '+proj=robin +datum=WGS84 +ellps=WGS84 +a=6378137.0 +rf=298.257223563 +pm=0 +lon_0=0 +x_0=0 +y_0=0 +units=m +axis=enu +no_defs', #'+init=ESRI:54030', # Robinson
+distributions = ['random'] 
+projections = ['eqc',
+                'lcc', 
+               'tmerc',
                ] 
 datas = [False, 
          True] 
 metas = [False, # nothing
-         True, # text noise + meta boxes (arealabels + title + legend)
+         True, # text noise + meta boxes (arealabels + title + legend) + gridlines
          ]
 imformats = ['png','jpg']
 paramvals = dict(extents=extents,
@@ -522,7 +1598,7 @@ paramkeys = dict(extents=lambda f: f['rendopts']['regionopts']['extent'],
               toponyms=lambda f: f['rendopts']['placeopts']['quantity'],
               distributions=lambda f: f['rendopts']['placeopts']['distribution'],
               uncertainties=lambda f: f['rendopts']['placeopts']['uncertainty'],
-              projections=lambda f: f['rendopts']['projection'],
+              projections=lambda f: f['rendopts']['projection'].split()[0].replace('+proj=',''),
               resolutions=lambda f: f['rendopts']['noiseopts']['resolution'],
               imformats=lambda f: f['rendopts']['noiseopts']['format'],
               datas=lambda f: len(f['rendopts']['datas'])>1,
@@ -579,7 +1655,7 @@ def boxplot_stats(ax, param, vals, xlabel=True, **baselinevals):
         printstats(errors)
         valerrors.append(errors)
     if param in 'extents uncertainties':
-        vals = [v*100 for v in vals]
+        vals = [int(v*100) for v in vals]
     _ = ax.boxplot(valerrors, labels=[str(v)[:12] for v in vals],
                    showcaps=False, showfliers=False, vert=True)
 
@@ -602,20 +1678,18 @@ boxplot_stats(axes[5], 'imformats', imformats, )
 
 boxplot_stats(axes[6], 'toponyms', quantities, )
 
-boxplot_stats(axes[7], 'distributions', distributions, )
-
-boxplot_stats(axes[8], 'uncertainties', uncertainties, )
+boxplot_stats(axes[7], 'uncertainties', uncertainties, )
 
 fig.subplots_adjust(left=0.08, right=0.99, top=0.95, bottom=0.05,
                    hspace=0.30) #wspace=0.05)
-#fig.delaxes(axes[-1])
+fig.delaxes(axes[-1])
 #fig.suptitle('Effect of each parameter \n while keeping all others at baseline')
 fig.savefig('analyze/figures/errors_baseline_boxplots.png')
 
 
 
 # same boxplots but broken down by extent
-fig,axes = plt.subplots(8, 4, 
+fig,axes = plt.subplots(7, 4, 
                         #sharex=True, sharey=True,
                         figsize=(8,10))
 
@@ -627,7 +1701,7 @@ ax.annotate('img\nResolution', xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - 12, 0),
                   xycoords=ax.yaxis.label, textcoords='offset points',
                   ha='center', va='center', rotation='vertical')
 for i in range(4):
-    axes[0,i].set_title('extent = {} km'.format(extents[i]*100))
+    axes[0,i].set_title('extent = {} km'.format(int(extents[i]*100)))
     boxplot_stats(axes[0,i], 'resolutions', resolutions, xlabel=False, extents=extents[i])
 
 j += 1
@@ -678,15 +1752,6 @@ for i in range(4):
 j += 1
 ax = axes[j,0]
 ax.set_ylabel('max error (%)')
-ax.annotate('toponym\nDispersed', xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - 12, 0),
-                  xycoords=ax.yaxis.label, textcoords='offset points',
-                  ha='center', va='center', rotation='vertical')
-for i in range(4):
-    boxplot_stats(axes[j,i], 'distributions', distributions, xlabel=False, extents=extents[i])
-
-j += 1
-ax = axes[j,0]
-ax.set_ylabel('max error (%)')
 ax.annotate('toponym\nUncertainty (km)', xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - 12, 0),
                   xycoords=ax.yaxis.label, textcoords='offset points',
                   ha='center', va='center', rotation='vertical')
@@ -700,6 +1765,121 @@ fig.savefig('analyze/figures/errors_baseline_boxplots_by_extent.png')
 
     
   
+# same but linegraphs of success rate (<100)
+
+import numpy as np
+
+# linegraphs for each param value
+def outcomeplot_stats(ax, stats, param, vals, xlabel=True, **baselinevals):
+    print param
+    #ax.set_title(param)
+    
+    if xlabel:
+        paramlabel = paramlabels[param]
+        ax.set_xlabel(paramlabel, weight='bold')
+    if axes.ndim == 1 and ax in (axes[0],axes[3]):
+        ax.set_ylabel('% of maps')
+        
+    rates1 = []
+    rates2 = []
+    def is_param_baseline(f):
+        # NO LONGER SETS ALL TO BASELINE, ONLY CUSTOM BASELINE VALS
+        return all([paramkeys[k](f)==v for k,v in baselinevals.items()])
+    for val in vals:
+        sub = stats.select(lambda f: f['rendopts'] and is_param_baseline(f) and paramkeys[param](f) == val)
+        outcomes = np.array([f['accuracy']['percent']['max'] if f['accuracy'] and not math.isnan(f['accuracy']['percent']['max']) else 999999999999999
+                            for f in sub])
+        #rate1 = (outcomes!=999999999999999).mean() * 100 # not fail
+        rate1 = (outcomes<100).mean() * 100 # usable
+        rate2 = (outcomes<5).mean() * 100 # human-equivalent
+        print 'stats for {}={} (n={})'.format(param, val, len(outcomes))
+        print rate1,rate2 #,rate3
+        rates1.append(rate1)
+        rates2.append(rate2)
+        
+    # get labels
+    labelvals = list(vals)
+    if isinstance(vals[0], basestring):
+        # only set tick labels for string values
+        vals = [i for i,v in enumerate(vals)]
+        ax.set_xticks(vals)
+        ax.set_xticklabels(labelvals)
+    else:
+        if param in 'extents uncertainties':
+            vals = [int(v*100) for v in vals]
+    
+    # usable
+    ax.plot(vals, rates2,
+           label='High-accuracy (<5% error)',
+            linewidth=2,
+            marker='o',
+            color='tab:green',
+           )
+    
+    # human
+    ax.plot(vals, rates1,
+           label='Low-accuracy (<100% error)',
+            linestyle='dashed',
+            linewidth=2,
+            marker='o',
+            color='tab:blue',
+           )
+
+# exclude outliers
+sub = stats.copy()
+sub = sub.select(lambda f: f['rendopts'] and not (\
+                     f['rendopts']['placeopts']['uncertainty']==0.5 and \
+                     f['rendopts']['regionopts']['extent']==1 \
+                                                     )
+                    )
+sub = sub.select(lambda f: f['rendopts'] and not (\
+                     f['rendopts']['placeopts']['uncertainty']==0.5 and \
+                     f['rendopts']['regionopts']['extent']==0.25 \
+                                                     )
+                    )
+sub = sub.select(lambda f: f['rendopts'] and not (\
+                     f['rendopts']['placeopts']['uncertainty']==0.1 and \
+                     f['rendopts']['regionopts']['extent']==0.25 \
+                                                     )
+                    )
+    
+fig,axes = plt.subplots(2, 3, 
+                        sharey=True, #sharex=True, sharey=True,
+                        figsize=(8,6))
+axes = axes.flatten()
+    
+outcomeplot_stats(axes[0], sub, 'extents', extents, )
+
+outcomeplot_stats(axes[1], sub, 'resolutions', resolutions, )
+
+outcomeplot_stats(axes[2], sub, 'projections', projections, )
+
+outcomeplot_stats(axes[3], sub, 'imformats', imformats, )
+
+outcomeplot_stats(axes[4], sub, 'toponyms', quantities, )
+
+outcomeplot_stats(axes[5], sub, 'uncertainties', uncertainties, )
+
+fig.subplots_adjust(left=0.08, right=0.99, top=0.95, bottom=0.15,
+                   hspace=0.4) #wspace=0.05)
+
+handles, labels = axes[0].get_legend_handles_labels()
+from matplotlib.lines import Line2D
+handles = [Line2D([0],[0],linewidth=2,
+                  marker=None,
+                  color='tab:green',),
+           Line2D([0],[0],linewidth=2,
+                  marker=None,
+                  linestyle='dashed',
+                  color='tab:blue',),
+          ]
+fig.legend(handles, labels, ncol=2, frameon=False,
+          loc='lower center')
+
+fig.savefig('analyze/figures/outcomes_baseline_lineplots.png')
+  
+  
+  
 # same but bargraphs of success rate (<100)
 
 import numpy as np
@@ -711,7 +1891,7 @@ def outcomeplot_stats(ax, param, vals, xlabel=True, **baselinevals):
     if xlabel:
         paramlabel = paramlabels[param]
         ax.set_xlabel(paramlabel, weight='bold')
-    if axes.ndim == 1 and ax in (axes[0],axes[3],axes[6]):
+    if axes.ndim == 1 and ax in (axes[0],axes[3]):
         ax.set_ylabel('% of maps')
     rates1 = []
     rates2 = []
@@ -731,12 +1911,12 @@ def outcomeplot_stats(ax, param, vals, xlabel=True, **baselinevals):
         return all(checks)
     for val in vals:
         sub = stats.select(lambda f: f['rendopts'] and is_param_baseline(f) and paramkeys[param](f) == val)
-        outcomes = np.array([f['accuracy']['max_georeferenced']['percent'] if f['accuracy'] and not math.isnan(f['accuracy']['max_georeferenced']['percent']) else 999999999999999
+        outcomes = np.array([f['accuracy']['percent']['max'] if f['accuracy'] and not math.isnan(f['accuracy']['percent']['max']) else 999999999999999
                             for f in sub])
         #rate1 = (outcomes!=999999999999999).mean() * 100 # not fail
-        rate1 = (outcomes<1.0).mean() * 100 # usable
-        #rate2 = (outcomes<0.2).mean() * 100 # no fixing
-        rate2 = (outcomes<0.05).mean() * 100 # human-equivalent
+        rate1 = (outcomes<100).mean() * 100 # usable
+        #rate2 = (outcomes<20).mean() * 100 # no fixing
+        rate2 = (outcomes<5).mean() * 100 # human-equivalent
         print 'stats for {}={} (n={})'.format(param, val, len(outcomes))
         print rate1,rate2 #,rate3
         rates1.append(rate1)
@@ -744,18 +1924,20 @@ def outcomeplot_stats(ax, param, vals, xlabel=True, **baselinevals):
         #rates3.append(rate3)
     labelvals = list(vals)
     if param in 'extents uncertainties':
-        labelvals = [v*100 for v in vals]
+        labelvals = [int(v*100) for v in vals]
     w = 0.35
     _ = ax.bar([x for x in range(len(rates1))], rates1, 
                #tick_label=[str(v)[:12] for v in labelvals], 
                align='edge',
-               color='tab:blue', width=w, 
+               ##color='tab:blue', 
+               width=w, 
                label='Usable (<100% error)',
                 )
     _ = ax.bar([x+w for x in range(len(rates2))], rates2, 
                tick_label=[str(v)[:12] for v in labelvals], 
                align='edge',
-               color='tab:orange', width=w, 
+               ##color='tab:orange', 
+               width=w, 
                label='Human equivalent (<5% error)',
                 )
     #_ = ax.bar([x+w+w for x in range(len(rates3))], rates3, 
@@ -763,7 +1945,7 @@ def outcomeplot_stats(ax, param, vals, xlabel=True, **baselinevals):
     #           color='tab:green', width=w, 
     #            )
 
-fig,axes = plt.subplots(3, 3, 
+fig,axes = plt.subplots(2, 3, 
                         sharey=True, #sharex=True, sharey=True,
                         figsize=(8,6))
 axes = axes.flatten()
@@ -774,23 +1956,21 @@ outcomeplot_stats(axes[1], 'resolutions', resolutions, )
 
 outcomeplot_stats(axes[2], 'projections', projections, )
 
-outcomeplot_stats(axes[3], 'datas', datas, )
+##outcomeplot_stats(axes[3], 'datas', datas, )
 
-outcomeplot_stats(axes[4], 'metas', metas, )
+##outcomeplot_stats(axes[4], 'metas', metas, )
 
-outcomeplot_stats(axes[5], 'imformats', imformats, )
+outcomeplot_stats(axes[3], 'imformats', imformats, )
 
-outcomeplot_stats(axes[6], 'toponyms', quantities, )
+outcomeplot_stats(axes[4], 'toponyms', quantities, )
 
-outcomeplot_stats(axes[7], 'distributions', distributions, )
-
-outcomeplot_stats(axes[8], 'uncertainties', uncertainties, )
+outcomeplot_stats(axes[5], 'uncertainties', uncertainties, )
 
 fig.subplots_adjust(left=0.08, right=0.99, top=0.95, bottom=0.15,
                    hspace=0.4) #wspace=0.05)
 #fig.delaxes(axes[-1])
 #fig.suptitle('Effect of each parameter \n while keeping all others at baseline')
-handles, labels = axes[-1].get_legend_handles_labels()
+handles, labels = axes[0].get_legend_handles_labels()
 fig.legend(handles, labels, ncol=2, frameon=False,
           loc='lower center')
 fig.savefig('analyze/figures/outcomes_baseline_barplots.png')
@@ -798,9 +1978,9 @@ fig.savefig('analyze/figures/outcomes_baseline_barplots.png')
   
 ###
 # same barplots but broken down by extent
-fig,axes = plt.subplots(4, 4, 
+fig,axes = plt.subplots(3, 4, 
                         sharey=True, #sharex=True, sharey=True,
-                        figsize=(8,5))
+                        figsize=(8,6))
 
 j = 0
 ax = axes[j,0]
@@ -821,12 +2001,12 @@ ax.annotate('data\nNoise', xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - 12, 0),
 for i in range(4):
     outcomeplot_stats(axes[j,i], 'datas', datas, xlabel=False, extents=extents[i])
 
-j += 1
-ax = axes[j,0]
-ax.set_ylabel('% of maps')
-ax.annotate('num\nToponyms', xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - 12, 0),
-                  xycoords=ax.yaxis.label, textcoords='offset points',
-                  ha='center', va='center', rotation='vertical')
+#j += 1
+#ax = axes[j,0]
+#ax.set_ylabel('% of maps')
+#ax.annotate('num\nToponyms', xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - 12, 0),
+#                  xycoords=ax.yaxis.label, textcoords='offset points',
+#                  ha='center', va='center', rotation='vertical')
 for i in range(4):
     outcomeplot_stats(axes[j,i], 'toponyms', quantities, xlabel=False, extents=extents[i])
     
@@ -850,7 +2030,7 @@ fig.savefig('analyze/figures/outcomes_baseline_barplots_by_extent.png')
 
     
     
-# table of error sources
+# table of error sources (NOT USING, REMOVE?)
 def table():
     import classypie as cp
     def classfunc(f): 
@@ -940,8 +2120,6 @@ x = np.array([[f['rendopts']['regionopts']['extent'] if f['rendopts'] else float
                f['rendopts']['resolution'] if f['rendopts'] else float('nan'),
                f['rendopts']['placeopts']['quantity'] if f['rendopts'] else float('nan'),
                f['rendopts']['placeopts']['uncertainty'] if f['rendopts'] else float('nan'),
-                #distribution
-                (1 if f['rendopts']['placeopts']['distribution'] == 'dispersed' else 0) if f['rendopts'] else float('nan'),
                 #gcps
                 f['accuracy']['labels'] * f['accuracy']['labels_used'] if f['accuracy'] else float('nan'),
                 #projection
@@ -954,7 +2132,7 @@ x = np.array([[f['rendopts']['regionopts']['extent'] if f['rendopts'] else float
                 (1 if f['rendopts']['noiseopts']['format']=='jpg' else 0) if f['rendopts'] else float('nan'),
               ]
               for f in stats])
-xnames = ['Constant', 'mapExtent', 'imgResolution', 'numToponyms', 'toponymUncertainty', 'toponymDispersed', 'numControlPoints', 'mapProjection', 'dataNoise', 'metaNoise', 'pixelNoise']
+xnames = ['Constant', 'mapExtent', 'imgResolution', 'numToponyms', 'toponymUncertainty', 'numControlPoints', 'mapProjection', 'dataNoise', 'metaNoise', 'pixelNoise']
 y = np.array([f['accuracy']['max_georeferenced']['percent'] if f['accuracy'] else float('nan')
               for f in stats])
 ynames = ['Max Error (%)']
@@ -972,10 +2150,12 @@ x = np.array([[f['rendopts']['regionopts']['extent'] if f['rendopts'] else float
                f['rendopts']['resolution'] if f['rendopts'] else float('nan'),
                f['rendopts']['placeopts']['quantity'] if f['rendopts'] else float('nan'),
                f['rendopts']['placeopts']['uncertainty'] if f['rendopts'] else float('nan'),
-                #distribution
-                (1 if f['rendopts']['placeopts']['distribution'] == 'dispersed' else 0) if f['rendopts'] else float('nan'),
-                #projection
-                (1 if f['rendopts']['projection'] else 0) if f['rendopts'] else float('nan'),
+                #projection eqc
+                1 if 'eqc' in f['rendopts']['projection'] else 0,
+                #projection lcc
+                1 if 'lcc' in f['rendopts']['projection'] else 0,
+                #projection tmerc
+                1 if 'tmerc' in f['rendopts']['projection'] else 0,
                 #data noise
                 (1 if f['rendopts']['datas'] else 0) if f['rendopts'] else float('nan'),
                 #text noise
@@ -988,7 +2168,7 @@ for i in range(x.shape[1]):
     # min-max normalize predictors
     v = x[:,i][~np.isnan(x[:,i])]
     x[:,i] = (x[:,i] - v.min()) / (v.max() - v.min())
-xnames = ['Constant', 'mapExtent', 'imgResolution', 'numToponyms', 'toponymUncertainty', 'toponymDispersed', 'mapProjection', 'dataNoise', 'metaNoise', 'pixelNoise']
+xnames = ['Constant', 'mapExtent', 'imgResolution', 'numToponyms', 'toponymUncertainty', 'mapProjectionEqc', 'mapProjectionLcc', 'mapProjectionTmerc', 'dataNoise', 'metaNoise', 'pixelNoise']
 y = np.array([f['accuracy']['max_georeferenced']['percent'] if f['accuracy'] else 999999999999999
               for f in stats])
 y[y<0.05] = 1

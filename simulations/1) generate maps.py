@@ -25,8 +25,8 @@ except:
 
 ####################
 # PARAMETERS
-N = 48*4 # (48*4=192 scenes) (*96=18,432 maps) # number of unique map scenes to render (each is rendered almost a hundred times with different map parameters)
-MAXPROCS = 4 # number of available cpu cores / parallel processes
+N = 48*4*2 # (48*4*2=384 scenes) (*24=9,216 maps) # number of unique map scenes to render (each is rendered 24 times with different map parameters)
+MAXPROCS = 20 # number of available cpu cores / parallel processes
 
 
 
@@ -283,8 +283,8 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
     
     # render pure map image
     m = pg.renderer.Map(width, height,
-                        title=metaopts['title'],
-                        titleoptions=metaopts['titleoptions'],
+                        #title=metaopts['title'],
+                        #titleoptions=metaopts['titleoptions'],
                         #textoptions={'font':'eb garamond 12'},
                         #textoptions={'font':'lato'},
                         #textoptions={'font':'dejavu sans'},
@@ -294,27 +294,28 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
 
     # country background
     if metaopts['arealabels']:
-        arealabels = {'text':lambda f: f['NAME'].upper(), 'textoptions': {'textsize':textopts['textsize']*1.5, 'textcolor':(88,88,88)}}
+        arealabels = {'text':lambda f: f['NAME'].upper(), 'textoptions': {'textsize':textopts['textsize']*2, 'textcolor':(88,88,88)}}
         rencountries = countries #.manage.crop(bbox)
         #rencountries.create_spatial_index()
     else:
         arealabels = {}
         rencountries = countries
-    m.add_layer(rencountries, fillcolor=(255,222,173), outlinewidth=0.2, outlinecolor=(100,100,100),
-                legendoptions={'title':'Country border'},
+    m.add_layer(rencountries, fillcolor=(219,218,193), outlinewidth=0.2, outlinecolor=(100,100,100,200),
+                legendoptions={'title':'Country border', 'titleoptions':{'textsize':textopts['textsize']+2}},
                 **arealabels)
 
     # extra data
     for datadef in datas:
         if datadef:
             data,style = datadef
+            style['legendoptions']['titleoptions'] = {'textsize':textopts['textsize']+2}
             m.add_layer(data, **style)
 
     # toponyms
     m.add_layer(mapplaces,
                 text=lambda f: f['name'],
                 textoptions=textopts,
-                legendoptions={'title':'Populated place'},
+                legendoptions={'title':'Populated place', 'titleoptions':{'textsize':textopts['textsize']+2}},
                 **anchoropts)
 
     # zoom
@@ -343,12 +344,14 @@ def render_map(bbox, mapplaces, datas, resolution, regionopts, projection, ancho
             geoj = {'type':'LineString', 'coordinates':horiz}
             gridlines.add_feature([], geoj)
         print 'gridlines',gridlines
-        m.add_layer(gridlines, fillcolor=(62,88,130), fillsize=0.15)
+        m.add_layer(gridlines, fillcolor=(62,88,130), fillsize=0.15/2.0, legend=False)
 
     # legend
     if metaopts['legend']:
         legendoptions = {'padding':0, 'direction':'s'}
         legendoptions.update(metaopts['legendoptions'])
+        legendoptions['title'] = metaopts['title']
+        legendoptions['titleoptions'] = {'side':'n', 'textsize':textopts['textsize']*2} #metaopts['titleoptions']
         m.add_legend(legendoptions=legendoptions)
 
     # note...
@@ -387,19 +390,29 @@ def save_map(name, mapp, mapplaces, datas, resolution, regionopts, placeopts, pr
 
     # store the original place coordinates
     mapplaces = mapplaces.copy()
-    #if projection:
-    #    mapplaces.manage.reproject(projection)
-    mapplaces.add_field('col')
-    mapplaces.add_field('row')
+    # first lat/lon
     mapplaces.add_field('x')
     mapplaces.add_field('y')
     for f in mapplaces:
         x,y = f.geometry['coordinates']
-        col,row = m.drawer.coord2pixel(x,y)
-        f['col'] = col
-        f['row'] = row
         f['x'] = x
         f['y'] = y
+    # then col/row (requires the local crs coords)
+    mapplaces.add_field('col')
+    mapplaces.add_field('row')
+    if projection:
+        mapplaces_p = mapplaces.manage.reproject(projection)
+        for f,f_p in zip(mapplaces,mapplaces_p):
+            x,y = f_p.geometry['coordinates']
+            col,row = m.drawer.coord2pixel(x,y)
+            f['col'] = col
+            f['row'] = row
+    else:
+        for f in mapplaces:
+            x,y = f.geometry['coordinates']
+            col,row = m.drawer.coord2pixel(x,y)
+            f['col'] = col
+            f['row'] = row
     mapplaces.save('maps/{}_placenames.geojson'.format(name))
 
     # save options as json
@@ -629,7 +642,7 @@ def iteroptions(center, extent, quantity, projection):
         for datas,meta in itertools.product(alldatas,metas):
 
             metaopts = {'title':meta['title'], 'titleoptions':meta.get('titleoptions', {}), 'legend':meta['legend'], 'legendoptions':meta.get('legendoptions', {}), 'arealabels':meta['arealabels']}
-            textopts = {'textsize':8, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
+            textopts = {'textsize':10, 'anchor':'sw', 'xoffset':0.5, 'yoffset':0}
             anchoropts = {'fillcolor':'black', 'fillsize':0.1}
             resolution = resolutions[0] # render at full resolution (downsample later)
 
@@ -783,16 +796,16 @@ roads.create_spatial_index()
 # options
 print('defining options')
 n = N # each N is a particular scene at a particular extent, toponym quantity, and projection
-extents = [10] + [50, 1, 0.25] # ca 5000km, 1000km, 100km, and 25km
+extents = [10] + [50, 5, 1, 0.25] # ca 5000km, 1000km, 500km, 100km, and 25km
 quantities = [80, 40, 20, 10]
 distributions = ['random'] # MOST MAPS WILL RESEMBLE RANDOM  #['dispersed','random'] # IMPROVE W NUMERIC
 uncertainties = [0, 0.01, 0.1, 0.5] # ca 0km, 1km, 10km, and 50km
 alldatas = [
-                [], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
+                #[], #(roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),], # no data layers
                 [
-                (rivers, {'fillcolor':(54,115,159), 'fillsize':0.08, 'legendoptions':{'title':'Rivers'}}), # three layers
+                (rivers, {'fillcolor':(54,115,159,200), 'fillsize':0.08*2, 'legendoptions':{'title':'Rivers'}}), # three layers
                 (urban, {'fillcolor':(209,194,151), 'outlinecolor':(209-50,194-50,151-50), 'legendoptions':{'title':'Urban area'}}),
-                (roads, {'fillcolor':(187,0,0), 'fillsize':0.08, 'legendoptions':{'title':'Roads'}}),
+                (roads, {'fillcolor':(187,0,0,155), 'fillsize':0.08*2, 'legendoptions':{'title':'Roads'}}),
                 # + gridlines (hardcoded in function above)
                  ],
             ]
@@ -806,10 +819,10 @@ projections = [#None, # lat/lon
                ]
 resolutions = [3000, 2000, 1000] #, 750] #, 4000]
 imformats = ['png','jpg']
-metas = [{'title':'','legend':False,'arealabels':False}, # nothing
-         {'title':'This is the Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':True}, # text noise + meta boxes (arealabels + title + legend)
-         #{'title':'This is the Map Title','titleoptions':{'fillcolor':None},'legend':True,'legendoptions':{'fillcolor':None},'arealabels':True}, # text noise (arealabels + title + legend)
-         #{'title':'This is the Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes (title + legend)
+metas = [#{'title':'','legend':False,'arealabels':False}, # nothing
+         {'title':'Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':(240,240,240),'outlinewidth':'5px'},'arealabels':True}, # text noise + meta boxes (arealabels + title + legend)
+         #{'title':'Map Title','titleoptions':{'fillcolor':None},'legend':True,'legendoptions':{'fillcolor':None},'arealabels':True}, # text noise (arealabels + title + legend)
+         #{'title':'Map Title','titleoptions':{'fillcolor':'white'},'legend':True,'legendoptions':{'fillcolor':'white'},'arealabels':False}, # meta boxes (title + legend)
          ]
 
 # main process handler
