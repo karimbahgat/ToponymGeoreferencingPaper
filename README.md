@@ -8,17 +8,17 @@ For the latest version including possible fixes to these replication scripts, go
 
 The code and packages in this repository works on Python 2.7 and 3.x. 
 
-The main package for map georeferencing is contained in the "automap" package folder. Note that this package is intended solely for replicating the implementation and results used in the article -- a more user-friendly standalone georeferencing package may be announced at a later point. 
+The main package for map georeferencing is contained in the "automap" package folder. Note that the automap package is intended solely for replicating the implementation and results used in the article -- a more user-friendly standalone georeferencing package may be announced at a later point. 
 
 To install this package and all the necessary dependencies on your machine, write the following from the commandline:
 
 ```
-pip install git+https://github.com/karimbahgat/ToponymGeoreferencingPaper
+pip install -r requirements.txt
 ``` 
 
 ### Tesseract
 
-The text recognition part requires that you have Tesseract installed on your machine. For information on how to install Tesseract, see https://tesseract-ocr.github.io/tessdoc/Installation.html. 
+The text recognition part requires that you have Tesseract installed on your machine. For information on how to install Tesseract, see https://tesseract-ocr.github.io/tessdoc/Installation.html. As described in the link, it's important that you add the folder containing the installed tesseract binaries to your system's PATH environment variable. 
 
 ### Data dependencies
 
@@ -44,4 +44,7 @@ Be forewarned that the simulations generates very large volumes of map image dat
 The "realworld" folder of this repository contains the scripts necessary to replicate the results for the automated map georeferencing of real-world maps presented in the article. 
 
 To replicate the results of the real-world maps, the scripts should be run in the following order: 
+
+- `1) scrape and georeference.py` (scrapes the top two maps for each country page on the University of Texas at Austin's Perry-Castaneda Library (PCL) Map Collection, georeferences them, and outputs the source information and georeferencing results to JSON files in `realworld/scrape`).
+- `2) error analyze.py` (collects all the information about the real-world maps, georeferencing results and errors from the JSON files produced in the previous script, and generates some but not all of the article figures in `realworld/analyze/figures`).
 

@@ -1,0 +1,6 @@
+Pillow
+numpy
+opencv-python-headless==4.3.0.36
+colormath
+pytesseract
+PythonGIS @ git+https://github.com/karimbahgat/PythonGis
