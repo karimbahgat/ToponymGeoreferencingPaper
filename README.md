@@ -2,7 +2,7 @@
 
 This repository contains the algorithm and simulation code for the paper "Toponym-assisted map georeferencing: Evaluating the use of toponyms for the digitization of map collections", by Karim Bahgat and Dan Runfola (2021). 
 
-The exact version that was used in the original article, is located at: https://github.com/karimbahgat/ToponymGeoreferencingPaper/releases/tag/0.1.0. 
+The exact version that was used in the original article, is currently undergoing bug fixes in order to be used for replication, but will be linked to here shortly: URL OF STABLE VERSION HERE. 
 
 For the latest version including possible fixes to these replication scripts, go to: https://github.com/karimbahgat/ToponymGeoreferencingPaper. 
 
