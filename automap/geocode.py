@@ -58,6 +58,7 @@ class OptimizedCoder(object):
         self.path = path or 'resources/gazetteers.db'
         self.db = sqlite3.connect(self.path)
 
+    '''
     def geocode(self, name, limit=None):
         # NOT CORRRECT QUERY, RETURNS DUPLICATES
         if limit:
@@ -71,6 +72,30 @@ class OptimizedCoder(object):
                                   },
                    'geometry': wkb_to_shapely(geom).__geo_interface__,
                    } for data,ID,names,geom in results)
+        return results #Matches(results)
+    '''
+
+    def geocode(self, name, limit=None):
+        # NOT CORRRECT QUERY, RETURNS DUPLICATES
+        if limit:
+            raise NotImplemented("Geocode results 'limit' not yet implemented")
+        #query = "SELECT locs.data, locs.id, GROUP_CONCAT(names.name, '|'), locs.geom FROM locs, names, (SELECT data,id FROM names WHERE name = ? COLLATE NOCASE) AS m WHERE locs.id=m.id AND locs.data=m.data and names.id=m.id and names.data=m.data GROUP BY m.data,m.id"
+        _matches = "SELECT * FROM names WHERE name = ? COLLATE NOCASE"
+        #_locmatches = "SELECT loc_id, GROUP_CONCAT(matches.name, '|') AS names FROM matches GROUP BY loc_id"
+        _select = "sources.name,locs.loc_id,GROUP_CONCAT(names.name, '|'),locs.lon,locs.lat"
+        #_from = "locmatches INNER JOIN locs ON locmatches.loc_id=locs.loc_id"
+        _from = "sources,locs,names,matches WHERE names.loc_id=matches.loc_id AND names.loc_id=locs.loc_id AND locs.source_id=sources.source_id"
+        _groupby = "matches.loc_id"
+        query = "WITH matches AS ({_matches}) SELECT {_select} FROM {_from} GROUP BY {_groupby}".format(_matches=_matches, _select=_select, _from=_from, _groupby=_groupby)
+        results = self.db.cursor().execute(query, (name,))
+        results = ({'type': 'Feature',
+                   'properties': {'data':data,
+                                  'id':ID,
+                                  'name':names,
+                                  'search':name,
+                                  },
+                   'geometry': {'type':'Point', 'coordinates':[lon,lat]},
+                   } for data,ID,names,lon,lat in results)
         return results #Matches(results)
 
 

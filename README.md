@@ -24,7 +24,7 @@ The text recognition part requires that you have Tesseract installed on your mac
 
 ### Data dependencies
 
-The replication scripts in this repository are dependent on several external data files. Some of these data dependencies are not included in this repository due to file size restrictions, but instead have to be downloaded as a zipfile from URL-TO-BE-ADDED-LATER. The contents of the zipfile should be extracted to the "data" folder. 
+The replication scripts in this repository are dependent on several external data files. Some of these data dependencies are not included in this repository due to file size restrictions, but instead have to be downloaded as a zipfile from [here](https://filedn.com/lvxzpqbRuTkLnAjfFXe7FFu/Gazetteer%20DB/gazetteers%202021-12-03.zip). The file named "gazetteers.db" should be extracted to the "data" folder. 
 
 ## Replicating the results
 
