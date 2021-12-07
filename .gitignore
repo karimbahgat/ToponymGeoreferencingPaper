@@ -47,6 +47,8 @@ Temporary Items
 
 # Folders
 tests/testmaps/
+data/gazetteers.db
+data/gns.db
 simulations/maps/
 simulations/output/
 simulations/analyze/
