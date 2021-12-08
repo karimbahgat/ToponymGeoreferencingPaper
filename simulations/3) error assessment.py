@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, '../dependencies/georeference maps')
 
 import automap as mapfit
 import pythongis as pg

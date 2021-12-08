@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, '../dependencies/georeference maps')
 
 import automap as mapfit
 import pythongis as pg
@@ -26,7 +28,7 @@ except:
 # PARAMS
 TEXTCOLOR = (0,0,0) # rgb color tuple of map text, or None for autodetect
 WARPORDER = None # polynomial warp order, or None for detecting optimal order
-MAXPROCS = 20 # number of available cpu cores / parallel processes
+MAXPROCS = 2#20 # number of available cpu cores / parallel processes
 
 
 ###################

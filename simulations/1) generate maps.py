@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, '../dependencies/generate maps')
 
 import pythongis as pg
 import pycrs
@@ -194,10 +196,10 @@ def get_crs_transformer(fromcrs, tocrs):
     if not (fromcrs and tocrs):
         return None
     
-    if isinstance(fromcrs, basestring):
+    if isinstance(fromcrs, str):
         fromcrs = pycrs.parse.from_unknown_text(fromcrs)
 
-    if isinstance(tocrs, basestring):
+    if isinstance(tocrs, str):
         tocrs = pycrs.parse.from_unknown_text(tocrs)
 
     fromcrs = fromcrs.to_proj4()
@@ -211,11 +213,11 @@ def get_crs_transformer(fromcrs, tocrs):
             x,y = p
             return not (math.isinf(x) or math.isnan(x) or math.isinf(y) or math.isnan(y))
         def _project(points):
-            xs,ys = itertools.izip(*points)
+            xs,ys = zip(*points)
             xs,ys = pyproj.transform(fromcrs,
                                      tocrs,
                                      xs, ys)
-            newpoints = list(itertools.izip(xs, ys))
+            newpoints = zip(xs, ys)
             newpoints = [p for p in newpoints if _isvalid(p)] # drops inf and nan
             return newpoints
     else:

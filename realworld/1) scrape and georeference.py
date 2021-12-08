@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, '../dependencies/georeference maps')
 
 from urllib2 import urlopen
 from PIL import Image

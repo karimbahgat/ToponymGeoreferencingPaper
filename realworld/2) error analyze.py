@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, '../dependencies/georeference maps')
+
 import pythongis as pg
 import matplotlib.pyplot as plt
 import seaborn as sns

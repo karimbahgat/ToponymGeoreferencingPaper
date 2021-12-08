@@ -8,7 +8,7 @@ For the latest version including possible fixes to these replication scripts, go
 
 ## Installation
 
-The code and packages in this repository works on Python 2.7 and 3.x. 
+The code and packages in this repository works on Python 2.7. 
 
 The main package for map georeferencing is contained in the "automap" package folder. Note that the automap package is intended primarily for replicating the implementation and results used in the article -- a more user-friendly standalone georeferencing package may be announced at a later point. 
 
