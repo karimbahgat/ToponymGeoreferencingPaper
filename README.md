@@ -1,14 +1,16 @@
 # Toponym Georeferencing Paper - Replication Code
 
-This repository contains the algorithm and simulation code for the paper "Toponym-assisted map georeferencing: Evaluating the use of toponyms for the digitization of map collections", by Karim Bahgat and Dan Runfola (2021). 
+This repository contains the algorithm and simulation code for the paper: 
 
-The exact version that was used in the original article, is currently undergoing bug fixes in order to be used for replication, but will be linked to here shortly: URL OF STABLE VERSION HERE. 
+- [Bahgat K, Runfola D (2021) Toponym-assisted map georeferencing: Evaluating the use of toponyms for the digitization of map collections. PLoS ONE 16(11): e0260039. https://doi.org/10.1371/journal.pone.0260039](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0260039). 
 
-For the latest version including possible fixes to these replication scripts, go to: https://github.com/karimbahgat/ToponymGeoreferencingPaper. 
+For the latest version including possible fixes to these replication scripts, go to: 
+
+- https://github.com/karimbahgat/ToponymGeoreferencingPaper. 
 
 ## Installation
 
-The code and packages in this repository works on Python 2.7. 
+The code and packages in this repository only works on Python 2.7. 
 
 The main package for map georeferencing is contained in the "automap" package folder. Note that the automap package is intended primarily for replicating the implementation and results used in the article -- a more user-friendly standalone georeferencing package may be announced at a later point. 
 
